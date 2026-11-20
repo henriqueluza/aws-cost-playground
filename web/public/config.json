@@ -1,0 +1,5 @@
+{
+  "apiBaseUrl": "http://localhost:8000",
+  "cognitoAuthority": "http://localhost:9229/local_pool",
+  "cognitoClientId": "local-client"
+}
