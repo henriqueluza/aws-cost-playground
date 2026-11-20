@@ -155,7 +155,7 @@ O nó fixo `client` (Internet) não tem categoria: ladrilho `--raised`, ícone `
 | Categoria × estado | 10,7 (operação × aviso) | 10,1 (operação × aviso) |
 | Referência: aviso × erro | 10,7 | 14,2 |
 
-Com deuteranopia e protanopia simuladas (Machado 2009), alguns pares se aproximam (verde × magenta, oliva × aviso). Nenhuma paleta de sete matizes evita isso. Por isso o ícone é o canal principal e a cor é reforço.
+Com deuteranopia e protanopia simuladas (Machado 2009), alguns pares se aproximam: verde × magenta, petróleo × magenta e, no pior caso, oliva de operação × aviso em protanopia no tema claro. Nenhuma paleta de sete matizes evita isso. Por isso o ícone é o canal principal da categoria e o texto é o canal principal do estado: o ladrilho de operação sempre tem o ícone `activity`, e o aviso nunca aparece sem palavra (pílula ou frase). A cor é reforço nos dois casos.
 
 ```css
 :root {
@@ -378,7 +378,7 @@ Os componentes ainda não existem. Esta seção fixa a anatomia e os estados que
 - **Anatomia fixa:** a mesma em todos os blocos, para que o olho ache cada coisa no mesmo lugar. Linha 1: ladrilho de `--tile-node` (`--cat-*-tint`, ícone de 16px em `--cat-*-ink`, `--radius-chip`) e nome do serviço em 14px/600. Linha 2: resumo do SKU em 12px mono `--muted` (`t4g.small · 2 AZ`). Linha 3: a cota, com `por mês` à esquerda em `--muted` e o valor em mono 14px à direita.
 - **Texto longo:** nome e resumo do SKU ficam numa linha, com reticências e o texto completo em tooltip e no `aria-label`. O valor da cota nunca é cortado. Se não couber, `por mês` some primeiro e o valor ocupa a linha (até `US$ 9.999.999,99` cabe nos 192px internos).
 - **Selecionado:** borda de 2px em `--accent`, desenhada como `outline` para o bloco não mudar de tamanho.
-- **Foco (teclado):** anel `--focus` de 2px com `--focus-offset-node`, fora da borda de seleção.
+- **Foco (teclado):** anel `--focus` de 2px a `--focus-offset-node` do bloco, fora da borda de seleção. Os 3px entre o anel e o bloco ficam sempre em `--surface`, então um bloco selecionado e focado mostra duas linhas de tinta separadas por uma faixa da folha. A Issue do editor confere isso na tela renderizada, com zoom de 200%.
 - **Em arraste:** `--shadow-float`, sem mudar de escala.
 - **Custo zero (IAM, CloudFormation, ECS):** a cota mostra `US$ 0,00` em `--muted`. No ECS vem `custo no EC2` como meta.
 - **Teclado:** Tab percorre os blocos na ordem de leitura; setas movem 8px (Shift + setas, 40px); Enter abre o inspetor; Delete apaga; Ctrl/Cmd+Z desfaz e Shift+Ctrl/Cmd+Z refaz. Seleção múltipla, foco em aresta e os demais atalhos ficam para a Issue do editor, que deve cumprir a WCAG 2.1.1.
@@ -387,7 +387,7 @@ Os componentes ainda não existem. Esta seção fixa a anatomia e os estados que
 - A cota de aresta é uma etiqueta no meio do traço: mono 12px/500, fundo `--surface`, borda `--border`, `--radius-chip`, padding de 2px por 6px.
 - Arestas `data` e `logs` sempre mostram a cota, mesmo com `US$ 0,00`. Arestas `runs-on` não têm cota, porque o custo está no EC2.
 - **Colisão:** a etiqueta fica acima das arestas e abaixo dos blocos. Se cobrir um bloco ou outra etiqueta, ela desliza ao longo do traço, entre 25% e 75% do comprimento. Em aresta com menos de 48px visíveis, a etiqueta só aparece no hover, no foco e na seleção; o valor continua na lista por aresta do painel de custo.
-- **Aresta selecionada:** traço de 2px em `--accent`.
+- **Aresta selecionada:** traço de 2px em `--accent` e um ponto de 6px em `--accent` em cada ponta, para a seleção não depender só da espessura.
 - **Sem arraste obrigatório (WCAG 2.5.7):** toda aresta também se cria pelo inspetor do bloco de origem ("Conectar a…", com uma lista de destinos e o tipo da aresta).
 
 ### Carimbo (assinatura)
@@ -413,7 +413,7 @@ Cada valor de uso no inspetor (e na aresta) diz de onde veio, por forma e não s
 - **Forma:** `--control-height`, `--radius-control`, padding de 0 a 12px, 14px/500. Botões de ícone com 32 × 32, ícone de 16px, `aria-label` e tooltip.
 - **Primário:** `--primary` com `--primary-ink`. Um por tela. Hover em `--primary-hover`.
 - **Secundário:** `--surface` com borda `--control` e texto `--text`. Hover em `--raised`.
-- **Terciário:** só texto, em `--text`, com sublinhado no hover.
+- **Terciário:** só texto, em `--text`, com sublinhado permanente de 1px (`text-underline-offset: 2px`) que engrossa para 2px no hover. Com a interação em tinta, o sublinhado é o que mostra que o texto clica ("Tentar de novo", "Baixar o JSON").
 - **Destrutivo:** texto ou contorno em `--negative`, sempre com confirmação que nomeia o objeto ("Apagar o design Loja v2?").
 - **Pressionado:** escala 0,97 em `--t-press`.
 
@@ -430,6 +430,7 @@ Cada valor de uso no inspetor (e na aresta) diz de onde veio, por forma e não s
 ### Abas e navegação
 - Abas de 14px/500; a ativa em 600 e com sublinhado de 2px em `--accent`, que passa 8px de cada lado do rótulo, sobre uma régua `--rule` de 1px. Seguem o padrão de abas da WAI-ARIA: setas trocam de aba e Tab entra no painel.
 - Item ativo de lista ou menu: fundo `--active`, sem barra lateral colorida.
+- **Links:** todo link fora de botão, aba ou item de menu é `--accent` com sublinhado permanente de 1px (`text-underline-offset: 2px`), que engrossa para 2px no hover. Nunca um link só com cor ou só com sublinhado no hover (WCAG 1.4.1). Vale para as páginas de texto e para os links dentro de painéis e mensagens.
 
 ### Estados
 
@@ -478,6 +479,7 @@ Transições curtas em CSS, só de cor, opacidade e `transform`. Números nunca 
 ### Don't:
 - **Don't** colorir custo: nada de vermelho para caro nem de verde para barato.
 - **Don't** usar matiz para seleção, foco, aba ativa ou link: são tinta.
+- **Don't** deixar link ou botão terciário sem sublinhado permanente; em tinta, o sublinhado é o que diz que o texto clica.
 - **Don't** criar um verde de sucesso; o sucesso se diz em texto.
 - **Don't** usar ladrilho colorido fora do bloco do canvas e da paleta.
 - **Don't** usar o laranja da marca AWS, o logotipo da AWS ou os ícones oficiais de arquitetura como identidade.
