@@ -7,15 +7,15 @@ Os guardrails que vivem no código (quotas, limites de entrada, `max_tokens`, ti
 ## Antes de começar
 
 - **Quem:** o autor, com acesso de administrador à conta AWS e de administrador da organização no Console da Anthropic.
-- **Quando:** antes do primeiro deploy de produção; de novo a cada troca de modelo ou de quota da LLM; e na revisão mensal (seção "Verificação mensal").
-- **Pré-requisito:** a infra de cada ambiente já aplicada (funções, papéis e buckets existem).
-- **Placeholders:** tudo entre `< >` é substituído na hora de rodar e nunca é escrito de volta neste arquivo, em Issue ou em commit. `<ACCOUNT_ID>` é o id da conta; `<env>` é `staging` ou `production`; `<pfx>` é `acp-stg` ou `acp-prod`. Os nomes reais de função, papel, API e bucket saem do `terraform output` de cada ambiente.
+- **Quando:** por ambiente, depois do primeiro `apply` dele e antes de liberar o uso. Staging primeiro; produção antes de gravar a chave real no SSM de produção. Repita a cada troca de modelo ou de quota da LLM e na revisão mensal (seção "Verificação mensal").
+- **Pré-requisito:** a infra do ambiente já aplicada (funções, papéis e buckets existem). Se o papel de produção ainda não existir, crie a ação do Budgets só com o de staging e acrescente o de produção depois (passos 4 e 5).
+- **Placeholders:** tudo entre `< >` é substituído na hora de rodar e nunca é escrito de volta neste arquivo, em Issue ou em commit. `<ACCOUNT_ID>` é o id da conta; `<env>` é `staging` ou `production`. Os nomes reais de função, papel, API e bucket saem do `terraform output` de cada ambiente.
 
 > **Drift com o Terraform.** O `apply` volta ao valor do código todo atributo que o Terraform gerencia, mesmo os que o módulo não declara. Exemplos: a concorrência reservada da Lambda (o padrão é "sem reserva"), as variáveis de ambiente e as políticas do papel, se o módulo usar anexação exclusiva. Staging é aplicado a cada merge em `main`, e o `plan-guard` só barra `delete` e `replace`: a reversão é silenciosa. Por isso:
 >
 > - o que é variável do Terraform (limite de taxa, retenção de logs) muda por PR, nunca só no console;
-> - o que é manual só sobrevive se o módulo deixar o atributo em paz. O módulo das funções (#18) precisa de `ignore_changes = [reserved_concurrent_executions]` e não pode usar anexação exclusiva no papel do proxy (`managed_policy_arns` ou `aws_iam_role_policy_attachments_exclusive`); senão, o `apply` desfaz o corte do Budgets no meio dele. O nome do papel também precisa ser estável, porque a ação do Budgets aponta para ele;
-> - confira o plano de **todo** PR de infra. Se um desses atributos aparecer como alteração, não faça merge: abra Issue.
+> - o que é manual só sobrevive se o módulo deixar o atributo em paz. Os requisitos para o módulo das funções estão comentados na #18: ignorar `reserved_concurrent_executions`, não usar anexação exclusiva de políticas no papel do proxy (senão o `apply` desfaz o corte do Budgets) e manter estável o nome do papel, para o qual a ação do Budgets aponta;
+> - confira o plano de **todo** PR de infra. Se um desses atributos aparecer como alteração, não faça merge: abra Issue. Durante um corte, confira depois de cada `apply` que a política continua anexada (`aws iam list-attached-role-policies`).
 
 ## Resumo
 
@@ -48,9 +48,11 @@ aws lambda get-account-settings \
 
   A reserva só dura se o módulo das funções ignorar `reserved_concurrent_executions` (ver "Drift com o Terraform"). Confira depois de cada `apply` com `aws lambda get-function-concurrency --function-name <função>`.
 
+  Com a reserva, o gargalo real passa a ser a Lambda, não o limite de taxa do passo 2. Uma estimativa pode levar até 29 s, então duas simultâneas já ocupam a reserva de produção, e a terceira recebe erro (nem o 429 do API Gateway, nem o 503 tratado). Com um usuário no lançamento, isso é aceitável; suba a reserva se aparecer erro de throttle no alarme do proxy.
+
 - **Limite menor:** não reserve. Se quiser, peça aumento em Service Quotas → AWS Lambda → "Concurrent executions" (código `L-B99A9384`; o pedido é gratuito) e volte a este passo quando aprovado.
 
-Concorrência reservada não tem custo. Não a confunda com **concorrência provisionada** (provisioned concurrency), que é cobrada e seria custo fixo, proibido pelo ADR.
+Concorrência reservada não tem custo; a **provisionada** é cobrada e seria custo fixo, proibido pelo ADR.
 
 ## 2. Limite de taxa no API Gateway
 
@@ -62,8 +64,9 @@ O limite é da rota, não de cada usuário: um usuário insistente pode fazer os
 
 **Conferir** depois do deploy de cada ambiente:
 
+`<API_ID>` sai do `terraform output` do ambiente (ou da lista de `aws apigatewayv2 get-apis --query 'Items[].[Name,ApiId]' --output table`).
+
 ```bash
-aws apigatewayv2 get-apis --query "Items[?starts_with(Name, '<pfx>')].[Name,ApiId]" --output table
 aws apigatewayv2 get-routes --api-id <API_ID> --query 'Items[].RouteKey'
 aws apigatewayv2 get-stage --api-id <API_ID> --stage-name '<stage>' \
   --query '[DefaultRouteSettings,RouteSettings]'
@@ -91,9 +94,7 @@ IAM → Policies → Create policy → JSON, nome `acp-llm-proxy-corte`:
 }
 ```
 
-Com ela anexada, o proxy perde toda chamada à AWS, exceto escrever log: não lê a chave no SSM e não consome a quota no DynamoDB. A quota é consumida **antes** da chamada à Claude API: é a ordem do ADR ("Fluxo da estimativa de carga", passo 2) e um critério de aceite da rota de estimativa (#62). Por isso a requisição falha antes de chegar à Anthropic, mesmo num ambiente quente que já tenha a chave em memória. Os logs continuam, para diagnosticar.
-
-O corte depende de o proxy **falhar fechado**: um erro do DynamoDB ao consumir a quota, inclusive `AccessDenied`, precisa encerrar a requisição sem chamar a LLM. Um cache local de quota ou um `try/except` que siga em frente abririam a brecha.
+Com ela anexada, o proxy perde toda chamada à AWS, exceto escrever log: não lê a chave no SSM e não consome a quota no DynamoDB. A quota é consumida **antes** da chamada à Claude API: é a ordem do ADR ("Fluxo da estimativa de carga", passo 2) e um critério de aceite da rota de estimativa (#62). Por isso a requisição falha antes de chegar à Anthropic, mesmo num ambiente quente que já tenha a chave em memória. Isso só vale se o proxy **falhar fechado**: um erro do DynamoDB ao consumir a quota, inclusive `AccessDenied`, precisa encerrar a requisição sem chamar a LLM (pedido comentado na #62). Os logs continuam, para diagnosticar. Durante o corte, `GET /quota`, que também vai para o proxy (#19), falha junto.
 
 **Teste em staging antes de confiar no corte:**
 
@@ -181,10 +182,11 @@ Custo: monitorar e alertar é gratuito, e os dois primeiros orçamentos com aç�
 
 **Teste ponta a ponta do corte (staging, uma vez):** o teste do passo 3 não prova que o Budgets consegue assumir `acp-budgets-acao`. Se a trust policy estiver errada, o corte só falha no dia em que for necessário.
 
-1. Crie um segundo orçamento, `acp-teste-corte`, mensal, com valor fixo **abaixo** do gasto real já registrado no mês (veja no Cost Explorer; se o gasto for zero, espere haver algum).
-2. Anexe uma ação igual à do item 4, mas só com `<papel-llm-proxy-stg>`, gatilho real em 100% e execução automática.
-3. Espere a próxima atualização do Budgets (até 12 horas). Confira que a ação executou, que a política aparece em `aws iam list-attached-role-policies --role-name <papel-llm-proxy-stg>` e que uma estimativa em staging falha.
-4. Reverta a ação (seção "Reverter o corte do Budgets") e **apague** `acp-teste-corte`, para não ficar com dois orçamentos com ação.
+1. Confira que `acp-conta-mensal` é o único orçamento com ação na conta; com o de teste, serão dois, ainda gratuitos.
+2. Crie `acp-teste-corte`, mensal, com valor fixo **abaixo** do gasto real já registrado no mês (veja no Cost Explorer; se o gasto for zero, espere haver algum).
+3. Anexe uma ação igual à do item 4, mas só com `<papel-llm-proxy-stg>`, gatilho real em 100% e execução automática.
+4. Espere a próxima atualização do Budgets (até 12 horas). Confira que a ação executou, que a política aparece em `aws iam list-attached-role-policies --role-name <papel-llm-proxy-stg>` e que uma estimativa em staging falha.
+5. No mesmo dia, reverta a ação com o passo 2 de "Reverter o corte do Budgets", trocando o nome por `--budget-name acp-teste-corte`. Confira com `list-attached-role-policies` que a política saiu de `<papel-llm-proxy-stg>` e **apague** `acp-teste-corte`, para não esquecer uma ação que corta staging.
 
 **Importante:** o gasto com a Claude API não aparece na fatura da AWS, e o Budgets não o vê. O teto da LLM é o passo 8.
 
@@ -197,7 +199,7 @@ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/acp- \
   --query 'logGroups[].[logGroupName,retentionInDays]' --output table
 ```
 
-Confira também o grupo do log de acesso do API Gateway (#19; nome no `terraform output`). Se um grupo estiver sem retenção ou com valor diferente de 7:
+Confira também o grupo do log de acesso do API Gateway (#19; retenção por variável e nome no `terraform output` foram pedidos em comentário na Issue). Se um grupo estiver sem retenção ou com valor diferente de 7:
 
 - **ele está no Terraform:** corrija a variável por PR;
 - **ele não está:** foi criado pela própria AWS (a Lambda cria o seu na primeira invocação, se o Terraform não o criou antes). Ajuste com `aws logs put-retention-policy --log-group-name <grupo> --retention-in-days 7` e abra Issue para o módulo passar a criá-lo.
@@ -256,13 +258,13 @@ Use quando houver suspeita de abuso, chave vazada, gasto sem explicação ou o w
 
 **Desligar (emergência):**
 
-1. Lambda → `<função-llm-proxy-<env>>` → Configuration → Environment variables → Edit.
+1. Lambda → `<função-llm-proxy>` do ambiente → Configuration → Environment variables → Edit.
 2. Mude só `LLM_ENABLED` para `false` e salve.
 3. Confira: uma estimativa com conta de teste recebe 503, e o uso no Console da Anthropic para de subir.
 
 Não use `aws lambda update-function-configuration --environment` para isso: o comando substitui **todas** as variáveis da função pelas que você passar.
 
-**Por quanto tempo vale:** até o próximo `apply` daquele ambiente, que volta o valor do Terraform (em staging, o próximo merge em `main`). Para manter desligado além disso, abra um PR que mude a variável no Terraform do ambiente.
+**Por quanto tempo vale:** até o próximo `apply` daquele ambiente, que volta o valor do Terraform (em staging, o próximo merge em `main`; em produção, o próximo deploy disparado). Enquanto o proxy precisar ficar desligado, não faça merge em `main` nem dispare o deploy de produção. Se for durar mais de um dia, abra um PR que mude a variável no Terraform do ambiente.
 
 **Religar:** volte `LLM_ENABLED` para `true` no console (ou reverta o PR) e faça uma estimativa de teste.
 
@@ -288,6 +290,7 @@ Não use `aws lambda update-function-configuration --environment` para isso: o c
 3. **Confira** que a política saiu dos dois papéis:
 
    ```bash
+   aws iam list-attached-role-policies --role-name <papel-llm-proxy-stg>
    aws iam list-attached-role-policies --role-name <papel-llm-proxy-prod>
    ```
 
