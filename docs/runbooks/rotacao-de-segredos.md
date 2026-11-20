@@ -20,14 +20,14 @@ Rotacione **staging primeiro**, confirme, e só então produção.
 
 ## Rotação planejada (sem indisponibilidade)
 
-A ordem importa: a chave antiga só é revogada depois que a nova está em uso.
+A ordem importa: a chave antiga só é excluída depois que a nova está em uso. No Console, **Disable** é reversível e **Delete** é permanente.
 
-1. **Crie a chave nova.** Console da Anthropic → workspace `acp-<env>` → API keys → Create key. Nome `acp-<env>-<aaaa-mm>`, para saber depois qual é a corrente. Copie o valor uma única vez.
+1. **Crie a chave nova.** Console da Anthropic (`platform.claude.com`) → API keys → Create key, com **escopo do workspace** `acp-<env>`. Uma chave sem escopo de workspace não fica sob o limite de gasto do ambiente e exigiria o cabeçalho `anthropic-workspace-id` em cada chamada. Nome `acp-<env>-<aaaa-mm>`, para saber depois qual é a corrente. Copie o valor uma única vez.
 2. **Grave no SSM pelo console da AWS.** Systems Manager → Parameter Store → `/acp/<env>/anthropic-api-key` → Edit → cole o valor → Save. Mantenha o tipo `SecureString` e a chave KMS padrão.
 
    Prefira o console à CLI: `aws ssm put-parameter --value ...` deixa o valor no histórico do shell e na lista de processos.
 
-3. **Faça o proxy ler a chave nova.** O proxy pode manter a chave em memória enquanto o ambiente de execução estiver quente. Para descartar os ambientes antigos, publique uma mudança de configuração inócua:
+3. **Faça o proxy ler a chave nova.** O proxy pode manter a chave em memória enquanto o ambiente de execução estiver quente. Publique uma mudança de configuração inócua; depois dela, as invocações rodam com a configuração nova:
 
    ```bash
    aws lambda update-function-configuration --function-name <função-llm-proxy-<env>> \
@@ -37,21 +37,20 @@ A ordem importa: a chave antiga só é revogada depois que a nova está em uso.
 
    A descrição volta ao valor do Terraform no próximo `apply`, sem efeito.
 
-4. **Confira que a nova está em uso.** Faça uma estimativa com uma conta de teste do ambiente. No Console da Anthropic, a chave nova passa a mostrar uso.
-5. **Revogue a antiga.** Console da Anthropic → API keys → chave anterior → desative e depois exclua.
-6. **Confira de novo:** outra estimativa de teste funciona, e a chave antiga não registra uso novo.
-7. **Registre** a data da rotação na Issue de operação do mês (sem nenhum valor).
-
-Se o passo 4 falhar, **não revogue a antiga**. Confira se a chave nova é do workspace certo e foi colada inteira; se preciso, crie outra e repita do passo 2. O Parameter Store guarda as versões anteriores do parâmetro (aba History), caso precise voltar.
+4. **Teste:** faça uma estimativa com uma conta de teste do ambiente.
+5. **Desative a antiga** (Disable, reversível). Console → API keys → chave anterior → Disable.
+6. **Teste de novo.** Se a estimativa funciona com a antiga desativada, a nova está em uso. Se falha, reative a antiga, confira se a nova tem o escopo certo e foi colada inteira, e repita do passo 2 (o Parameter Store guarda as versões anteriores na aba History).
+7. **Exclua a antiga** (Delete, permanente) e confira nas páginas Usage e Logs do Console que o workspace segue com uso normal.
+8. **Registre** a data da rotação na Issue de operação do mês (sem nenhum valor).
 
 ## Vazamento
 
 Trate como incidente. Velocidade importa mais que disponibilidade: o proxy pode ficar fora enquanto você troca a chave.
 
-1. **Revogue a chave vazada já.** Console da Anthropic → workspace do ambiente → API keys → desative a chave. Não espere ter a nova pronta.
+1. **Desative a chave vazada já.** Console da Anthropic → API keys → Disable. Não espere ter a nova pronta. Se o aviso veio por e-mail da Anthropic porque a chave apareceu num repositório público do GitHub, ela já foi desativada automaticamente: siga do passo 2.
 2. **Desligue o proxy de forma limpa:** `LLM_ENABLED=false` no ambiente afetado ([guardrails de custo](guardrails-de-custo.md), "Interruptor manual"). Assim o usuário recebe 503 em vez de erro de autenticação.
-3. **Contenha o gasto:** baixe temporariamente o limite de gasto do workspace e confira, no uso do Console, se houve consumo que não veio do proxy (horário, modelo, volume).
-4. **Crie e instale a chave nova:** passos 1 a 4 da rotação planejada. Religue com `LLM_ENABLED=true` e faça uma estimativa de teste.
+3. **Contenha o gasto:** baixe temporariamente o limite de gasto do workspace e confira, nas páginas Usage e Logs do Console, se houve consumo que não veio do proxy (horário, modelo, volume).
+4. **Crie e instale a chave nova:** passos 1 a 3 da rotação planejada. Religue com `LLM_ENABLED=true`, faça uma estimativa de teste e então exclua (Delete) a chave vazada.
 5. **Ache a origem do vazamento:**
    - Repositório: `gitleaks git` (ou `gitleaks detect` em versões antigas) no histórico local. Se a chave entrou num commit, a rotação já resolve o risco; reescrever o histórico exige `push --force`, que é decisão só do autor e não de agente.
    - Logs: busque nos grupos `acp-` do CloudWatch (Logs Insights) pelo começo fixo que toda chave da Anthropic tem, sem colar nenhuma chave inteira no terminal.
@@ -65,6 +64,6 @@ Se a chave vazada for a de staging, produção não é afetada, porque usa outra
 ## Verificação
 
 - [ ] Cada ambiente usa uma chave do próprio workspace, criada há menos de 90 dias.
-- [ ] Nenhuma chave antiga ativa no Console da Anthropic.
+- [ ] Nenhuma chave antiga ativa no Console da Anthropic, e toda chave do projeto com escopo de workspace.
 - [ ] O parâmetro de cada ambiente é `SecureString`, e só o papel do `llm-proxy` tem `ssm:GetParameter` nele.
 - [ ] Nenhum valor de chave em repositório, Issue, log ou histórico do shell.

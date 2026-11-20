@@ -28,7 +28,7 @@ Os guardrails que vivem no código (quotas, limites de entrada, `max_tokens`, ti
 
 ## 1. Quota de concorrência da conta
 
-Contas novas costumam nascer com limite de 10 execuções concorrentes, e a AWS exige manter 100 não reservadas. Nesse caso não dá para reservar concorrência, e o limite de taxa do passo 2 é a contenção.
+Contas novas nascem com quota de concorrência reduzida (o ADR cita 10), e a AWS exige manter pelo menos 100 execuções não reservadas. Nesse caso não dá para reservar concorrência, e o limite de taxa do passo 2 é a contenção.
 
 ```bash
 aws lambda get-account-settings \
@@ -42,9 +42,9 @@ aws lambda get-account-settings \
   aws lambda put-function-concurrency --function-name <função-llm-proxy-stg> --reserved-concurrent-executions 1
   ```
 
-- **Limite menor:** não reserve. Se quiser, peça aumento em Service Quotas → AWS Lambda → "Concurrent executions" (o pedido é gratuito) e volte a este passo quando aprovado.
+- **Limite menor:** não reserve. Se quiser, peça aumento em Service Quotas → AWS Lambda → "Concurrent executions" (código `L-B99A9384`; o pedido é gratuito) e volte a este passo quando aprovado.
 
-Não confunda com **concorrência provisionada** (provisioned concurrency): ela é cobrada por hora e seria custo fixo, que o ADR proíbe.
+Concorrência reservada não tem custo. Não a confunda com **concorrência provisionada** (provisioned concurrency), que é cobrada e seria custo fixo, proibido pelo ADR.
 
 ## 2. Limite de taxa no API Gateway
 
@@ -61,7 +61,7 @@ aws apigatewayv2 get-stage --api-id <API_ID> --stage-name '<stage>' \
   --query '[DefaultRouteSettings,RouteSettings]'
 ```
 
-`<stage>` costuma ser `$default` (as aspas simples evitam que o shell expanda o `$`). Repita para os dois ambientes. Requisição acima do limite recebe 429 sem invocar a Lambda.
+`<stage>` costuma ser `$default` (as aspas simples evitam que o shell expanda o `$`). Repita para os dois ambientes. Requisição acima do limite recebe 429 sem invocar a Lambda. Se o comando recusar o stage por ser gerenciado pela criação rápida (`ApiGatewayManaged`), abra Issue para o módulo criar o stage explicitamente.
 
 ## 3. Política de negação do `llm-proxy`
 
@@ -111,7 +111,10 @@ IAM → Roles → Create role → Custom trust policy, nome `acp-budgets-acao`:
       "Effect": "Allow",
       "Principal": { "Service": "budgets.amazonaws.com" },
       "Action": "sts:AssumeRole",
-      "Condition": { "StringEquals": { "aws:SourceAccount": "<ACCOUNT_ID>" } }
+      "Condition": {
+        "StringEquals": { "aws:SourceAccount": "<ACCOUNT_ID>" },
+        "ArnLike": { "aws:SourceArn": "arn:aws:budgets::<ACCOUNT_ID>:budget/*" }
+      }
     }
   ]
 }
@@ -138,14 +141,14 @@ Política em linha do papel:
 }
 ```
 
-Não use a política gerenciada genérica de ações do Budgets: ela também permite parar EC2 e RDS e aplicar SCP na conta inteira.
+A condição na trust policy evita que outra conta use o Budgets para assumir o papel (confused deputy). Não há política gerenciada que sirva aqui: a do papel de execução do Budgets só cobre EC2 e RDS e não tem `iam:AttachRolePolicy`. Quem cria a ação no console precisa de `iam:PassRole` para este papel; o administrador da conta já tem.
 
 ## 5. AWS Budgets: orçamento, alertas e ação de corte
 
 Billing and Cost Management → Budgets → Create budget → Customize → Cost budget.
 
 1. **Orçamento:** nome `acp-conta-mensal`, período mensal, recorrente, valor fixo de US$ 20, escopo de todos os serviços (staging e produção dividem a conta).
-2. **Opções avançadas:** desmarque **Credits** e **Refunds**. Com créditos incluídos, o gasto líquido fica em zero enquanto os créditos duram e nenhum alerta dispara.
+2. **Créditos fora da conta:** o orçamento inclui créditos por padrão (`IncludeCredit` é `true` na API). Com créditos incluídos, o gasto medido cai pelo valor dos créditos e os alertas atrasam ou não disparam enquanto eles duram. Em Budget scope, exclua o tipo de cobrança *Credit* (e *Refund*) e não use a agregação *net unblended*, que já desconta créditos.
 3. **Alertas por e-mail** (para `<seu-e-mail>`):
 
    | Gatilho | Limite | Para quê |
@@ -160,7 +163,9 @@ Billing and Cost Management → Budgets → Create budget → Customize → Cost
    - Papel de execução: `acp-budgets-acao`.
    - Execução: **automática**, sem aprovação. Notificar o mesmo e-mail.
 
-Os dados do Budgets atrasam horas: ele é rede de segurança, não controle em tempo real. Por isso o corte é em 80%, e não em 100%. O controle em tempo real são as quotas no código.
+Os dados do Budgets atualizam até três vezes por dia, com 8 a 12 horas entre uma atualização e outra: ele é rede de segurança, não controle em tempo real. Por isso o corte é em 80%, e não em 100%. O controle em tempo real são as quotas no código.
+
+Custo: monitorar e alertar é gratuito, e os dois primeiros orçamentos com ação também; este runbook usa um. Do terceiro em diante, cada orçamento com ação custa US$ 0,10 por dia.
 
 **Importante:** o gasto com a Claude API não aparece na fatura da AWS, e o Budgets não o vê. O teto da LLM é o passo 8.
 
@@ -213,9 +218,9 @@ A regra apaga só versões **antigas** (não correntes) e uploads incompletos. O
 
 É o único teto real do gasto com a LLM. Cada ambiente tem o seu workspace e a sua chave (ADR, "Hospedagem e ambientes").
 
-1. Console da Anthropic → Settings → Workspaces → crie `acp-staging` e `acp-production`, se ainda não existirem.
-2. Em cada workspace → Limits → defina o limite mensal de gasto: **production US$ 20** (o pior caso com a quota global cheia é cerca de US$ 13 com `claude-haiku-5-5`) e **staging US$ 5**.
-3. Confira que a chave usada por cada ambiente foi criada dentro do workspace certo (ver [rotação de segredos](rotacao-de-segredos.md)).
+1. Console da Anthropic (`platform.claude.com`) → Settings → Workspaces → crie `acp-staging` e `acp-production`, se ainda não existirem. Não use o Default Workspace: o limite dele pode não contar parte do uso.
+2. Settings → Spend limits → em **Workspace limits**, escolha o workspace na lista → Set limit. Valores: **production US$ 20/mês** (o pior caso com a quota global cheia é cerca de US$ 13 com `claude-haiku-5-5`) e **staging US$ 5/mês**.
+3. Confira que a chave de cada ambiente tem escopo do workspace certo (ver [rotação de segredos](rotacao-de-segredos.md)). Uma chave sem escopo de workspace não fica sob o limite.
 
 Ao atingir o limite, a Claude API recusa as chamadas daquele workspace até o mês virar ou o limite subir; o proxy devolve erro tratado. Trocar de modelo muda o custo em até 40 vezes: antes de qualquer troca, refaça a conta e reveja este limite.
 
@@ -241,6 +246,8 @@ Não use `aws lambda update-function-configuration --environment` para isso: o c
 
 **Sintoma:** o e-mail do Budgets avisa que a ação rodou, e os logs do proxy mostram `AccessDenied`.
 
+**Atenção:** depois de revertida, o Budgets não avalia mais a ação no resto do período. O corte fica **desarmado até o mês virar**, e o que protege no resto do mês são as quotas, o limite de taxa, o limite do workspace da Anthropic e o interruptor `LLM_ENABLED`.
+
 1. **Entenda a causa antes de reverter.** Cost Explorer → custo por serviço nos últimos dias. Se a causa continua ativa, reverter só devolve o gasto; deixe `LLM_ENABLED=false` enquanto investiga.
 2. **Reverta a ação:** Budgets → `acp-conta-mensal` → Actions → selecione a ação → Reverse. Pela CLI:
 
@@ -261,12 +268,12 @@ Não use `aws lambda update-function-configuration --environment` para isso: o c
    Se ela ainda estiver lá, desanexe à mão com `aws iam detach-role-policy` (mesmos argumentos do teste do passo 3).
 
 4. **Teste** uma estimativa com conta de teste em cada ambiente.
-5. **Decida o resto do mês:** o gasto continua acima de 80%. Se a causa foi resolvida e o mês ainda cabe no teto, siga; se não, mantenha `LLM_ENABLED=false` até o mês virar. Mudar o valor do orçamento ou o limite do corte é decisão do autor, registrada no ADR.
+5. **Decida o resto do mês:** o gasto continua acima de 80%. Se a causa foi resolvida e o mês ainda cabe no teto, siga; se não, mantenha `LLM_ENABLED=false` até o mês virar. Para rearmar o corte no mesmo mês há `--execution-type RESET_BUDGET_ACTION`, mas com o gasto acima do limite ele dispara de novo: só faz sentido depois de subir o limite do corte. Mudar o valor do orçamento ou o limite do corte é decisão do autor, registrada no ADR.
 
 ## Verificação mensal
 
 - [ ] Fatura do mês anterior abaixo de US$ 20, e o gasto da Anthropic abaixo do limite de cada workspace.
-- [ ] `acp-conta-mensal` com os 3 alertas e a ação em estado de espera (`STANDBY`).
+- [ ] `acp-conta-mensal` com os 3 alertas e a ação em espera (`STANDBY`) no começo do mês. Se ela ainda estiver revertida, rearme com `RESET_BUDGET_ACTION`.
 - [ ] `acp-llm-proxy-corte` **não** anexada a nenhum papel fora de um corte em andamento.
 - [ ] Todos os grupos de log `acp-` com retenção de 7 dias.
 - [ ] Throttling dos stages e lifecycle dos buckets iguais aos deste runbook (nada desfeito por `apply`).
