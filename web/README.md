@@ -20,6 +20,14 @@ npm run dev   # servidor de desenvolvimento do Vite
 npx prettier --check . && npx eslint . && npx tsc --noEmit && npm test -- --run && npm run build
 ```
 
+### Lint de arquitetura
+
+As regras de import do ADR-0001 são verificadas pelo `npx eslint .` (config em `eslint.config.js`) e pelo teste `src/architecture.test.ts`:
+
+- Uma feature só importa outra feature pelo `index.ts` dela.
+- `app/` e as features podem importar `shared/`; `shared/` não importa feature nem `app/`.
+- `**/application/**` e `**/model/**` não importam `react`, `react-dom`, `@xyflow/*` nem `shared/lib/http` (motor de preço puro).
+
 ## Configuração de runtime (`/config.json`)
 
 O build é o mesmo em todos os ambientes. O que muda por ambiente é o arquivo `/config.json`, buscado na inicialização (sem cache) e validado com zod. O deploy sobrescreve o arquivo de cada ambiente; `public/config.json` traz só valores de desenvolvimento.
