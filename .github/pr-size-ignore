@@ -31,3 +31,6 @@
 **/*.png
 **/*.jpg
 **/*.ico
+
+# Preços gerados pelo pipeline pricing/
+web/public/prices/**
