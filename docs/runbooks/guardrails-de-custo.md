@@ -1,6 +1,6 @@
 # Runbook — guardrails de custo
 
-Tudo o que o autor configura **à mão** na conta AWS e no Console da Anthropic para que o projeto fique abaixo do teto de US$ 20/mês de hospedagem e do limite de gasto da Claude API. Nenhum item deste runbook é automatizado, por decisão do Gate 1 ([ADR-0001](../architecture/aws-cost-playground/ADR-0001-stack.md), seção "Guardrails de custo").
+Tudo o que o autor configura na conta AWS e no Console da Anthropic para que o projeto fique abaixo do teto de US$ 20/mês de hospedagem e do limite de gasto da Claude API. Nenhuma configuração de custo é automatizada, por decisão do Gate 1 ([ADR-0001](../architecture/aws-cost-playground/ADR-0001-stack.md), seção "Guardrails de custo"). Dois valores são variáveis dos módulos de infra, com o valor escolhido pelo autor em cada ambiente: o limite de taxa (#19) e a retenção de logs (#18). Para esses, o runbook diz o valor sugerido e como conferir.
 
 Os guardrails que vivem no código (quotas, limites de entrada, `max_tokens`, timeouts) estão no ADR e não são configurados aqui.
 
@@ -11,18 +11,22 @@ Os guardrails que vivem no código (quotas, limites de entrada, `max_tokens`, ti
 - **Pré-requisito:** a infra de cada ambiente já aplicada (funções, papéis e buckets existem).
 - **Placeholders:** tudo entre `< >` é substituído na hora de rodar e nunca é escrito de volta neste arquivo, em Issue ou em commit. `<ACCOUNT_ID>` é o id da conta; `<env>` é `staging` ou `production`; `<pfx>` é `acp-stg` ou `acp-prod`. Os nomes reais de função, papel, API e bucket saem do `terraform output` de cada ambiente.
 
-> **Drift com o Terraform.** Se um módulo declarar o mesmo atributo que este runbook configura à mão (retenção de log, throttling do stage, lifecycle, concorrência reservada, variável de ambiente), o próximo `apply` volta o valor do código sem avisar. Staging é aplicado a cada merge em `main`. Depois de configurar, confira no plano do próximo PR de infra se algum desses atributos aparece como alteração; se aparecer, abra Issue para o módulo ignorar o atributo (`lifecycle { ignore_changes = [...] }`).
+> **Drift com o Terraform.** O `apply` volta ao valor do código todo atributo que o Terraform gerencia, mesmo os que o módulo não declara. Exemplos: a concorrência reservada da Lambda (o padrão é "sem reserva"), as variáveis de ambiente e as políticas do papel, se o módulo usar anexação exclusiva. Staging é aplicado a cada merge em `main`, e o `plan-guard` só barra `delete` e `replace`: a reversão é silenciosa. Por isso:
+>
+> - o que é variável do Terraform (limite de taxa, retenção de logs) muda por PR, nunca só no console;
+> - o que é manual só sobrevive se o módulo deixar o atributo em paz. O módulo das funções (#18) precisa de `ignore_changes = [reserved_concurrent_executions]` e não pode usar anexação exclusiva no papel do proxy (`managed_policy_arns` ou `aws_iam_role_policy_attachments_exclusive`); senão, o `apply` desfaz o corte do Budgets no meio dele. O nome do papel também precisa ser estável, porque a ação do Budgets aponta para ele;
+> - confira o plano de **todo** PR de infra. Se um desses atributos aparecer como alteração, não faça merge: abra Issue.
 
 ## Resumo
 
 | # | Guardrail | Onde | Valor sugerido |
 |---|---|---|---|
 | 1 | Quota de concorrência da conta | Lambda / Service Quotas | Verificar; reservar 2 (prod) e 1 (stg) no `llm-proxy` se a conta permitir |
-| 2 | Limite de taxa | API Gateway, stage de cada ambiente | `POST /estimates`: 1 req/s, rajada 5. Demais rotas: 10 req/s, rajada 20 |
+| 2 | Limite de taxa | Variável do módulo do API Gateway (#19) | `POST /estimates`: 1 req/s, rajada 5. Demais rotas: 10 req/s, rajada 20 |
 | 3 | Política de negação do `llm-proxy` | IAM | `acp-llm-proxy-corte` |
 | 4 | Papel de execução do Budgets | IAM | `acp-budgets-acao` |
 | 5 | Orçamento, alertas e ação de corte | AWS Budgets | US$ 20/mês; alertas em 25%, 50% e 100% previsto; corte em 80% real |
-| 6 | Retenção de logs | CloudWatch Logs | 7 dias |
+| 6 | Retenção de logs | Variável do módulo das funções (#18); conferir no CloudWatch Logs | 7 dias |
 | 7 | Lifecycle | S3 (site e artefatos) | Versões antigas após 30 dias, mantendo as 3 mais novas; multipart incompleto após 7 dias |
 | 8 | Limite de gasto | Console da Anthropic, por workspace | production US$ 20/mês; staging US$ 5/mês |
 
@@ -42,26 +46,30 @@ aws lambda get-account-settings \
   aws lambda put-function-concurrency --function-name <função-llm-proxy-stg> --reserved-concurrent-executions 1
   ```
 
+  A reserva só dura se o módulo das funções ignorar `reserved_concurrent_executions` (ver "Drift com o Terraform"). Confira depois de cada `apply` com `aws lambda get-function-concurrency --function-name <função>`.
+
 - **Limite menor:** não reserve. Se quiser, peça aumento em Service Quotas → AWS Lambda → "Concurrent executions" (código `L-B99A9384`; o pedido é gratuito) e volte a este passo quando aprovado.
 
 Concorrência reservada não tem custo. Não a confunda com **concorrência provisionada** (provisioned concurrency), que é cobrada e seria custo fixo, proibido pelo ADR.
 
 ## 2. Limite de taxa no API Gateway
 
-O HTTP API aceita limite padrão no stage e limite por rota. A quota global é de 300 estimativas por dia; 1 requisição por segundo em `POST /estimates` sobra para o uso legítimo e limita as invocações do proxy sob abuso.
+O limite por rota é variável do módulo do API Gateway (#19), com valor por ambiente em `infra/envs/<env>`. Mude por PR: o que for mudado só no console volta no próximo `apply`.
+
+Valores sugeridos, iguais nos dois ambientes: `POST /estimates` com 1 req/s e rajada 5; demais rotas com 10 req/s e rajada 20. A quota global é de 300 estimativas por dia. Com 1 req/s sobra folga para o uso legítimo, e as invocações do proxy ficam limitadas sob abuso. Requisição acima do limite recebe 429 sem invocar a Lambda.
+
+O limite é da rota, não de cada usuário: um usuário insistente pode fazer os outros receberem 429. Com um usuário no lançamento, isso é aceitável; reveja se aparecer reclamação.
+
+**Conferir** depois do deploy de cada ambiente:
 
 ```bash
 aws apigatewayv2 get-apis --query "Items[?starts_with(Name, '<pfx>')].[Name,ApiId]" --output table
-
-aws apigatewayv2 update-stage --api-id <API_ID> --stage-name '<stage>' \
-  --default-route-settings ThrottlingBurstLimit=20,ThrottlingRateLimit=10 \
-  --route-settings '{"POST /estimates":{"ThrottlingBurstLimit":5,"ThrottlingRateLimit":1}}'
-
+aws apigatewayv2 get-routes --api-id <API_ID> --query 'Items[].RouteKey'
 aws apigatewayv2 get-stage --api-id <API_ID> --stage-name '<stage>' \
   --query '[DefaultRouteSettings,RouteSettings]'
 ```
 
-`<stage>` costuma ser `$default` (as aspas simples evitam que o shell expanda o `$`). Repita para os dois ambientes. Requisição acima do limite recebe 429 sem invocar a Lambda. Se o comando recusar o stage por ser gerenciado pela criação rápida (`ApiGatewayManaged`), abra Issue para o módulo criar o stage explicitamente.
+`<stage>` costuma ser `$default` (as aspas simples evitam que o shell expanda o `$`). Cada chave de `RouteSettings` precisa ser idêntica a um `RouteKey` da lista, por exemplo `POST /estimates`. Uma chave diferente é aceita e não tem efeito.
 
 ## 3. Política de negação do `llm-proxy`
 
@@ -83,7 +91,9 @@ IAM → Policies → Create policy → JSON, nome `acp-llm-proxy-corte`:
 }
 ```
 
-Com ela anexada, o proxy perde toda chamada à AWS, exceto escrever log: não lê a chave no SSM e não consome a quota no DynamoDB. Como a quota é consumida **antes** da chamada à Claude API (ADR, "Fluxo da estimativa de carga", passo 2), a requisição falha antes de chegar à Anthropic, mesmo num ambiente quente que já tenha a chave em memória. Os logs continuam, para diagnosticar.
+Com ela anexada, o proxy perde toda chamada à AWS, exceto escrever log: não lê a chave no SSM e não consome a quota no DynamoDB. A quota é consumida **antes** da chamada à Claude API: é a ordem do ADR ("Fluxo da estimativa de carga", passo 2) e um critério de aceite da rota de estimativa (#62). Por isso a requisição falha antes de chegar à Anthropic, mesmo num ambiente quente que já tenha a chave em memória. Os logs continuam, para diagnosticar.
+
+O corte depende de o proxy **falhar fechado**: um erro do DynamoDB ao consumir a quota, inclusive `AccessDenied`, precisa encerrar a requisição sem chamar a LLM. Um cache local de quota ou um `try/except` que siga em frente abririam a brecha.
 
 **Teste em staging antes de confiar no corte:**
 
@@ -95,7 +105,7 @@ aws iam detach-role-policy --role-name <papel-llm-proxy-stg> \
   --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/acp-llm-proxy-corte
 ```
 
-A mudança de IAM leva alguns segundos para valer. Se o fluxo do proxy mudar (por exemplo, chamar a LLM antes de consumir a quota), refaça este teste.
+A mudança de IAM leva alguns segundos para valer. Este teste prova a política, não o Budgets: o teste ponta a ponta fica no fim do passo 5. Se o fluxo do proxy mudar (por exemplo, chamar a LLM antes de consumir a quota), refaça os dois testes.
 
 ## 4. Papel de execução do Budgets
 
@@ -157,6 +167,8 @@ Billing and Cost Management → Budgets → Create budget → Customize → Cost
    | Real | 50% (US$ 10) | Investigar no mesmo dia |
    | Previsto | 100% (US$ 20) | O mês vai estourar se nada mudar |
 
+   O alerta de previsão só funciona depois de cerca de 5 semanas de histórico de uso na conta. Até lá, quem cobre são os alertas de gasto real e o corte.
+
 4. **Ação** (Attach actions):
    - Tipo: IAM policy; política `acp-llm-proxy-corte`; papéis `<papel-llm-proxy-stg>` e `<papel-llm-proxy-prod>`.
    - Gatilho: custo **real** em **80%** (US$ 16).
@@ -167,30 +179,42 @@ Os dados do Budgets atualizam até três vezes por dia, com 8 a 12 horas entre u
 
 Custo: monitorar e alertar é gratuito, e os dois primeiros orçamentos com ação também; este runbook usa um. Do terceiro em diante, cada orçamento com ação custa US$ 0,10 por dia.
 
+**Teste ponta a ponta do corte (staging, uma vez):** o teste do passo 3 não prova que o Budgets consegue assumir `acp-budgets-acao`. Se a trust policy estiver errada, o corte só falha no dia em que for necessário.
+
+1. Crie um segundo orçamento, `acp-teste-corte`, mensal, com valor fixo **abaixo** do gasto real já registrado no mês (veja no Cost Explorer; se o gasto for zero, espere haver algum).
+2. Anexe uma ação igual à do item 4, mas só com `<papel-llm-proxy-stg>`, gatilho real em 100% e execução automática.
+3. Espere a próxima atualização do Budgets (até 12 horas). Confira que a ação executou, que a política aparece em `aws iam list-attached-role-policies --role-name <papel-llm-proxy-stg>` e que uma estimativa em staging falha.
+4. Reverta a ação (seção "Reverter o corte do Budgets") e **apague** `acp-teste-corte`, para não ficar com dois orçamentos com ação.
+
 **Importante:** o gasto com a Claude API não aparece na fatura da AWS, e o Budgets não o vê. O teto da LLM é o passo 8.
 
 ## 6. Retenção de logs
 
-7 dias em todos os grupos de log do projeto: limita custo e cumpre a LGPD (ADR, seção "Segurança").
+7 dias em todos os grupos de log do projeto: limita custo e cumpre a LGPD (ADR, seção "Segurança"). O módulo das funções (#18) cria um grupo por função com a retenção por variável. Defina 7 em cada ambiente e mude por PR. Aqui você só confere.
 
 ```bash
 aws logs describe-log-groups --log-group-name-prefix /aws/lambda/acp- \
   --query 'logGroups[].[logGroupName,retentionInDays]' --output table
-
-aws logs put-retention-policy --log-group-name <grupo> --retention-in-days 7
 ```
 
-Faça o mesmo nos grupos de access log do API Gateway (nome no `terraform output`). A Lambda cria o grupo sozinha, sem retenção, na primeira invocação se ele não existir: rode a listagem de novo depois do primeiro uso de cada função e na verificação mensal.
+Confira também o grupo do log de acesso do API Gateway (#19; nome no `terraform output`). Se um grupo estiver sem retenção ou com valor diferente de 7:
+
+- **ele está no Terraform:** corrija a variável por PR;
+- **ele não está:** foi criado pela própria AWS (a Lambda cria o seu na primeira invocação, se o Terraform não o criou antes). Ajuste com `aws logs put-retention-policy --log-group-name <grupo> --retention-in-days 7` e abra Issue para o módulo passar a criá-lo.
 
 ## 7. Lifecycle do S3
 
 Nos buckets do site e de artefatos de cada ambiente. **Não** aplique no bucket de estado do Terraform: ele é do `infra/bootstrap/`, e as versões antigas são a proteção do estado.
+
+Nenhum módulo declara lifecycle hoje (o do site, #14, não declara). Se um passar a declarar, ele vence, e esta configuração manual sai.
 
 `put-bucket-lifecycle-configuration` substitui a configuração inteira. Veja antes se já existe alguma regra e, se existir, junte as duas no mesmo arquivo:
 
 ```bash
 aws s3api get-bucket-lifecycle-configuration --bucket <bucket>
 ```
+
+O erro `NoSuchLifecycleConfiguration` quer dizer só que o bucket ainda não tem regra.
 
 `lifecycle.json`:
 
@@ -213,6 +237,8 @@ aws s3api put-bucket-lifecycle-configuration --bucket <bucket> --lifecycle-confi
 ```
 
 A regra apaga só versões **antigas** (não correntes) e uploads incompletos. Os artefatos guardados por SHA continuam: o rollback depende deles.
+
+Consequência: o versionamento é uma das travas contra destruição do ADR, e com esta regra a janela de recuperação desses buckets cai para 30 dias, com as 3 versões mais novas sempre guardadas. O impacto é baixo, porque o site e os artefatos são reconstruídos a partir do repositório; o dado real fica no DynamoDB, com PITR em produção.
 
 ## 8. Limite de gasto do workspace da Anthropic
 
@@ -274,7 +300,9 @@ Não use `aws lambda update-function-configuration --environment` para isso: o c
 
 - [ ] Fatura do mês anterior abaixo de US$ 20, e o gasto da Anthropic abaixo do limite de cada workspace.
 - [ ] `acp-conta-mensal` com os 3 alertas e a ação em espera (`STANDBY`) no começo do mês. Se ela ainda estiver revertida, rearme com `RESET_BUDGET_ACTION`.
+- [ ] Os papéis da ação existem e batem com o `terraform output` de cada ambiente.
+- [ ] No máximo 2 orçamentos com ação na conta (do terceiro em diante há custo diário).
 - [ ] `acp-llm-proxy-corte` **não** anexada a nenhum papel fora de um corte em andamento.
 - [ ] Todos os grupos de log `acp-` com retenção de 7 dias.
-- [ ] Throttling dos stages e lifecycle dos buckets iguais aos deste runbook (nada desfeito por `apply`).
+- [ ] Throttling dos stages, lifecycle dos buckets e concorrência reservada iguais aos deste runbook (nada desfeito por `apply`).
 - [ ] `LLM_ENABLED=true` nos dois ambientes, a menos que tenha sido desligado de propósito.
