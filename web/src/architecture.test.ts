@@ -21,8 +21,11 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
   });
 
   it.each([
+    ["import { useState } from 'react';", './features/pricing/application/x.ts'],
+    ["import { createRoot } from 'react-dom/client';", './features/pricing/model/x.ts'],
     ["import { ReactFlow } from '@xyflow/react';", './features/pricing/application/x.ts'],
     ["import { get } from '../../../shared/lib/http';", './features/pricing/model/x.ts'],
+    ["import { get } from '../../../shared/lib/http';", './features/pricing/application/x.ts'],
   ])('proíbe %s em %s', async (line, file) => {
     const rules = await errorRules(`${line}\nexport const dep = 1;\n`, file);
     expect(rules).toContain('no-restricted-imports');
