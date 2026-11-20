@@ -17,7 +17,7 @@ related_targets: []
 
 THESIS: o design é uma prancha técnica cotada. O custo é escrito no próprio desenho (cota em cada bloco e em cada aresta cobrada) e resumido no carimbo do canto. Recusa o arranjo padrão da categoria: diagrama mudo de um lado e planilha de custo do outro.
 
-OWN-WORLD: moldura em L cor de papel vegetal, folha branca com 1px e cantos de 16px, tinta quase preta, IBM Plex Sans e Plex Mono em todo dólar, cinco tintas de categoria em ladrilhos de 24px, teal só para seleção e foco, fixo sólido e variável hachurado.
+OWN-WORLD: moldura em U cor de papel vegetal (barra superior, paleta e coluna direita), folha branca com 1px e cantos de 16px, tinta quase preta, IBM Plex Sans e Plex Mono em todo dólar, cinco tintas de categoria em ladrilhos de 24px só no canvas e na paleta, seleção e foco em tinta, fixo sólido e variável hachurado.
 
 STORY: o usuário abre o template já calculado, entende de onde vem cada dólar olhando o desenho, troca um SKU e vê a cota e o carimbo mudarem na hora; confia porque cada valor de uso diz a origem e o carimbo diz "estimativa" e a data dos preços.
 
@@ -37,7 +37,7 @@ Challengers do roll, todos recusados nos dois eixos (identificação do público
 - Registro de exposição de laboratório: estado sem cor, por hachura → variável hachurado.
 - Telas Metro tipográficas: o número é a interface → o total sem cartão em volta no topo do painel.
 - Catálogo de personagens: mobília fixa por item → anatomia idêntica em todos os blocos.
-- Sinalização de aeroporto: uma cor, um trabalho → teal só para seleção e foco.
+- Sinalização de aeroporto: uma cor, um trabalho → categoria só no desenho, vermelho e âmbar só para estado, o resto em tinta.
 - Composição com trilho central: estados como marcas impressas → ponto, anel e cinza para a origem do valor.
 - Horário de bolso de companhia aérea: hierarquia por peso, não por tamanho → cinco tamanhos, três pesos.
 
