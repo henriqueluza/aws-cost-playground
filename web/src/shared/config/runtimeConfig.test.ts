@@ -5,6 +5,7 @@ const valid = {
   cognitoAuthority: 'https://cognito-idp.us-east-1.amazonaws.com/pool',
   cognitoClientId: 'abc_123-XYZ',
 };
+const json = (override: object = {}) => JSON.stringify({ ...valid, ...override });
 const reply = (body: string, status = 200) =>
   vi.fn(() => Promise.resolve(new Response(body, { status })));
 const load = async () => import('./runtimeConfig');
@@ -13,7 +14,7 @@ describe('runtimeConfig', () => {
   beforeEach(() => vi.resetModules());
 
   it('carrega config válida, sem cache, e a guarda', async () => {
-    const fetchFn = reply(JSON.stringify(valid));
+    const fetchFn = reply(json());
     const { loadRuntimeConfig, getRuntimeConfig } = await load();
     await expect(loadRuntimeConfig(fetchFn)).resolves.toEqual(valid);
     expect(getRuntimeConfig()).toEqual(valid);
@@ -30,15 +31,12 @@ describe('runtimeConfig', () => {
   });
 
   it.each([
-    ['404', '{}', 404],
-    ['campo ausente', JSON.stringify({ ...valid, cognitoClientId: undefined }), 200],
-    [
-      'http fora de localhost',
-      JSON.stringify({ ...valid, apiBaseUrl: 'http://api.example.com' }),
-      200,
-    ],
-    ['javascript:', JSON.stringify({ ...valid, cognitoAuthority: 'javascript:alert(1)' }), 200],
-    ['client id inválido', JSON.stringify({ ...valid, cognitoClientId: 'a b' }), 200],
+    ['404', json(), 404],
+    ['campo ausente', json({ cognitoClientId: undefined }), 200],
+    ['http fora de localhost', json({ apiBaseUrl: 'http://api.example.com' }), 200],
+    ['http em host parecido com localhost', json({ apiBaseUrl: 'http://localhost.evil.com' }), 200],
+    ['javascript:', json({ cognitoAuthority: 'javascript:alert(1)' }), 200],
+    ['client id inválido', json({ cognitoClientId: 'a b' }), 200],
     ['corpo não-JSON', '<html>', 200],
   ])('rejeita: %s', async (_name, body, status) => {
     const { loadRuntimeConfig } = await load();
