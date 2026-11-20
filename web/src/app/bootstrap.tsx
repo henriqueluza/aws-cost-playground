@@ -10,13 +10,10 @@ import { routes } from './router';
 /** Carrega `/config.json` e monta o app; se a configuração falhar, mostra a tela de erro. */
 export async function bootstrap(container: HTMLElement, fetchFn = fetch): Promise<Root> {
   const root = createRoot(container);
-  const configured = await loadRuntimeConfig(fetchFn).then(
-    () => true,
-    () => false,
-  );
+  const config = await loadRuntimeConfig(fetchFn).catch(() => null);
   root.render(
     <StrictMode>
-      {configured ? (
+      {config ? (
         <QueryClientProvider client={new QueryClient()}>
           <RouterProvider router={createBrowserRouter(routes)} />
         </QueryClientProvider>

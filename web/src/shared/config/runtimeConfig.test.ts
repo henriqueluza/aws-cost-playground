@@ -1,13 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { reply, validConfig as valid } from '../../test/fixtures';
 
-const valid = {
-  apiBaseUrl: 'https://api.example.com',
-  cognitoAuthority: 'https://cognito-idp.us-east-1.amazonaws.com/pool',
-  cognitoClientId: 'abc_123-XYZ',
-};
 const json = (override: object = {}) => JSON.stringify({ ...valid, ...override });
-const reply = (body: string, status = 200) =>
-  vi.fn(() => Promise.resolve(new Response(body, { status })));
 const load = async () => import('./runtimeConfig');
 
 describe('runtimeConfig', () => {
