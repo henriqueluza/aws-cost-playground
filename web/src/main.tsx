@@ -1,6 +1,5 @@
 import { bootstrap } from './app/bootstrap';
 
 const container = document.getElementById('root');
-if (container) {
-  void bootstrap(container);
-}
+if (!container) throw new Error('Elemento #root ausente no index.html.');
+void bootstrap(container);
