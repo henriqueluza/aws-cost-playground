@@ -4,11 +4,17 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Check YAML syntax
         run: |
           for f in $(find .github -name "*.yml" -o -name "*.yaml"); do
@@ -39,8 +45,17 @@ jobs:
         run: |
           cp -R .agents/skills /tmp/committed && ./scripts/sync-agents-mirror.sh
           diff -r /tmp/committed .agents/skills || { echo "::error::.agents/skills desatualizado. Rode scripts/sync-agents-mirror.sh"; exit 1; }
-      # TODO (por projeto): adicione aqui lint, typecheck e testes da stack.
-      # O snippet pronto está na seção 9 do guia da stack:
-      # .claude/skills/engineering-standards/references/stacks/<stack>.md
-      - name: Aviso — lint e testes ainda nao configurados
-        run: echo "::warning::validate.yml ainda nao roda lint nem testes. Edite este arquivo (ver secao 9 do guia da stack)."
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Web — format, lint, typecheck, testes e build
+        working-directory: web
+        run: |
+          npm ci --ignore-scripts
+          npx prettier --check .
+          npx eslint .
+          npx tsc --noEmit
+          npm test -- --run
+          npm run build
