@@ -69,7 +69,7 @@ Por quê: um asset inexistente em `/assets/*` cai no fallback e devolve o HTML d
 Montada em `headers.tf`:
 
 ```text
-default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' <connect_src_origins>; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; upgrade-insecure-requests
+default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' <connect_src_origins>; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; upgrade-insecure-requests
 ```
 
 Se a SPA precisar de outra origem, altere só `connect_src_origins` (a validação impede curinga, caminho e injeção de diretivas).

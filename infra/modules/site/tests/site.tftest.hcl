@@ -64,8 +64,8 @@ run "cabecalhos_de_seguranca" {
     error_message = "A CSP deve ter script-src 'self', frame-ancestors 'none' e as origens de connect-src."
   }
   assert {
-    condition     = alltrue([for k in ["default", "assets"] : !strcontains(aws_cloudfront_response_headers_policy.this[k].security_headers_config[0].content_security_policy[0].content_security_policy, "unsafe-inline")])
-    error_message = "A CSP não pode conter unsafe-inline."
+    condition     = alltrue([for k in ["default", "assets"] : !strcontains(aws_cloudfront_response_headers_policy.this[k].security_headers_config[0].content_security_policy[0].content_security_policy, "unsafe-inline") && !strcontains(aws_cloudfront_response_headers_policy.this[k].security_headers_config[0].content_security_policy[0].content_security_policy, "data:")])
+    error_message = "A CSP não pode conter unsafe-inline nem liberar data:."
   }
   assert {
     condition     = alltrue([for k in ["default", "assets"] : aws_cloudfront_response_headers_policy.this[k].security_headers_config[0].strict_transport_security[0].access_control_max_age_sec == 31536000 && aws_cloudfront_response_headers_policy.this[k].security_headers_config[0].frame_options[0].frame_option == "DENY" && aws_cloudfront_response_headers_policy.this[k].security_headers_config[0].referrer_policy[0].referrer_policy == "no-referrer" && aws_cloudfront_response_headers_policy.this[k].security_headers_config[0].content_type_options[0].override])

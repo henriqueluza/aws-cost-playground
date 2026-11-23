@@ -3,7 +3,7 @@ locals {
     "default-src 'none'",
     "script-src 'self'",
     "style-src 'self'",
-    "img-src 'self' data:",
+    "img-src 'self'", # sem data:, o build do web/ barra URI data:
     "font-src 'self'",
     "connect-src ${join(" ", concat(["'self'"], var.connect_src_origins))}",
     "manifest-src 'self'",
