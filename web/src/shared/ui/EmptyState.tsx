@@ -1,4 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
+import styles from './EmptyState.module.css';
 
 export type EmptyStateProps = {
   /** O que está vazio, em poucas palavras; vira heading. Texto, nunca HTML. */
@@ -13,5 +14,13 @@ export type EmptyStateProps = {
 
 /** Estado vazio: título, uma frase e a próxima ação dentro de um contorno tracejado de 1px. */
 export function EmptyState(props: EmptyStateProps): ReactElement {
-  throw new Error(`EmptyState: contrato sem implementação (${props.title})`);
+  const { title, description, action, headingLevel = 3 } = props;
+  const Heading = `h${headingLevel}` as const;
+  return (
+    <div className={styles.empty}>
+      <Heading className={styles.title}>{title}</Heading>
+      <p className={styles.description}>{description}</p>
+      {action}
+    </div>
+  );
 }
