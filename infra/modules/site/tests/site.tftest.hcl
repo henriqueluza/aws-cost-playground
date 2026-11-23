@@ -48,8 +48,12 @@ run "bucket_privado_com_oac_e_versionamento" {
 run "https_tls_e_fallback_spa" {
   command = plan
   assert {
-    condition     = (aws_cloudfront_distribution.this.default_cache_behavior[0].viewer_protocol_policy == "redirect-to-https" && aws_cloudfront_distribution.this.ordered_cache_behavior[0].viewer_protocol_policy == "redirect-to-https") && (aws_cloudfront_distribution.this.viewer_certificate[0].minimum_protocol_version == "TLSv1.2_2021" && aws_cloudfront_distribution.this.viewer_certificate[0].ssl_support_method == "sni-only") && (alltrue([for e in aws_cloudfront_distribution.this.custom_error_response : e.response_code == 200 && e.response_page_path == "/index.html" && e.error_caching_min_ttl == 0]) && toset([for e in aws_cloudfront_distribution.this.custom_error_response : e.error_code]) == toset([403, 404]))
-    error_message = "Os dois comportamentos devem redirecionar HTTP para HTTPS. O certificado deve exigir TLS 1.2 (2021) com SNI. 403 e 404 devem responder 200 com /index.html, sem cache do erro."
+    condition     = aws_cloudfront_distribution.this.default_cache_behavior[0].viewer_protocol_policy == "redirect-to-https" && aws_cloudfront_distribution.this.ordered_cache_behavior[0].viewer_protocol_policy == "redirect-to-https" && aws_cloudfront_distribution.this.viewer_certificate[0].minimum_protocol_version == "TLSv1.2_2021" && aws_cloudfront_distribution.this.viewer_certificate[0].ssl_support_method == "sni-only"
+    error_message = "Os dois comportamentos devem redirecionar HTTP para HTTPS, e o certificado deve exigir TLS 1.2 (2021) com SNI."
+  }
+  assert {
+    condition     = toset([for e in aws_cloudfront_distribution.this.custom_error_response : e.error_code]) == toset([403, 404]) && alltrue([for e in aws_cloudfront_distribution.this.custom_error_response : e.response_code == 200 && e.response_page_path == "/index.html" && e.error_caching_min_ttl == 0])
+    error_message = "403 e 404 devem responder 200 com /index.html (fallback da SPA), sem cache do erro."
   }
 }
 

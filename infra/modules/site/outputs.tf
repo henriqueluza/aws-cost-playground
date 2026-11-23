@@ -3,19 +3,9 @@ output "bucket_name" {
   value       = aws_s3_bucket.this.id
 }
 
-output "bucket_arn" {
-  description = "ARN do bucket do site (para a política do papel de deploy)."
-  value       = aws_s3_bucket.this.arn
-}
-
 output "distribution_id" {
   description = "Id da distribuição (para a invalidação de cache no deploy)."
   value       = aws_cloudfront_distribution.this.id
-}
-
-output "distribution_arn" {
-  description = "ARN da distribuição (para a política do papel de deploy)."
-  value       = aws_cloudfront_distribution.this.arn
 }
 
 output "distribution_domain_name" {
