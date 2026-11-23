@@ -6,7 +6,7 @@ Terraform da AWS (us-east-1, 100% serverless). Decisões em `docs/architecture/a
 
 | Pasta | Conteúdo |
 |---|---|
-| `modules/` | Módulos reutilizáveis (vazio por enquanto) |
+| `modules/` | Módulos reutilizáveis, cada um com README próprio (hoje: `functions`) |
 | `envs/staging` | Raiz do ambiente `staging` |
 | `envs/production` | Raiz do ambiente `production` |
 | `tools/` | `plan_guard.py` e seus testes |
