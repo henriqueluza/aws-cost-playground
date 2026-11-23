@@ -135,6 +135,12 @@ describe('theme.js', () => {
     expect(theme()).toBe('light');
   });
 
+  it('matchMedia sem addEventListener ainda aplica o sistema, sem lançar', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    expect(run).not.toThrow();
+    expect(theme()).toBe('dark');
+  });
+
   it('não cria global novo', () => {
     stubSystem(false);
     const before = Object.keys(globalThis);
