@@ -14,6 +14,7 @@ async function errorRules(code: string, file: string): Promise<string[]> {
 const reactImport = "import { useState } from 'react';\nexport const hook = useState;\n";
 const designsUi = './features/designs/ui/x.tsx';
 const designLib = './shared/lib/design/x.ts';
+const moneyLib = './shared/lib/money.ts';
 
 describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
   it('proíbe react em model/', async () => {
@@ -33,6 +34,9 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     ["import { get } from '../http';", designLib],
     ["import { get } from '../http';", './features/pricing/model/x.ts'],
     ["import { get } from '../../lib/http';", designLib],
+    ["import { useState } from 'react';", moneyLib],
+    ["import { ReactFlow } from '@xyflow/react';", moneyLib],
+    ["import { get } from './http';", moneyLib],
   ])('proíbe %s em %s', async (line, file) => {
     const rules = await errorRules(`${line}\nexport const dep = 1;\n`, file);
     expect(rules).toContain('no-restricted-imports');

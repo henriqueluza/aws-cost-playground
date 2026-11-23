@@ -6,7 +6,7 @@ Terraform da AWS (us-east-1, 100% serverless). Decisões em `docs/architecture/a
 
 | Pasta | Conteúdo |
 |---|---|
-| `modules/` | Módulos reutilizáveis: `site` (bucket privado + CloudFront da SPA; ver `modules/site/README.md`) |
+| `modules/` | Módulos reutilizáveis, cada um com README próprio (hoje: `database` e `site`, o bucket privado + CloudFront da SPA) |
 | `envs/staging` | Raiz do ambiente `staging` |
 | `envs/production` | Raiz do ambiente `production` |
 | `tools/` | `plan_guard.py` e seus testes |
@@ -20,6 +20,8 @@ Terraform da AWS (us-east-1, 100% serverless). Decisões em `docs/architecture/a
 ```bash
 terraform -chdir=infra/envs/<env> init -backend=false && terraform -chdir=infra/envs/<env> validate
 ```
+
+Módulo com testes (`tests/*.tftest.hcl`, provider simulado, sem credenciais): `terraform -chdir=infra/modules/<m> init -backend=false && terraform -chdir=infra/modules/<m> validate && terraform -chdir=infra/modules/<m> test`. O lockfile do módulo não é versionado, e o CI só roda `validate` nos ambientes.
 
 ## Backend
 
