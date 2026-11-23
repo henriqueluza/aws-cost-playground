@@ -1,6 +1,6 @@
 locals {
-  # Só `https://<host>[/caminho]`: recusa `http`, curinga, porta, query, fragmento e credencial.
-  https_url_pattern = "^https://([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}(/[A-Za-z0-9._~/-]*)?$"
+  # Só `https://<host>[/caminho]`: recusa `http`, curinga, porta, query, fragmento, credencial, `//` e segmento iniciado por ponto (`..`).
+  https_url_pattern = "^https://([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)*/?$"
 }
 
 variable "name_prefix" {
@@ -41,7 +41,7 @@ variable "callback_urls" {
 
   validation {
     condition     = length(var.callback_urls) > 0 && alltrue([for u in var.callback_urls : can(regex(local.https_url_pattern, u))])
-    error_message = "callback_urls: ao menos uma URL `https://<host>/<caminho>`, sem curinga, porta, query nem fragmento."
+    error_message = "callback_urls: ao menos uma URL `https://<host>[/caminho]`, sem curinga, porta, query nem fragmento."
   }
 }
 
@@ -51,7 +51,7 @@ variable "logout_urls" {
 
   validation {
     condition     = length(var.logout_urls) > 0 && alltrue([for u in var.logout_urls : can(regex(local.https_url_pattern, u))])
-    error_message = "logout_urls: ao menos uma URL `https://<host>/<caminho>`, sem curinga, porta, query nem fragmento."
+    error_message = "logout_urls: ao menos uma URL `https://<host>[/caminho]`, sem curinga, porta, query nem fragmento."
   }
 }
 

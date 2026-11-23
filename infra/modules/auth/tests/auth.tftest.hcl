@@ -133,10 +133,31 @@ run "rejeita_prefixo_dominio_e_certificado_invalidos" {
   expect_failures = [var.name_prefix, var.domain_name, var.acm_certificate_arn]
 }
 
-run "rejeita_callback_http" {
+run "rejeita_urls_http" {
   command = plan
-  variables { callback_urls = ["http://staging.exemplo.com/auth/callback"] }
-  expect_failures = [var.callback_urls]
+  variables {
+    callback_urls = ["http://staging.exemplo.com/auth/callback"]
+    logout_urls   = ["http://staging.exemplo.com/"]
+  }
+  expect_failures = [var.callback_urls, var.logout_urls]
+}
+
+run "rejeita_urls_com_curinga" {
+  command = plan
+  variables {
+    callback_urls = ["https://*.exemplo.com/cb"]
+    logout_urls   = ["https://*.exemplo.com/"]
+  }
+  expect_failures = [var.callback_urls, var.logout_urls]
+}
+
+run "rejeita_urls_vazias" {
+  command = plan
+  variables {
+    callback_urls = []
+    logout_urls   = []
+  }
+  expect_failures = [var.callback_urls, var.logout_urls]
 }
 
 run "rejeita_callback_localhost" {
@@ -145,26 +166,18 @@ run "rejeita_callback_localhost" {
   expect_failures = [var.callback_urls]
 }
 
-run "rejeita_callback_com_curinga" {
+# O padrão compartilhado pelas duas variáveis, caso a caso: cada URL ruim tem de ser recusada sozinha.
+run "padrao_de_url_caso_a_caso" {
   command = plan
-  variables { callback_urls = ["https://*.exemplo.com/cb"] }
-  expect_failures = [var.callback_urls]
-}
-
-run "rejeita_callback_vazio" {
-  command = plan
-  variables { callback_urls = [] }
-  expect_failures = [var.callback_urls]
-}
-
-run "rejeita_logout_http" {
-  command = plan
-  variables { logout_urls = ["http://staging.exemplo.com/"] }
-  expect_failures = [var.logout_urls]
-}
-
-run "rejeita_logout_vazio" {
-  command = plan
-  variables { logout_urls = [] }
-  expect_failures = [var.logout_urls]
+  assert {
+    condition = !anytrue([for u in [
+      "https://a.exemplo.com:8443/cb", "https://a.exemplo.com/cb?x=1", "https://a.exemplo.com/cb#x", "https://u:p@a.exemplo.com/cb",
+      "https://localhost/cb", "https://A.exemplo.com/cb", "https://a.exemplo.com/../cb", "https://a.exemplo.com/a/..", "https://a.exemplo.com//b.com",
+    ] : can(regex(local.https_url_pattern, u))])
+    error_message = "O padrão aceitou porta, query, fragmento, credencial, host sem ponto, maiúscula no host, `..` ou `//`."
+  }
+  assert {
+    condition     = alltrue([for u in ["https://a.exemplo.com", "https://a.exemplo.com/", "https://a.exemplo.com/auth/callback"] : can(regex(local.https_url_pattern, u))])
+    error_message = "O padrão recusou uma URL legítima."
+  }
 }

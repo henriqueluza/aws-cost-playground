@@ -36,7 +36,9 @@ module "auth" {
 }
 ```
 
-O caminho de volta é no módulo `dns`, que cria o registro do login:
+O exemplo descreve a composição da #21 e depende da #121: hoje o módulo `dns` só expõe `zone_id`, `domain_names` e `certificate_arns`. A saída `auth_domain` (que espera o registro A do site) e as variáveis `site_alias`, `api_alias` e `auth_alias` chegam com a #121. Até lá, `module.dns.domain_names["auth"]` dá o mesmo nome, mas não garante a ordem: o Cognito exige o registro A do domínio pai antes de criar o domínio.
+
+O caminho de volta é no módulo `dns` (variável `auth_alias`, da #121), que cria o registro do login:
 
 ```hcl
 auth_alias = {
@@ -63,7 +65,7 @@ Avisos de composição (ambiente, #21):
 | `name_prefix` | `string` | obrigatório | Prefixo do ambiente; nomeia o pool (`<prefixo>-users`) e o cliente (`<prefixo>-web`). Aceita só `acp-stg` ou `acp-prod` |
 | `domain_name` | `string` | obrigatório | Domínio do login gerenciado. Precisa ser `auth.<domínio>` em minúsculas, até 63 caracteres, sem esquema nem porta |
 | `acm_certificate_arn` | `string` | obrigatório | Certificado ACM em us-east-1 que cobre `domain_name`. Outra região é recusada |
-| `callback_urls` | `list(string)` | obrigatório | URLs de retorno do login. Ao menos uma; cada uma `https://<host>[/caminho]`, sem curinga, porta, query nem fragmento. Idênticas ao `redirect_uri` do site |
+| `callback_urls` | `list(string)` | obrigatório | URLs de retorno do login. Ao menos uma; cada uma `https://<host>[/caminho]`, sem curinga, porta, query, fragmento, `//` nem segmento de caminho iniciado por ponto. Idênticas ao `redirect_uri` do site |
 | `logout_urls` | `list(string)` | obrigatório | URLs de retorno do logout, mesmas regras de `callback_urls`. Idênticas ao `logout_uri` do site |
 | `self_signup_enabled` | `bool` | `false` | Abre o cadastro pelo login gerenciado. Produção passa `true`; staging mantém `false` |
 
