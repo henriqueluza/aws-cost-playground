@@ -14,18 +14,12 @@ class FakeContext:
 
 
 def make_event(
-    path: str = "/",
-    *,
-    method: str = "GET",
-    claims: dict[str, Any] | None = None,
-    headers: dict[str, str] | None = None,
-    query: str = "",
-    body: str | None = None,
+    path: str = "/", *, claims: dict[str, Any] | None = None, headers: dict[str, str] | None = None
 ) -> dict[str, Any]:
-    """Evento do API Gateway HTTP API (payload 2.0). `claims=None` = sem authorizer."""
+    """Evento GET do API Gateway HTTP API (payload 2.0). `claims=None` = sem authorizer."""
     context: dict[str, Any] = {
         "requestId": "apigw-req-1",
-        "http": {"method": method, "path": path, "sourceIp": "203.0.113.9", "protocol": "HTTP/1.1"},
+        "http": {"method": "GET", "path": path, "sourceIp": "203.0.113.9", "protocol": "HTTP/1.1"},
     }
     if claims is not None:
         context["authorizer"] = {"jwt": {"claims": claims, "scopes": None}}
@@ -33,10 +27,9 @@ def make_event(
         "version": "2.0",
         "routeKey": "$default",
         "rawPath": path,
-        "rawQueryString": query,
+        "rawQueryString": "",
         "headers": {"host": "api.test", **(headers or {})},
         "requestContext": context,
-        "body": body,
         "isBase64Encoded": False,
     }
 
