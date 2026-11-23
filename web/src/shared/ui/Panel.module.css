@@ -1,0 +1,19 @@
+/* DESIGN.md, "Hierarchy" (Section) e "Regras de densidade": padding de 16px. */
+
+.panel {
+  box-sizing: border-box;
+  padding: var(--card-pad);
+  background-color: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-card);
+  color: var(--text);
+  /* a regra do dinheiro tabular: todo número do painel alinha em coluna */
+  font-variant-numeric: tabular-nums;
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-semibold);
+}
