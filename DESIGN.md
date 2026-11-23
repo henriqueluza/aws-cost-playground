@@ -129,7 +129,7 @@ Estratégia contida: neutros tingidos da moldura, tinta quase preta para texto, 
 }
 ```
 
-**Como o tema é escolhido.** O escuro é declarado uma vez só, no seletor `[data-theme="dark"]`. Um arquivo do bundle, `theme.js`, carregado no `<head>` sem `defer` e nunca inline (a CSP não ganha `unsafe-inline`), grava `data-theme` no `<html>` antes da primeira pintura. Ele usa a escolha salva em `localStorage` (chave `acp-theme`) ou, se não houver, `prefers-color-scheme`, e acompanha a mudança do sistema enquanto o usuário não escolher.
+**Como o tema é escolhido.** O escuro é declarado uma vez só, no seletor `[data-theme="dark"]`. Um script clássico, `web/public/theme.js` (copiado para `dist/` sem hash e sem passar pelo bundler), carregado no `<head>` sem `defer` e nunca inline (a CSP não ganha `unsafe-inline`), grava `data-theme` no `<html>` antes da primeira pintura. Ele usa a escolha salva em `localStorage` (chave `acp-theme`) ou, se não houver, `prefers-color-scheme`, e acompanha a mudança do sistema enquanto o usuário não escolher.
 
 ### Categorias dos blocos
 

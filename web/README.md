@@ -61,4 +61,5 @@ Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de 
 - Para mudar um token, edite o `DESIGN.md` e o `tokens.css` juntos, no mesmo PR. O teste `src/shared/ui/tokens.test.ts` compara os dois nos dois sentidos e falha se divergirem.
 - O Prettier ignora o `tokens.css` (`.prettierignore`) para não reformatar a cópia; não o formate à mão.
 - `base.css` (estilo base) e `global.css` (importa tokens e base) ficam em `src/shared/ui/`; o `global.css` é importado em `src/main.tsx`. Componentes usam `var(--token)`, sem cores ou medidas fixas.
-- Ainda não existem: a escolha do tema claro/escuro antes da primeira pintura (#109) e as fontes (#108).
+- `public/theme.js` escolhe o tema antes da primeira pintura: script clássico no `<head>` de `index.html`, sem `defer` e nunca inline (a CSP não ganha `unsafe-inline`). Grava `data-theme` (`light` ou `dark`) no `<html>` a partir de `localStorage['acp-theme']` ou de `prefers-color-scheme`. Fica em `public/`, então o Vite o copia para `dist/theme.js` sem hash e sem passar pelo bundler; o hosting deve servi-lo com `Cache-Control` curto. Regra completa em "Como o tema é escolhido" no `DESIGN.md`.
+- Ainda não existem: as fontes (#108).
