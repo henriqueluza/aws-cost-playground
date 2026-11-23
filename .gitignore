@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .claude/skills/stageshow/node_modules/
 .agents/skills/stageshow/node_modules/
+
+# Terraform: diretório local de providers e planos (nunca versionar)
+**/.terraform/
+*.tfplan
+*.tfstate*
