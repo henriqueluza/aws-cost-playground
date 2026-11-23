@@ -31,6 +31,8 @@ EXIT_INVALID = 2
 
 # `forget` (bloco `removed` com `destroy = false`) tira o recurso do estado: é um `state rm`.
 BLOCKING_ACTIONS: frozenset[str] = frozenset({"delete", "forget"})
+# Ação fora desta lista (nova ou grafada diferente) é entrada inválida, não plano seguro.
+KNOWN_ACTIONS: frozenset[str] = BLOCKING_ACTIONS | {"no-op", "create", "read", "update"}
 
 
 class InvalidPlanError(ValueError):
@@ -55,7 +57,7 @@ def find_destructive(plan: Mapping[str, Any]) -> list[DestructiveChange]:
 
     Levanta InvalidPlanError (falha fechada) se a raiz não é objeto, falta `format_version`,
     `resource_changes` existe e não é lista, ou um item não tem `address` (str) ou
-    `change.actions` (lista de str).
+    `change.actions` (lista de ações de KNOWN_ACTIONS).
     """
     if not isinstance(plan, Mapping) or "format_version" not in plan:
         raise InvalidPlanError("não é um plano do Terraform (falta `format_version`)")
@@ -70,9 +72,9 @@ def find_destructive(plan: Mapping[str, Any]) -> list[DestructiveChange]:
         if (
             not isinstance(address, str)
             or not isinstance(actions, list)
-            or not all(isinstance(action, str) for action in actions)
+            or not all(isinstance(action, str) and action in KNOWN_ACTIONS for action in actions)
         ):
-            raise InvalidPlanError(f"`resource_changes[{index}]` sem `address` ou `change.actions`")
+            raise InvalidPlanError(f"`resource_changes[{index}]`: `address` ou `actions` inválido")
         if BLOCKING_ACTIONS.intersection(actions):
             found.append(DestructiveChange(address, tuple(actions)))
     return found

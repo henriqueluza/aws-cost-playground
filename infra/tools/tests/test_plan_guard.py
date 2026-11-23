@@ -125,6 +125,8 @@ class InvalidInput(unittest.TestCase):
             {"format_version": "1.2", "resource_changes": [{"address": "a.b", "change": {}}]},
             {"format_version": "1.2", "resource_changes": [{**item, "change": {"actions": "delete"}}]},
             {"format_version": "1.2", "resource_changes": [{**item, "change": {"actions": [1]}}]},
+            plan_with(("a.b", ["DELETE"])),
+            plan_with(("a.b", ["update", "ação-nova"])),
         ]
         for case in cases:
             with self.subTest(case=case):
