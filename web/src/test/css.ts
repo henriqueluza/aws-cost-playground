@@ -25,15 +25,20 @@ function addDecls(decls: CssDecls, context: string, body: string): void {
   const target = (decls[context] ??= {});
   for (const decl of body.split(';')) {
     const colon = decl.indexOf(':');
-    if (colon > 0) target[normalize(decl.slice(0, colon))] = normalize(decl.slice(colon + 1));
+    if (colon <= 0) continue;
+    const prop = normalize(decl.slice(0, colon));
+    // Repetida, a última venceria em silêncio e esconderia uma divergência.
+    if (prop in target) throw new Error(`${prop} declarada duas vezes em ${context}`);
+    target[prop] = normalize(decl.slice(colon + 1));
   }
 }
 
 /**
  * Lê as declarações de um CSS por contexto. O contexto é o seletor com espaços colapsados e
  * aspas simples, prefixado pela at-rule que o envolve (`@media (…) :root`). Blocos repetidos do
- * mesmo contexto são fundidos. Feito para tokens e estilo base: não trata `;` nem `{` dentro de
- * strings ou `url()`.
+ * mesmo contexto são fundidos; propriedade repetida num contexto lança erro. Valores só têm espaços
+ * colapsados e aspas duplas trocadas por simples, então uma diferença só de tipo de aspa não conta.
+ * Feito para tokens e estilo base: não trata `;` nem `{` dentro de strings ou `url()`.
  */
 export function parseCss(source: string): CssDecls {
   const decls: CssDecls = {};

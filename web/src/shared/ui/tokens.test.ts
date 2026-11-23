@@ -23,6 +23,7 @@ describe('tokens.css', () => {
     );
   });
 
+  // Guarda contra um parse vazio dos dois lados (ex.: o regex dos blocos falhar com CRLF).
   it('o DESIGN.md rende mais de 100 tokens em :root', () => {
     expect(Object.keys(fromDesign()[':root'] ?? {}).length).toBeGreaterThan(100);
   });
@@ -37,6 +38,10 @@ describe('parseCss como comparador', () => {
 
   it('detecta hex diferente', () => {
     expect(parseCss(css('#265496'))).not.toEqual(parseCss(css('#265497')));
+  });
+
+  it('recusa token declarado duas vezes no mesmo contexto', () => {
+    expect(() => parseCss(':root { --a: 1; } :root { --a: 2; }')).toThrow('--a');
   });
 
   it('ignora só espaços e aspas, não o valor', () => {

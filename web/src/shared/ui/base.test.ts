@@ -31,8 +31,8 @@ describe('base.css', () => {
 
   it('todo var(--x) usado está definido em :root dos tokens', () => {
     const defined = new Set(Object.keys(tokens()[':root'] ?? {}));
-    const css = readRepoFile('web/src/shared/ui/base.css');
-    const used = [...css.matchAll(/var\((--[\w-]+)/g)].flatMap((m) => (m[1] ? [m[1]] : []));
+    const values = Object.values(base()).flatMap((decls) => Object.values(decls));
+    const used = values.flatMap((v) => [...v.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1] ?? ''));
     expect(used.length).toBeGreaterThan(0);
     expect(used.filter((name) => !defined.has(name))).toEqual([]);
   });
