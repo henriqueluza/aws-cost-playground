@@ -34,6 +34,11 @@ run "tabela_unica_on_demand" {
   }
 
   assert {
+    condition     = length(aws_dynamodb_table.this.server_side_encryption) == 0
+    error_message = "A criptografia fica na chave de propriedade da AWS: sem bloco de KMS, que cria custo."
+  }
+
+  assert {
     condition     = aws_dynamodb_table.this.deletion_protection_enabled
     error_message = "A proteção contra exclusão deve estar ligada."
   }
