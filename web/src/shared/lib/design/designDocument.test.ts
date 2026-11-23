@@ -16,15 +16,16 @@ const parse = (input: unknown) => designDocumentSchema.safeParse(input);
 const issuePaths = (input: unknown) => parse(input).error?.issues.map((issue) => issue.path);
 const [lambda] = adrExampleDesign.blocks;
 const [egress] = adrExampleDesign.edges;
-const { maxBlocks, maxEdges, maxDescriptionLength, maxLabelLength } = DESIGN_LIMITS;
+const { maxBlocks, maxEdges, maxDescriptionLength, maxLabelLength, maxUsageValue } = DESIGN_LIMITS;
 const egressEdges = (count: number) =>
   Array.from({ length: count }, (_, i) => ({ ...egress, id: `edg_${i}` }));
 const duration = 'blocks.0.usage.values.avgDurationMs';
 const unknownKeys = ['futureField', 'workload.tag', 'blocks.0.color', 'edges.0.weight'];
 
 describe('designDocumentSchema (ADR-0001, "Modelo de dados")', () => {
-  it('aceita o exemplo do ADR, com aresta para client e llm sem estimatedAt', () => {
+  it('aceita o exemplo do ADR, com aresta data para client e llm sem estimatedAt', () => {
     expect(egress).toMatchObject({ target: CLIENT_NODE_ID, usage: { source: 'llm' } });
+    expect(egress).toHaveProperty('kind', 'data');
     expect(egress).not.toHaveProperty('usage.estimatedAt');
     const result = parse(structuredClone(adrExampleDesign));
     expect(result.success).toBe(true);
@@ -47,6 +48,7 @@ describe('designDocumentSchema (ADR-0001, "Modelo de dados")', () => {
     ['rótulo no limite', variant('blocks.0.label', 'a'.repeat(maxLabelLength))],
     ['atributo string com 64 caracteres', variant('blocks.0.attributes.a', 'a'.repeat(64))],
     ['valor de uso zero', variant(duration, 0)],
+    ['valor de uso no teto', variant(duration, maxUsageValue)],
   ])('aceita no limite: %s', (_name, input) => {
     expect(parse(input).success).toBe(true);
   });
@@ -97,10 +99,16 @@ describe('designDocumentSchema (ADR-0001, "Modelo de dados")', () => {
     ['valor de uso negativo', duration, -1],
     ['valor de uso NaN', duration, NaN],
     ['valor de uso Infinity', duration, Infinity],
+    ['valor de uso acima do teto', duration, maxUsageValue * 10],
     ['override negativo', 'blocks.0.overrides.avgDurationMs', -1],
+    ['override acima do teto', 'blocks.0.overrides.avgDurationMs', maxUsageValue * 10],
     ['scenarios não vazio', 'scenarios', [{ id: 'scn_1' }]],
     ['chave de uso fora do camelCase', 'blocks.0.usage.values.Memory-MB', 1],
     ['chave de atributo fora do camelCase', 'blocks.0.attributes.Memory-MB', 1],
+    ['chave de uso constructor', 'blocks.0.usage.values.constructor', 1],
+    ['chave de uso toString', 'blocks.0.usage.values.toString', 1],
+    ['chave de atributo constructor', 'blocks.0.attributes.constructor', 1],
+    ['chave de atributo toString', 'blocks.0.attributes.toString', 1],
     ['atributo string com 65 caracteres', 'blocks.0.attributes.a', 'a'.repeat(65)],
     ['estimatedAt que não é data ISO', 'blocks.0.usage.estimatedAt', '18/11/2026'],
     ['estimatedAt fora de UTC', 'blocks.0.usage.estimatedAt', '2026-11-18T11:00:00-03:00'],
@@ -117,6 +125,8 @@ describe('designDocumentSchema (ADR-0001, "Modelo de dados")', () => {
     ['source inexistente', variant('edges.0.source', 'blk_missing'), ['edges', 0, 'source']],
     ['target inexistente', variant('edges.0.target', 'blk_missing'), ['edges', 0, 'target']],
     ['source client', variant('edges.0.source', CLIENT_NODE_ID), ['edges', 0, 'source']],
+    ['runs-on para client', variant('edges.0.kind', 'runs-on'), ['edges', 0, 'kind']],
+    ['logs para client', variant('edges.0.kind', 'logs'), ['edges', 0, 'kind']],
   ])('recusa por integridade: %s, no caminho certo', (_name, input, path) => {
     expect(parse(input).success).toBe(false);
     expect(issuePaths(input)).toContainEqual(path);

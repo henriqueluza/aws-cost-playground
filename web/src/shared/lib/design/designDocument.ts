@@ -9,21 +9,34 @@ export const USAGE_SOURCES = ['llm', 'default'] as const;
 /** Nó fixo, sem preço, que representa a internet. É o destino das arestas de egress. */
 export const CLIENT_NODE_ID = 'client';
 
-/** Limites do documento. `maxBlocks` e `maxDescriptionLength` vêm do ADR-0001; os outros, do PR #8. */
+/** Limites do documento. `maxBlocks` e `maxDescriptionLength` vêm do ADR-0001; os outros foram decididos na #98. */
 export const DESIGN_LIMITS = {
   maxBlocks: 100,
   maxEdges: 400,
   maxDescriptionLength: 2000,
   maxLabelLength: 80,
+  maxUsageValue: 1e12,
 } as const;
 
-/** Chave de atributo e de uso em camelCase. O zod 4 já descarta `__proto__` dos records. */
-const fieldKey = z.string().regex(/^[a-z][A-Za-z0-9]{0,39}$/);
+/**
+ * Chave de atributo e de uso em camelCase, fora dos nomes de `Object.prototype` (`constructor`,
+ * `toString`...). O zod 4 já descarta `__proto__` dos records.
+ */
+const fieldKey = z
+  .string()
+  .regex(/^[a-z][A-Za-z0-9]{0,39}$/)
+  .refine((key) => !Object.hasOwn(Object.prototype, key));
 const blockId = z.string().regex(/^blk_[A-Za-z0-9_-]{1,60}$/);
 const edgeId = z.string().regex(/^edg_[A-Za-z0-9_-]{1,60}$/);
 
-/** Números de uso: finitos e não negativos. Também é o formato de `overrides`. */
-export const usageValuesSchema = z.record(fieldKey, z.number().min(0));
+/**
+ * Números de uso: finitos, não negativos e até `maxUsageValue`. Também é o formato de `overrides`.
+ * As faixas plausíveis por tipo de bloco virão com a Issue dos 20 blocos.
+ */
+export const usageValuesSchema = z.record(
+  fieldKey,
+  z.number().min(0).max(DESIGN_LIMITS.maxUsageValue),
+);
 
 export const usageSchema = z.object({
   source: z.enum(USAGE_SOURCES),
@@ -84,6 +97,9 @@ export const designDocumentSchema = z
       }
       if (edge.target !== CLIENT_NODE_ID && !blockIds.has(edge.target)) {
         issue(['edges', i, 'target'], 'A aresta chega a um bloco que não existe.');
+      }
+      if (edge.target === CLIENT_NODE_ID && edge.kind !== 'data') {
+        issue(['edges', i, 'kind'], 'Só arestas de dados chegam à internet.');
       }
     });
   });
