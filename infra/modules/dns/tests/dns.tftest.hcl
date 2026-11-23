@@ -72,13 +72,8 @@ run "aliases_para_os_tres_alvos" {
       { rec = aws_route53_record.api, name = "api.staging.example.com", target = "api.gw.example", zone = "ZAPI" },
       { rec = aws_route53_record.auth, name = "auth.staging.example.com", target = "auth.cf.example", zone = "ZAUTH" },
       ] : length(r.rec) == 1 && r.rec[0].type == "A" && r.rec[0].name == r.name && r.rec[0].zone_id == "Z0000000EXAMPLE" &&
-    one(r.rec[0].alias).name == r.target && one(r.rec[0].alias).zone_id == r.zone && !one(r.rec[0].alias).evaluate_target_health])
-    error_message = "Cada alias deve ser um registro A na zona lida, com o nome e o alvo do seu serviço."
-  }
-
-  assert {
-    condition     = output.auth_domain == "auth.staging.example.com"
-    error_message = "auth_domain deve ser o nome do login."
+    one(r.rec[0].alias).name == r.target && one(r.rec[0].alias).zone_id == r.zone && !one(r.rec[0].alias).evaluate_target_health]) && output.auth_domain == "auth.staging.example.com"
+    error_message = "Cada alias deve ser um registro A na zona lida, com o nome e o alvo do seu serviço; auth_domain é o nome do login."
   }
 }
 
@@ -101,11 +96,6 @@ run "consumidor_com_cognito_sem_ciclo" {
 
   module {
     source = "./tests/consumer"
-  }
-
-  assert {
-    condition     = length(module.dns.zone_id) > 0
-    error_message = "O consumidor deve planejar o módulo sem ciclo."
   }
 }
 

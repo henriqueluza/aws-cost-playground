@@ -1,5 +1,4 @@
-# Consumidor mínimo, só para o teste: o domínio do Cognito lê auth_domain e devolve
-# o próprio alvo em auth_alias. Se o módulo fechar ciclo com o Cognito, o plan falha.
+# Consumidor só de teste: o Cognito lê auth_domain e devolve o alvo em auth_alias (ciclo = plan falha).
 terraform {
   required_version = "~> 1.16.0"
 
