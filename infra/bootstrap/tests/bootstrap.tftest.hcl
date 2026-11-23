@@ -95,15 +95,26 @@ run "papel_plan_somente_leitura" {
   }
 
   assert {
-    condition = length(setsubtract(
-      ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "cognito-idp:ListUsers", "logs:GetLogEvents", "ssm:GetParameter", "secretsmanager:GetSecretValue"],
-      jsondecode(aws_iam_role_policy.plan_deny_data.policy).Statement[0].Action
-    )) == 0 && jsondecode(aws_iam_role_policy.plan_deny_data.policy).Statement[0].Resource == "*"
-    error_message = "O papel plan não lê itens, usuários, logs nem segredos."
+    condition = jsondecode(aws_iam_role_policy.plan_deny_data.policy).Statement[0].Resource == "*" && toset(jsondecode(aws_iam_role_policy.plan_deny_data.policy).Statement[0].Action) == toset([
+      "cognito-idp:AdminGetUser", "cognito-idp:AdminListDevices", "cognito-idp:AdminListGroupsForUser",
+      "cognito-idp:AdminListUserAuthEvents", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup",
+      "dynamodb:BatchGetItem", "dynamodb:GetItem", "dynamodb:GetRecords", "dynamodb:PartiQLSelect",
+      "dynamodb:Query", "dynamodb:Scan",
+      "logs:FilterLogEvents", "logs:GetLogEvents", "logs:GetLogRecord", "logs:GetQueryResults",
+      "logs:StartLiveTail", "logs:StartQuery", "logs:Unmask",
+      "secretsmanager:GetSecretValue",
+      "ssm:GetParameter", "ssm:GetParameterHistory", "ssm:GetParameters", "ssm:GetParametersByPath",
+    ])
+    error_message = "O papel plan não lê itens, usuários, logs nem segredos (inclusive o parâmetro da chave da Claude API), em nenhum recurso."
   }
 
   assert {
-    condition     = toset(jsondecode(aws_iam_role_policy.plan_deny_data.policy).Statement[1].NotResource) == toset([for b in aws_s3_bucket.state : "${b.arn}/*"])
+    condition = jsondecode(aws_iam_role_policy.plan_deny_data.policy).Statement[1] == {
+      Sid         = "DenyObjectReadOutsideState"
+      Effect      = "Deny"
+      Action      = ["s3:GetObject", "s3:GetObjectVersion"]
+      NotResource = [for b in aws_s3_bucket.state : "${b.arn}/*"]
+    }
     error_message = "O papel plan só lê objetos dos buckets de estado."
   }
 

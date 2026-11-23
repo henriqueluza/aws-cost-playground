@@ -32,7 +32,7 @@ Estado no S3 com lock nativo (`use_lockfile`), sem DynamoDB. O nome do bucket **
 | staging | `acp-stg/terraform.tfstate` | `TF_STATE_BUCKET_STAGING` |
 | production | `acp-prod/terraform.tfstate` | `TF_STATE_BUCKET_PRODUCTION` |
 
-No CI, o papel de leitura vem de `AWS_PLAN_ROLE_ARN`. O workflow `terraform.yml` ainda não existe; chega na #90.
+No CI, o papel de leitura vem de `AWS_PLAN_ROLE_ARN` (workflow `terraform.yml`). Os buckets e o papel são criados por `bootstrap/`, que também gera essas variáveis: ver `bootstrap/README.md`.
 
 `.terraform.lock.hcl` é versionado em cada ambiente. Atualizar provider é um PR `chore` próprio.
 
