@@ -50,6 +50,63 @@ run "producao_no_apex" {
     condition     = output.domain_names == { site = "example.com", api = "api.example.com", auth = "auth.example.com" }
     error_message = "Em production, os nomes partem do apex da zona."
   }
+
+  assert {
+    condition     = length(aws_route53_record.site) + length(aws_route53_record.api) + length(aws_route53_record.auth) == 0
+    error_message = "Sem alvo informado, não deve haver registro alias."
+  }
+}
+
+run "aliases_para_os_tres_alvos" {
+  command = plan
+
+  variables {
+    site_alias = { name = "site.cf.example", zone_id = "ZSITE" }
+    api_alias  = { name = "api.gw.example", zone_id = "ZAPI" }
+    auth_alias = { name = "auth.cf.example", zone_id = "ZAUTH" }
+  }
+
+  assert {
+    condition = alltrue([for r in [
+      { rec = aws_route53_record.site, name = "staging.example.com", target = "site.cf.example", zone = "ZSITE" },
+      { rec = aws_route53_record.api, name = "api.staging.example.com", target = "api.gw.example", zone = "ZAPI" },
+      { rec = aws_route53_record.auth, name = "auth.staging.example.com", target = "auth.cf.example", zone = "ZAUTH" },
+      ] : length(r.rec) == 1 && r.rec[0].type == "A" && r.rec[0].name == r.name && r.rec[0].zone_id == "Z0000000EXAMPLE" &&
+    one(r.rec[0].alias).name == r.target && one(r.rec[0].alias).zone_id == r.zone && !one(r.rec[0].alias).evaluate_target_health])
+    error_message = "Cada alias deve ser um registro A na zona lida, com o nome e o alvo do seu serviço."
+  }
+
+  assert {
+    condition     = output.auth_domain == "auth.staging.example.com"
+    error_message = "auth_domain deve ser o nome do login."
+  }
+}
+
+run "so_o_alvo_informado_ganha_registro" {
+  command = plan
+
+  variables {
+    api_alias = { name = "api.gw.example", zone_id = "ZAPI" }
+  }
+
+  assert {
+    condition     = length(aws_route53_record.api) == 1 && length(aws_route53_record.site) == 0 && length(aws_route53_record.auth) == 0
+    error_message = "Só o alias com alvo informado deve ser criado."
+  }
+}
+
+# O Cognito consome auth_domain e devolve o alvo em auth_alias: o plan só passa sem ciclo.
+run "consumidor_com_cognito_sem_ciclo" {
+  command = plan
+
+  module {
+    source = "./tests/consumer"
+  }
+
+  assert {
+    condition     = length(module.dns.zone_id) > 0
+    error_message = "O consumidor deve planejar o módulo sem ciclo."
+  }
 }
 
 run "dominio_fora_da_zona" {
