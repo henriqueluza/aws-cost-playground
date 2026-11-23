@@ -8,6 +8,7 @@ import { Notice, type NoticeTone } from './Notice';
 import styles from './Notice.module.css';
 
 const css = () => parseCss(readRepoFile('web/src/shared/ui/Notice.module.css'));
+// Classe ausente no módulo vira um nome que não existe, para o toHaveClass não passar por acaso.
 const cls = (key: string) => styles[key] ?? `sem-${key}`;
 const message = 'O catálogo de preços tem mais de 30 dias.';
 const tones: [NoticeTone, string, string | null][] = [
@@ -37,9 +38,8 @@ describe('Notice', () => {
       if (icon) expect(within(root).getByRole('img', { name: icon })).toBeInTheDocument();
       else expect(within(root).queryByRole('img')).toBeNull();
     }
-    const svgs = tones.map(([, role]) => screen.getByRole(role).querySelector('svg'));
-    expect(svgs[2]).toHaveAttribute('aria-hidden', 'true');
-    const shapes = svgs.map((svg) => svg?.innerHTML.replace(/<title>.*?<\/title>/, ''));
+    expect(screen.getByRole('note').querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    const shapes = tones.map(([, role]) => screen.getByRole(role).querySelector('svg')?.innerHTML);
     expect(new Set(shapes).size).toBe(3);
   });
 
@@ -77,6 +77,7 @@ describe('Notice.module.css', () => {
     expect(css()[sel]).toMatchObject(decls);
   });
 
+  // Foco visível: o anel de 2px em --focus é o :focus-visible global (base.test.ts); aqui nada o apaga.
   it('só usa tokens e não declara outline: nenhum hex nem px literal', () => {
     const decls = Object.values(css());
     for (const value of decls.flatMap(Object.values)) expect(value).not.toMatch(/#|\d\s*px\b/);

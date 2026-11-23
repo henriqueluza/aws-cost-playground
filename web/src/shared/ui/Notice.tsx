@@ -54,16 +54,16 @@ const TONES: Record<NoticeTone, ToneSpec> = {
 };
 
 /** Aviso: frase com ícone de forma própria por tom, no par claro e escuro da pílula do mesmo tom. */
-export function Notice(props: NoticeProps): ReactElement {
-  const { role, iconLabel, shapes } = TONES[props.tone];
+export function Notice({ tone, message }: NoticeProps): ReactElement {
+  const { role, iconLabel, shapes } = TONES[tone];
   const iconA11y =
     iconLabel === null ? { 'aria-hidden': true } : { role: 'img', 'aria-label': iconLabel };
   return (
-    <div role={role} className={`${styles.notice} ${styles[props.tone]}`}>
+    <div role={role} className={`${styles.notice} ${styles[tone]}`}>
       <svg className={styles.icon} viewBox="0 0 16 16" focusable="false" {...iconA11y}>
         {shapes}
       </svg>
-      <p className={styles.message}>{props.message}</p>
+      <p className={styles.message}>{message}</p>
     </div>
   );
 }

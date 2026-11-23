@@ -75,6 +75,7 @@ describe('EmptyState.module.css', () => {
     expect(css()['.description']).toMatchObject({ color: 'var(--muted)' });
   });
 
+  // Foco visível: o anel de 2px em --focus é o :focus-visible global (base.test.ts); aqui nada o apaga.
   it('só usa tokens e não mexe no outline: nenhum hex, px literal nem outline', () => {
     for (const decls of Object.values(css())) {
       for (const value of Object.values(decls)) expect(value).not.toMatch(/#|\d\s*px\b/);
