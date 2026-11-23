@@ -32,6 +32,11 @@ run "certificados_dns_em_us_east_1" {
     condition     = length(aws_route53_record.validation) == 3 && alltrue([for r in aws_route53_record.validation : r.zone_id == "Z0000000EXAMPLE"])
     error_message = "Os registros de validação devem ficar na zona lida."
   }
+
+  assert {
+    condition     = output.zone_id == "Z0000000EXAMPLE" && data.aws_route53_zone.this.name == "example.com" && !data.aws_route53_zone.this.private_zone
+    error_message = "A zona pública deve ser lida como data source, pelo nome."
+  }
 }
 
 run "producao_no_apex" {

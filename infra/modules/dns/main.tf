@@ -20,6 +20,7 @@ resource "aws_acm_certificate" "this" {
   domain_name       = each.value
   validation_method = "DNS"
 
+  # Na troca, o novo nasce antes: o antigo segue em uso no CloudFront, na API ou no Cognito.
   lifecycle {
     create_before_destroy = true
   }
