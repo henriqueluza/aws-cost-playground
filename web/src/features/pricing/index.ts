@@ -9,4 +9,13 @@ export {
   type PriceSource,
   type PriceTier,
 } from './model/catalog';
+export {
+  estimate,
+  type BlockCost,
+  type ChargeKind,
+  type CostEstimate,
+  type CostLine,
+  type CostStatus,
+  type EdgeCost,
+} from './model/engine';
 export { PricingPanel } from './ui/PricingPanel';
