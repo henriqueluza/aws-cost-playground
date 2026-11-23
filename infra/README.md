@@ -10,7 +10,7 @@ Terraform da AWS (us-east-1, 100% serverless). Decisões em `docs/architecture/a
 | `envs/staging` | Raiz do ambiente `staging` |
 | `envs/production` | Raiz do ambiente `production` |
 | `tools/` | `plan_guard.py` e seus testes |
-| `bootstrap/` | Buckets de estado, provedor OIDC e papéis de CI; é do autor e chega na #13. Agentes não tocam |
+| `bootstrap/` | Buckets de estado, provedor OIDC e papéis de CI, com README próprio; só o autor aplica. Agentes não tocam sem Issue que autorize |
 
 ## Regras para agentes
 
