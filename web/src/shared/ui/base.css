@@ -1,1 +1,16 @@
-/* Estilo base sobre os tokens (pacote E). */
+/* Estilo base sobre os tokens do DESIGN.md. Só o que vale para o app inteiro. */
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-regular);
+}
+
+/* Foco do teclado: nunca removido, só em :focus-visible (DESIGN.md, "Foco"). */
+:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
