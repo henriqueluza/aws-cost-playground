@@ -27,6 +27,7 @@ Nada aqui tem custo fixo: sem chave própria do KMS e sem tabela de lock (o lock
 
 O job `plan` roda código do próprio PR, então o papel parte do princípio de que esse código é hostil. Limites conhecidos:
 
+- A negação cobre os serviços que o projeto usa (lista exata em `plan.tf`, travada por teste). `ReadOnlyAccess` vale para a conta inteira: se a conta ganhar outro serviço com dado (fila, stream), acrescente a negação aqui.
 - O papel lê os dois estados. Tudo que o Terraform gravar no estado fica visível para qualquer PR de branch deste repositório: **não ponha segredo no estado**.
 - `ReadOnlyAccess` deixa ler a configuração dos recursos, inclusive as variáveis de ambiente das funções Lambda. A regra do projeto já proíbe segredo em variável de ambiente; aqui ela é o que protege o segredo.
 - A negação de `ssm:GetParameter*` impede o `plan` de reler um `aws_ssm_parameter` gerenciado. Com isso o job `plan` falha no refresh de `/acp/<env>/anthropic-api-key` enquanto o autor não decidir a #126: criar o parâmetro à mão, fora do Terraform; planejar sem refresh desse recurso; ou aceitar que o papel `plan` leia a chave.

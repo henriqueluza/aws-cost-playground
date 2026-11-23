@@ -100,9 +100,9 @@ run "papel_plan_somente_leitura" {
       "cognito-idp:AdminListUserAuthEvents", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup",
       "dynamodb:BatchGetItem", "dynamodb:GetItem", "dynamodb:GetRecords", "dynamodb:PartiQLSelect",
       "dynamodb:Query", "dynamodb:Scan",
-      "logs:FilterLogEvents", "logs:GetLogEvents", "logs:GetLogRecord", "logs:GetQueryResults",
+      "logs:FilterLogEvents", "logs:GetLogEvents", "logs:GetLogObject", "logs:GetLogRecord", "logs:GetQueryResults",
       "logs:StartLiveTail", "logs:StartQuery", "logs:Unmask",
-      "secretsmanager:GetSecretValue",
+      "secretsmanager:BatchGetSecretValue", "secretsmanager:GetSecretValue",
       "ssm:GetParameter", "ssm:GetParameterHistory", "ssm:GetParameters", "ssm:GetParametersByPath",
     ])
     error_message = "O papel plan não lê itens, usuários, logs nem segredos (inclusive o parâmetro da chave da Claude API), em nenhum recurso."
