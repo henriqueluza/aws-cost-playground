@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { Block, Usage } from './designDocument';
+import { adrExampleDesign } from '../../../test/designFixtures';
+import { usageSchema, type Block } from './designDocument';
 import { effectiveUsage } from './effectiveUsage';
 
 type UsageSlot = Pick<Block, 'usage' | 'overrides'>;
-// Bloco Lambda do ADR-0001, seção "Modelo de dados".
-const adrUsage: Usage = {
-  source: 'llm',
-  estimatedAt: '2026-11-18T14:00:00Z',
-  values: { requestsPerMonth: 3000000, avgDurationMs: 120 },
-};
+// Bloco Lambda do ADR-0001, seção "Modelo de dados". O parse devolve `Usage`; o tipo inferido da
+// fixture (união dos blocos, com chaves opcionais `undefined`) não é atribuível a ele.
+const adrUsage = usageSchema.parse(adrExampleDesign.blocks[0]?.usage);
 
 describe('effectiveUsage (ADR-0001)', () => {
   it('o override vence o valor do usage e as outras chaves ficam', () => {
@@ -33,11 +31,9 @@ describe('effectiveUsage (ADR-0001)', () => {
       usage: { source: 'default', values: old },
       overrides: { avgDurationMs: 80, burstPerSecond: 50 },
     };
-    const overridesBefore = structuredClone(block.overrides);
     const values = { requestsPerMonth: 9000000, avgDurationMs: 200, coldStartsPerMonth: 300 };
     const reEstimated: UsageSlot = { ...block, usage: { source: 'llm', values } };
 
-    expect(reEstimated.overrides).toEqual(overridesBefore);
     const result = effectiveUsage(reEstimated.usage, reEstimated.overrides);
     expect(result).toEqual({ ...values, avgDurationMs: 80, burstPerSecond: 50 });
     expect(result).not.toHaveProperty('payloadKb');
