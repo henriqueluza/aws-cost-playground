@@ -1,0 +1,4 @@
+/* Estilo global do app, na ordem: fontes, tokens do DESIGN.md e base. */
+@import './fonts.css';
+@import './tokens.css';
+@import './base.css';

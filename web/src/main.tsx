@@ -1,3 +1,4 @@
+import './shared/ui/global.css';
 import { bootstrap } from './app/bootstrap';
 
 const container = document.getElementById('root');
