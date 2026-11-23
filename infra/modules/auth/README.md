@@ -56,7 +56,7 @@ Avisos de composição (ambiente, #21):
 
 - Certificado ACM **emitido** em us-east-1 que cubra `auth.<domínio>`.
 - O domínio pai (`<domínio>` ou `staging.<domínio>`) já com registro A: o Cognito recusa criar o domínio sem ele.
-- A criação do domínio no Cognito pode levar até cerca de uma hora.
+- A criação do domínio no Cognito pode levar até cerca de uma hora. Se o primeiro `apply` falhar nesse ponto, rode o `plan` de novo antes de qualquer outra ação; nada de import nem de mexer no estado.
 
 ## Entradas
 
@@ -87,7 +87,7 @@ Avisos de composição (ambiente, #21):
 - O escopo é exatamente `openid email`; qualquer outro devolve `invalid_scope`.
 - `redirect_uri` e `logout_uri` têm de ser idênticos aos registrados.
 - Troca do código e renovação em `POST https://<domain_name>/oauth2/token`, sem segredo.
-- Sair chama `/oauth2/revoke` e `/logout`.
+- Sair chama `/oauth2/revoke` e `/logout`. Apagar só os tokens do site não basta: o login gerenciado mantém um cookie de sessão próprio, que só o `/logout` (com o `logout_uri` registrado) encerra.
 - O refresh dura 1 dia e não há rotação: a sessão termina em no máximo um dia.
 
 ## Para a API (#19 e exclusão de conta)
@@ -103,7 +103,9 @@ Não dá para validar sem apply: se a página do login gerenciado oferece usuár
 
 - Listas de senhas comuns ou vazadas (ASVS 6.2.4 e 6.2.12) só existem no tier Plus, que o projeto não usa.
 - Sem WAF no domínio (risco aceito no ADR).
-- Depois do primeiro apply, por causa do `prevent_destroy`, não mudam sem substituir o pool: login por e-mail, `case_sensitive = false` e a ausência de `schema`.
+- O remetente padrão do Cognito envia no máximo 50 e-mails por dia por conta AWS; a cota não é ajustável e volta às 09:00 UTC. Com `self_signup_enabled = true`, qualquer pessoa com o `client_id` (público) pode esgotá-la por `SignUp`, `ResendConfirmationCode` e `ForgotPassword`; até a cota voltar, ninguém recebe código de verificação nem de recuperação. A saída é o SES, fora de escopo. Decisão do autor na #139.
+- Com o cadastro aberto, o `SignUp` responde `UsernameExistsException` para um e-mail já cadastrado: `prevent_user_existence_errors` não cobre o cadastro. Também na #139.
+- Depois do primeiro apply, por causa do `prevent_destroy`, não mudam sem substituir o pool: `name_prefix` (o nome do pool), login por e-mail, `case_sensitive = false` e a ausência de `schema`. Mudar `generate_secret` substituiria o cliente e trocaria o `client_id`; o plan-guard barra.
 
 ## Remover o pool
 

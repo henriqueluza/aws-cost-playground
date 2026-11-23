@@ -160,9 +160,9 @@ run "rejeita_urls_vazias" {
   expect_failures = [var.callback_urls, var.logout_urls]
 }
 
-run "rejeita_callback_localhost" {
+run "rejeita_localhost_em_lista_mista" {
   command = plan
-  variables { callback_urls = ["http://localhost:5173/auth/callback"] }
+  variables { callback_urls = ["https://staging.exemplo.com/auth/callback", "http://localhost:5173/auth/callback"] }
   expect_failures = [var.callback_urls]
 }
 
@@ -177,7 +177,7 @@ run "padrao_de_url_caso_a_caso" {
     error_message = "O padrão aceitou porta, query, fragmento, credencial, host sem ponto, maiúscula no host, `..` ou `//`."
   }
   assert {
-    condition     = alltrue([for u in ["https://a.exemplo.com", "https://a.exemplo.com/", "https://a.exemplo.com/auth/callback"] : can(regex(local.https_url_pattern, u))])
+    condition     = alltrue([for u in ["https://a.exemplo.com", "https://a.exemplo.com/", "https://a.exemplo.com/auth/callback", "https://a.exemplo.com/a/b/", "https://a.b.exemplo.com/cb"] : can(regex(local.https_url_pattern, u))])
     error_message = "O padrão recusou uma URL legítima."
   }
 }
