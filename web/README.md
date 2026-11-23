@@ -68,5 +68,6 @@ Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de 
 ## Componentes de `shared/ui` e testes de acessibilidade
 
 - `Button` e `IconButton` (`Button.tsx` + `Button.module.css`) seguem "Botões" e "Estados" do `DESIGN.md`. Variantes `primary`, `secondary` (padrão), `tertiary` e `destructive`; o `IconButton` não tem a terciária e exige `aria-label` (erro de tipo sem ele), que também vira o tooltip. `type` é `button` por padrão. Não aceitam `className` nem `style`: o visual vem só dos tokens. O texto entra como filho React, nunca como HTML.
+- `Panel` (`Panel.tsx` + `Panel.module.css`) é o bloco "Section" do `DESIGN.md`: uma região rotulada pelo próprio título (`headingLevel` 2 a 4, padrão 2), com `font-variant-numeric: tabular-nums` em todo o conteúdo. Não aceita `className` nem `style`.
 - Cada componente usa um CSS Module (`X.module.css`) só com `var(--…)`; um teste por arquivo confere que não há hex nem `px` literal.
 - `src/test/axe.ts` exporta `expectNoAxeViolations(elemento)`, que roda o `axe-core` (versão exata, devDependency) e falha com a lista de violações. A regra `color-contrast` fica desligada: o jsdom não calcula cores, e o contraste dos pares de tokens já está verificado no `DESIGN.md`. Todo componente de `shared/ui` tem um teste que o usa, além do teste de teclado.
