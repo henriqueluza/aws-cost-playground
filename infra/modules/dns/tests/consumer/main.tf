@@ -1,4 +1,4 @@
-# Consumidor só de teste: o Cognito lê auth_domain e devolve o alvo em auth_alias (ciclo = plan falha).
+# Só de teste: o Cognito lê auth_domain e devolve o alvo em auth_alias (ciclo = plan falha). Site literal.
 terraform {
   required_version = "~> 1.16.0"
 

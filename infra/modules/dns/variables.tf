@@ -15,8 +15,7 @@ variable "site_domain" {
   }
 }
 
-# Três variáveis (e não um map) de propósito: cada alvo é um nó próprio no grafo,
-# o que evita ciclo entre este módulo e os de site, API e Cognito.
+# Uma variável por alvo, não um map: mesmo motivo dos três blocos em main.tf (ciclo com o Cognito).
 variable "site_alias" {
   description = "Alvo do site: domain_name e hosted_zone_id do aws_cloudfront_distribution. null = sem registro."
   type        = object({ name = string, zone_id = string })
