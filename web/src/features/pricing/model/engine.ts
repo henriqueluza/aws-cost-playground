@@ -42,10 +42,7 @@ export interface EdgeCost extends ItemCost {
   readonly kind: EdgeKind;
 }
 
-/**
- * Custo mensal do design em USD. Os valores são `Decimal`: saem por `toFixed` e nunca entram
- * em JSON, em query key nem em estado persistido.
- */
+/** Custo mensal do design em USD. `Decimal` sai por `toFixed`: nunca vai a JSON, query key nem estado persistido. */
 export interface CostEstimate {
   /** `fixed + variable`: soma dos blocos e das arestas com status `priced`. */
   readonly total: Money;
@@ -62,22 +59,12 @@ const zeroCost = { status: 'priced', total: ZERO, fixed: ZERO, variable: ZERO, l
 
 /**
  * Estima o custo mensal de um design já validado com o catálogo da região dele. Função pura:
- * não altera as entradas nem faz I/O.
- *
- * Implementação provisória: todo item sai `priced` com zero. As regras de preço por bloco
- * chegam nas Issues do motor.
+ * não altera as entradas nem faz I/O. Implementação provisória: todo item sai `priced` com
+ * zero; as regras de preço por bloco chegam nas Issues do motor.
  */
 export function estimate(design: DesignDocument, catalog: PriceCatalog): CostEstimate {
   void catalog;
-  return {
-    total: ZERO,
-    fixed: ZERO,
-    variable: ZERO,
-    blocks: design.blocks.map((block) => ({
-      ...zeroCost,
-      blockId: block.id,
-      blockType: block.type,
-    })),
-    edges: design.edges.map((edge) => ({ ...zeroCost, edgeId: edge.id, kind: edge.kind })),
-  };
+  const blocks = design.blocks.map((b) => ({ ...zeroCost, blockId: b.id, blockType: b.type }));
+  const edges = design.edges.map((e) => ({ ...zeroCost, edgeId: e.id, kind: e.kind }));
+  return { total: ZERO, fixed: ZERO, variable: ZERO, blocks, edges };
 }
