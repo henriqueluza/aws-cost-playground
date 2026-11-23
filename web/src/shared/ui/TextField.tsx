@@ -1,4 +1,5 @@
-import type { ComponentPropsWithRef, ReactNode } from 'react';
+import type { ComponentPropsWithRef } from 'react';
+import { Field, fieldBoxClass, useFieldControl } from './Field';
 import type { FieldBaseProps } from './Field';
 
 /** Atributos nativos do `<input>` que o chamador pode passar; o resto o campo controla. */
@@ -10,7 +11,16 @@ export type NativeInputProps = Omit<
 export type TextFieldProps = NativeInputProps & FieldBaseProps;
 
 /** Campo de texto de uma linha (`<input type="text">`). */
-export function TextField(props: TextFieldProps): ReactNode {
-  void props;
-  throw new Error('contrato: implementar');
+export function TextField({ label, error, density, ...rest }: TextFieldProps) {
+  const { errorId, ...aria } = useFieldControl(error);
+  return (
+    <Field controlId={aria.id} errorId={errorId} label={label} error={error}>
+      <input
+        {...rest}
+        {...aria}
+        type="text"
+        className={fieldBoxClass({ error, density, disabled: rest.disabled })}
+      />
+    </Field>
+  );
 }

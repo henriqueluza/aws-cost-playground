@@ -1,0 +1,126 @@
+/* DESIGN.md, "Campos", "Estados" e "Regras de densidade". Só tokens: nenhuma cor ou tamanho literal. */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.label {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: var(--fw-medium);
+  color: var(--muted);
+}
+
+/* A borda de 1px cabe nos 12px entre a borda e o texto, como no botão. */
+.control {
+  height: var(--control-height);
+  margin: 0;
+  padding: 0 calc(var(--space-3) - var(--border-width));
+  background-color: var(--surface);
+  border: var(--border-width) solid var(--control);
+  border-radius: var(--radius-control);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  transition: border-color var(--t-hover) var(--ease-out);
+}
+.form {
+  height: var(--control-height-form);
+}
+/* O Firefox esmaece o placeholder; --faint já é o tom final. */
+.control::placeholder,
+.bare::placeholder {
+  color: var(--faint);
+  opacity: 1;
+}
+.control:focus-within {
+  border-color: var(--accent);
+}
+
+/* Numérico: input sem borda dentro da caixa da unidade; o anel vai para a caixa. */
+.affix {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+.bare {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+}
+.bare:focus-visible {
+  outline: none;
+}
+.affix:has(.bare:focus-visible) {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+.unit {
+  white-space: nowrap;
+  color: var(--faint);
+}
+
+/* Seleção: a seta nativa sai com `appearance: none` e a própria fica à direita. */
+.selectWrap {
+  position: relative;
+  display: grid;
+}
+.select {
+  min-width: 0;
+  padding-right: calc(var(--space-2) * 2 + var(--icon) - var(--border-width));
+  appearance: none;
+}
+.chevron {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  width: var(--icon);
+  height: var(--icon);
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.invalid,
+.invalid:focus-within {
+  border-color: var(--negative);
+}
+.disabled {
+  background-color: var(--raised);
+  border-color: var(--border);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+/* O Safari esmaece o texto desabilitado com tinta e opacidade próprias. */
+.control:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: currentColor;
+}
+
+.error {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--negative);
+}
+.errorIcon {
+  flex: none;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
+  margin-top: calc((var(--lh-small) - var(--icon-inline)) / 2);
+}
+/* Traço Lucide de 1,5px: o viewBox de cada ícone tem o tamanho em que ele aparece. */
+.chevron,
+.errorIcon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
