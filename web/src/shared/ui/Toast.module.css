@@ -1,0 +1,70 @@
+/* DESIGN.md, "Elevation & Depth" e "Movimento". Só tokens: nenhuma cor, tamanho ou tempo literal. */
+
+/* Flutuante no canto inferior esquerdo, longe do carimbo (inferior direito da folha). Fechado,
+   fica montado mas invisível e sem receber ponteiro. */
+.toast {
+  position: fixed;
+  inset-inline-start: var(--space-4);
+  inset-block-end: var(--space-4);
+  z-index: 1; /* sem token de camada; acima da folha (o React Flow isola o próprio contexto) */
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  max-inline-size: var(--stamp-width);
+  /* em tela estreita, a mesma folga de --space-4 do lado direito */
+  margin-inline-end: var(--space-4);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  background-color: var(--surface);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  opacity: 0;
+  transform: translateY(var(--space-2));
+  pointer-events: none;
+}
+
+/* A transição só existe aberta: a entrada anima; a saída é instantânea, porque a caixa fecha
+   já vazia e animá-la mostraria uma caixa sem texto. */
+.toast[data-open] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition:
+    opacity var(--t-ui) var(--ease-out),
+    transform var(--t-ui) var(--ease-out);
+}
+
+/* No escuro a sombra quase não aparece: o que flutua sobe de tom e ganha borda. */
+:global(:root[data-theme='dark']) .toast {
+  background-color: var(--raised);
+  border-color: var(--border);
+}
+
+.message {
+  flex: 1;
+  min-inline-size: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.closeIcon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5; /* traço Lucide de 1,5px: o viewBox tem o tamanho exibido */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    transform: none;
+  }
+
+  .toast[data-open] {
+    transition: none;
+  }
+}
