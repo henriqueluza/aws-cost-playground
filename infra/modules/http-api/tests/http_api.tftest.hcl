@@ -133,3 +133,16 @@ run "origem_curinga_e_rejeitada" {
   variables { cors_allowed_origins = ["*"] }
   expect_failures = [var.cors_allowed_origins]
 }
+run "origem_com_porta_ou_caminho_e_rejeitada" {
+  command = plan
+  variables { cors_allowed_origins = ["https://staging.exemplo.com:8443/app"] }
+  expect_failures = [var.cors_allowed_origins]
+}
+run "retencao_do_log_vem_da_variavel" {
+  command = plan
+  variables { log_retention_days = 14 }
+  assert {
+    condition     = aws_cloudwatch_log_group.access.retention_in_days == 14
+    error_message = "A retenção do log de acesso vem de log_retention_days."
+  }
+}
