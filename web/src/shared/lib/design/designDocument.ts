@@ -16,6 +16,7 @@ export const DESIGN_LIMITS = {
   maxDescriptionLength: 2000,
   maxLabelLength: 80,
   maxUsageValue: 1e12,
+  maxFieldsPerRecord: 32,
 } as const;
 
 /**
@@ -28,15 +29,17 @@ const fieldKey = z
   .refine((key) => !Object.hasOwn(Object.prototype, key));
 const blockId = z.string().regex(/^blk_[A-Za-z0-9_-]{1,60}$/);
 const edgeId = z.string().regex(/^edg_[A-Za-z0-9_-]{1,60}$/);
+/** Até `maxFieldsPerRecord` chaves em `attributes`, `usage.values` e `overrides`. */
+const withinFieldLimit = (record: object) =>
+  Object.keys(record).length <= DESIGN_LIMITS.maxFieldsPerRecord;
 
 /**
  * Números de uso: finitos, não negativos e até `maxUsageValue`. Também é o formato de `overrides`.
  * As faixas plausíveis por tipo de bloco virão com a Issue dos 20 blocos.
  */
-export const usageValuesSchema = z.record(
-  fieldKey,
-  z.number().min(0).max(DESIGN_LIMITS.maxUsageValue),
-);
+export const usageValuesSchema = z
+  .record(fieldKey, z.number().min(0).max(DESIGN_LIMITS.maxUsageValue))
+  .refine(withinFieldLimit, 'Chaves demais.');
 
 export const usageSchema = z.object({
   source: z.enum(USAGE_SOURCES),
@@ -50,7 +53,9 @@ export const blockSchema = z.object({
   /** Genérico de propósito: os tipos aceitos são definidos em `features/pricing/model`. */
   type: z.string().regex(/^aws\.[a-z0-9-]{1,40}$/),
   label: z.string().max(DESIGN_LIMITS.maxLabelLength),
-  attributes: z.record(fieldKey, z.union([z.string().max(64), z.number(), z.boolean()])),
+  attributes: z
+    .record(fieldKey, z.union([z.string().max(64), z.number(), z.boolean()]))
+    .refine(withinFieldLimit, 'Chaves demais.'),
   usage: usageSchema,
   overrides: usageValuesSchema,
 });
@@ -97,6 +102,9 @@ export const designDocumentSchema = z
       }
       if (edge.target !== CLIENT_NODE_ID && !blockIds.has(edge.target)) {
         issue(['edges', i, 'target'], 'A aresta chega a um bloco que não existe.');
+      }
+      if (edge.target === edge.source) {
+        issue(['edges', i, 'target'], 'A aresta não pode ligar um bloco a ele mesmo.');
       }
       if (edge.target === CLIENT_NODE_ID && edge.kind !== 'data') {
         issue(['edges', i, 'kind'], 'Só arestas de dados chegam à internet.');

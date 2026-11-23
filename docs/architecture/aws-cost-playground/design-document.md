@@ -24,9 +24,9 @@ O documento do design é o JSON que o anônimo baixa e o logado salva. A API (#1
 | `edges[].target`                                     | Id de bloco existente ou `client`. Destino `client` só com `kind: "data"`.                                                                                                                                                     |
 | `scenarios`                                          | Só `[]`                                                                                                                                                                                                                        |
 
-**Integridade:** ids de bloco únicos e ids de aresta únicos. `source` é sempre um bloco existente (nunca `client`); `target` é um bloco existente ou `client`. Ciclos são permitidos.
+**Integridade:** ids de bloco únicos e ids de aresta únicos. `source` é sempre um bloco existente (nunca `client`); `target` é um bloco existente ou `client`. Ciclos entre blocos são permitidos; uma aresta de um bloco para ele mesmo (auto-laço) é recusada.
 
-**Limites:** 100 blocos, 400 arestas, `workload.description` até 2.000 caracteres, `label` até 80, string de atributo até 64.
+**Limites:** 100 blocos, 400 arestas, `workload.description` até 2.000 caracteres, `label` até 80, string de atributo até 64, até 32 chaves em cada `attributes`, `usage.values` e `overrides`.
 
 ## Evolução
 
