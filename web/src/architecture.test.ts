@@ -13,6 +13,8 @@ async function errorRules(code: string, file: string): Promise<string[]> {
 
 const reactImport = "import { useState } from 'react';\nexport const hook = useState;\n";
 const designsUi = './features/designs/ui/x.tsx';
+const designLib = './shared/lib/design/x.ts';
+const moneyLib = './shared/lib/money.ts';
 
 describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
   it('proíbe react em model/', async () => {
@@ -26,6 +28,15 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     ["import { ReactFlow } from '@xyflow/react';", './features/pricing/application/x.ts'],
     ["import { get } from '../../../shared/lib/http';", './features/pricing/model/x.ts'],
     ["import { get } from '../../../shared/lib/http';", './features/pricing/application/x.ts'],
+    ["import { useState } from 'react';", designLib],
+    ["import { ReactFlow } from '@xyflow/react';", designLib],
+    ["import { get } from '../../../shared/lib/http';", designLib],
+    ["import { get } from '../http';", designLib],
+    ["import { get } from '../http';", './features/pricing/model/x.ts'],
+    ["import { get } from '../../lib/http';", designLib],
+    ["import { useState } from 'react';", moneyLib],
+    ["import { ReactFlow } from '@xyflow/react';", moneyLib],
+    ["import { get } from './http';", moneyLib],
   ])('proíbe %s em %s', async (line, file) => {
     const rules = await errorRules(`${line}\nexport const dep = 1;\n`, file);
     expect(rules).toContain('no-restricted-imports');
@@ -40,6 +51,11 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     const code =
       "import { EditorPage } from '../../editor/ui/EditorPage';\nexport const p = EditorPage;\n";
     expect(await errorRules(code, designsUi)).toContain('boundaries/dependencies');
+  });
+
+  it('proíbe shared/lib/design de importar uma feature', async () => {
+    const code = "import { PricingPanel } from '../../../features/pricing';\nexport const p = 1;\n";
+    expect(await errorRules(code, designLib)).toContain('boundaries/dependencies');
   });
 
   it('permite importar outra feature pelo index.ts', async () => {

@@ -14,7 +14,7 @@ const sameFeature = {
 const shared = { element: { type: 'shared' } };
 
 const pureTsMessage =
-  'ADR-0001: application/ e model/ são TypeScript puro (sem React, React Flow ou HTTP).';
+  'ADR-0001: application/, model/, shared/lib/design e shared/lib/money.ts são TypeScript puro (sem React, React Flow ou HTTP).';
 
 export default defineConfig([
   globalIgnores(['dist', 'coverage', 'playwright-report', 'test-results']),
@@ -52,7 +52,12 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/**/application/**', 'src/**/model/**'],
+    files: [
+      'src/**/application/**',
+      'src/**/model/**',
+      'src/shared/lib/design/**',
+      'src/shared/lib/money.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -67,8 +72,9 @@ export default defineConfig([
                 'react/*',
                 'react-dom/*',
                 '@xyflow/*',
-                '**/shared/lib/http',
-                '**/shared/lib/http/*',
+                // Qualquer módulo http, inclusive '../http' a partir de shared/lib.
+                '**/http',
+                '**/http/*',
               ],
               message: pureTsMessage,
             },

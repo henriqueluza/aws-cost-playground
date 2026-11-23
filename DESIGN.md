@@ -7,7 +7,7 @@ description: Prancha de arquitetura AWS com o custo mensal escrito no próprio d
 
 # Design System: AWS Cost Playground
 
-Fonte da verdade visual do `web/`. Os blocos `css` deste arquivo são os tokens normativos: a Issue do esqueleto os copia para `web/src/shared/ui/tokens.css` sem mudar nomes nem valores. Os nomes seguem `assets/app.css` da skill `design-taste-frontend`, para que o CSS base dela sirva sem renomear nada. Produto, público e escopo estão em [PRODUCT.md](PRODUCT.md) e no [PRD](docs/product/aws-cost-playground/PRD.md); aqui só entra o que é visual.
+Fonte da verdade visual do `web/`. Os blocos `css` deste arquivo são os tokens normativos: `web/src/shared/ui/tokens.css` é a cópia literal deles, sem mudar nomes nem valores; edite os dois juntos (um teste compara os dois). Os nomes seguem `assets/app.css` da skill `design-taste-frontend`, para que o CSS base dela sirva sem renomear nada. Produto, público e escopo estão em [PRODUCT.md](PRODUCT.md) e no [PRD](docs/product/aws-cost-playground/PRD.md); aqui só entra o que é visual.
 
 Origem: `ui-ux-pro-max` (estilo Minimalism & Swiss, IBM Plex Sans, densidade alta), `design-taste-frontend` (`draw.mjs --app --kind builder`, estilo `framed-sheet`, seed 20627501) e `impeccable` (modo Operate, `concept-seed` seed:1388cfa49c751380, direção nº 3). O histórico das escolhas está em `docs/handoff/4.md`.
 
@@ -129,7 +129,7 @@ Estratégia contida: neutros tingidos da moldura, tinta quase preta para texto, 
 }
 ```
 
-**Como o tema é escolhido.** O escuro é declarado uma vez só, no seletor `[data-theme="dark"]`. Um arquivo do bundle, `theme.js`, carregado no `<head>` sem `defer` e nunca inline (a CSP não ganha `unsafe-inline`), grava `data-theme` no `<html>` antes da primeira pintura. Ele usa a escolha salva em `localStorage` (chave `acp-theme`) ou, se não houver, `prefers-color-scheme`, e acompanha a mudança do sistema enquanto o usuário não escolher.
+**Como o tema é escolhido.** O escuro é declarado uma vez só, no seletor `[data-theme="dark"]`. Um script clássico, `web/public/theme.js` (copiado para `dist/` sem hash e sem passar pelo bundler), carregado no `<head>` sem `defer` e nunca inline (a CSP não ganha `unsafe-inline`), grava `data-theme` no `<html>` antes da primeira pintura. Ele usa a escolha salva em `localStorage` (chave `acp-theme`) ou, se não houver, `prefers-color-scheme`, e acompanha a mudança do sistema enquanto o usuário não escolher.
 
 ### Categorias dos blocos
 

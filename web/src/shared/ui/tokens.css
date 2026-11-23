@@ -1,0 +1,163 @@
+/* Fonte da verdade: DESIGN.md. Cópia literal dos blocos css; um teste compara os dois.
+   Não edite aqui sem editar o DESIGN.md. O Prettier ignora este arquivo. */
+
+:root {
+  color-scheme: light;
+  /* neutros: moldura de papel vegetal, folha branca */
+  --ground: #f0f5f9;
+  --surface: #ffffff;
+  --raised: #f4f6f8;
+  --active: #e8eef2;
+  --border: #dde3e8;
+  --rule: #eef1f3;
+  --control: #81878e;
+  --text: #131416;
+  --muted: #56595c;
+  --faint: #63676b;
+  /* ação e interação: tudo em tinta */
+  --primary: #1d1f20;
+  --primary-ink: #ffffff;
+  --primary-hover: #383b3d;
+  --accent: #131416;
+  --accent-ink: #ffffff;
+  --focus: var(--accent);
+  /* canvas e dados */
+  --edge: #6b7177;
+  --chart-muted: #c3c9ce;
+  --changed: rgb(19 20 22 / 0.07);
+  --scrim: rgb(19 20 22 / 0.32);
+  /* estado: só erro e aviso têm cor */
+  --negative: #c4242a;
+  --warning: #92400e;
+  --positive: var(--text);
+  --pill-negative-bg: #ffedea; --pill-negative-ink: #831c1e;
+  --pill-warning-bg: #fffbeb;  --pill-warning-ink: #92400e;  --pill-warning-border: #fde68a;
+  --pill-neutral-bg: #ebedee;  --pill-neutral-ink: #353736;
+  --pill-positive-bg: var(--pill-neutral-bg); --pill-positive-ink: var(--pill-neutral-ink);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* escuro neutro, sem navy nem slate; profundidade por claridade */
+  --ground: #0d0e0f;
+  --surface: #161718;
+  --raised: #1e2021;
+  --active: #26282a;
+  --border: #2c2f31;
+  --rule: #212325;
+  --control: #6d7378;
+  --text: #f2f3f4;
+  --muted: #b4b7ba;
+  --faint: #999da1;
+  --primary: #f2f3f4;
+  --primary-ink: #131416;
+  --primary-hover: #d4d6d8;
+  --accent: #f2f3f4;
+  --accent-ink: #131416;
+  --focus: var(--accent);
+  --edge: #80868c;
+  --chart-muted: #4a4e52;
+  --changed: rgb(242 243 244 / 0.10);
+  --scrim: rgb(0 0 0 / 0.6);
+  --negative: #ef6b80;
+  --warning: #f0a05f;
+  --positive: var(--text);
+  --pill-negative-bg: #2c1a20; --pill-negative-ink: #ef6b80;
+  --pill-warning-bg: #2e2312;  --pill-warning-ink: #f0a05f;  --pill-warning-border: #5c4520;
+  --pill-neutral-bg: #2a2c2e;  --pill-neutral-ink: #d6d8da;
+  --pill-positive-bg: var(--pill-neutral-bg); --pill-positive-ink: var(--pill-neutral-ink);
+}
+
+:root {
+  --cat-compute-ink: #265496;  --cat-compute-tint: #dcf0ff;
+  --cat-data-ink: #09672e;     --cat-data-tint: #daf8df;
+  --cat-network-ink: #0e6e72;  --cat-network-tint: #ccf8fa;
+  --cat-security-ink: #8b2b5d; --cat-security-tint: #ffe4f1;
+  --cat-ops-ink: #5c4c02;      --cat-ops-tint: #f8efcd;
+}
+:root[data-theme="dark"] {
+  --cat-compute-ink: #8fb9f7;  --cat-compute-tint: #1b2c44;
+  --cat-data-ink: #76cf8a;     --cat-data-tint: #17321e;
+  --cat-network-ink: #71d0d5;  --cat-network-tint: #073234;
+  --cat-security-ink: #f297bf; --cat-security-tint: #3e202e;
+  --cat-ops-ink: #c4c375;      --cat-ops-tint: #2d2d11;
+}
+
+:root {
+  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --fs-title: 22px;      --lh-title: 28px;
+  --fs-kpi: 28px;        --lh-kpi: 36px;
+  --fs-section: 16px;    --lh-section: 24px;
+  --fs-body: 14px;       --lh-body: 20px;
+  --fs-small: 12px;      --lh-small: 16px;
+  --fs-read: 16px;       --lh-read: 26px;   --measure-read: 68ch;
+  --fs-read-title: 28px; --lh-read-title: 36px;
+  --fw-regular: 400;     --fw-medium: 500;  --fw-semibold: 600;
+}
+
+:root {
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px;
+
+  /* casca do editor (1440 × 900 é a tela de referência) */
+  --topbar-height: 48px;
+  --sidebar-width: 232px;     /* paleta; 200px entre 1024 e 1279px */
+  --rail-width: 360px;        /* coluna direita: custo, bloco, carga; 320px entre 1024 e 1279px */
+  --sheet-inset: 8px;         /* folha recuada da borda de baixo (e da direita quando não há coluna) */
+  --panel-gap: 12px;          /* entre paleta, folha e coluna direita */
+  --pad: 24px;                /* padding interno da folha nas telas de lista e comparação */
+  --gap: 24px;                /* uma calha, horizontal e vertical, nas telas de folha */
+  --card-pad: 16px;
+
+  /* controles e linhas */
+  --control-height: 32px;     /* botões, inputs e selects em painéis e barras */
+  --control-height-form: 40px;/* campos em diálogo e nas páginas de texto */
+  --hit-min: 24px;            /* menor alvo clicável (WCAG 2.5.8), mesmo quando o desenho é menor */
+  --nav-row: 32px;            /* item da paleta e de menu, num passo de 40px */
+  --row-kv: 32px;             /* linha chave-valor no inspetor e no carimbo */
+  --row-cost: 36px;           /* linha da lista de custo (texto + barra de 2px) */
+  --row-table: 40px;          /* linha de tabela de comparação e lista de designs */
+  --row-header: 36px;         /* cabeçalho de tabela */
+
+  /* peças de tamanho fixo */
+  --node-width: 216px;        /* todos os blocos têm a mesma largura */
+  --tile-node: 24px;          /* ladrilho de categoria no bloco e na paleta */
+  --icon: 16px;               /* ícone de interface e de lista */
+  --icon-inline: 14px;        /* ícone dentro de linha de texto */
+  --stamp-width: 320px;       /* carimbo */
+  --split-bar: 8px;           /* barra fixo/variável */
+  --pill-height: 20px;
+  --mark-origin: 6px;         /* ponto e anel de origem do valor */
+}
+
+:root {
+  --shadow-float: 0 8px 24px rgb(19 20 22 / 0.12), 0 1px 3px rgb(19 20 22 / 0.08);
+  --shadow-tip: 0 2px 8px rgb(19 20 22 / 0.12);
+}
+:root[data-theme="dark"] {
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.55);
+  --shadow-tip: 0 2px 8px rgb(0 0 0 / 0.5);
+}
+
+:root {
+  --radius-sheet: 16px;   /* a folha e os painéis da casca */
+  --radius-card: 8px;     /* blocos, cartões, carimbo, popovers, diálogos */
+  --radius-control: 6px;  /* botões, inputs, selects, abas */
+  --radius-chip: 4px;     /* ladrilho de categoria, pílulas, cota de aresta */
+  --border-width: 1px;
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --focus-offset-node: 3px; /* nos blocos do canvas, para o anel ficar fora da borda de seleção */
+}
+
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --t-press: 120ms;    /* pressionar */
+  --t-hover: 150ms;    /* hover, troca de cor */
+  --t-ui: 200ms;       /* popover, menu, troca de aba; o teto da interface */
+  --t-changed: 600ms;  /* destaque que some do valor que mudou */
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --t-press: 0ms; --t-ui: 0ms; --t-changed: 0ms; }
+}
