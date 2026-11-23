@@ -137,6 +137,29 @@ describe('Button.module.css', () => {
     });
   });
 
+  it('o primário é tinta cheia e escurece no hover', () => {
+    expect(css()['.primary']).toMatchObject({
+      'background-color': 'var(--primary)',
+      color: 'var(--primary-ink)',
+    });
+    expect(css()['@media (hover: hover) .primary:hover:not(:disabled)']).toMatchObject({
+      'background-color': 'var(--primary-hover)',
+    });
+  });
+
+  it('o secundário é folha com borda de controle e vai a --raised no hover', () => {
+    expect(css()['.secondary']).toMatchObject({
+      'background-color': 'var(--surface)',
+      'border-color': 'var(--control)',
+      color: 'var(--text)',
+    });
+    expect(
+      css()[
+        '@media (hover: hover) .secondary:hover:not(:disabled), .destructive:hover:not(:disabled)'
+      ],
+    ).toMatchObject({ 'background-color': 'var(--raised)' });
+  });
+
   it('o destrutivo usa --negative no contorno e no texto', () => {
     expect(css()['.destructive']).toMatchObject({
       'border-color': 'var(--negative)',
