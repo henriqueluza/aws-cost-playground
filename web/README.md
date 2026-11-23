@@ -52,5 +52,13 @@ Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de 
 
 - `src/app/` — composition root: bootstrap (carga da config e providers) e rotas (`/`, `/designs`, `/comparar`, `/conta`, `/privacidade`, `/termos`, `/auth/callback`; as páginas ainda estão vazias).
 - `src/features/<feature>/` — uma pasta por funcionalidade (`editor`, `pricing`, `designs`, `compare`, `auth`, `account`, `workload`, `export`, `legal`). Uma feature só importa outra pelo `index.ts`. O motor de preço (`pricing/{application,model}`) é TypeScript puro, sem React, React Flow nem `fetch`. O lint que cobra essas fronteiras (`eslint-plugin-boundaries` + `no-restricted-imports`) já está ativo desde o PR #88; veja "Lint de arquitetura".
-- `src/shared/` — `config/` (schema e carga do `/config.json`), `lib/design/` e `ui/`. `lib/design/` guarda o contrato do documento do design: schema zod, tipos, limites (`DESIGN_LIMITS`) e `effectiveUsage`. Fica em `shared` porque várias features o usam. Importe pelo `index.ts`. Regras de validação: `docs/architecture/aws-cost-playground/design-document.md`.
+- `src/shared/` — `config/` (schema e carga do `/config.json`), `lib/design/` e `ui/` (tokens e estilo base, veja abaixo). `lib/design/` guarda o contrato do documento do design: schema zod, tipos, limites (`DESIGN_LIMITS`) e `effectiveUsage`. Fica em `shared` porque várias features o usam. Importe pelo `index.ts`. Regras de validação: `docs/architecture/aws-cost-playground/design-document.md`.
 - `src/test/` — setup dos testes (Vitest + Testing Library).
+
+## Tokens e estilo base
+
+- `src/shared/ui/tokens.css` é cópia literal dos blocos `css` do `DESIGN.md` (raiz do repositório), a fonte da verdade visual. Os nomes e valores dos tokens não se inventam aqui.
+- Para mudar um token, edite o `DESIGN.md` e o `tokens.css` juntos, no mesmo PR. O teste `src/shared/ui/tokens.test.ts` compara os dois nos dois sentidos e falha se divergirem.
+- O Prettier ignora o `tokens.css` (`.prettierignore`) para não reformatar a cópia; não o formate à mão.
+- `base.css` (estilo base) e `global.css` (importa tokens e base) ficam em `src/shared/ui/`; o `global.css` é importado em `src/main.tsx`. Componentes usam `var(--token)`, sem cores ou medidas fixas.
+- Ainda não existem: a escolha do tema claro/escuro antes da primeira pintura (#109) e as fontes (#108).
