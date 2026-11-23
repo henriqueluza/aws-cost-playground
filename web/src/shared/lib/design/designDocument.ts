@@ -29,7 +29,6 @@ const fieldKey = z
   .refine((key) => !Object.hasOwn(Object.prototype, key));
 const blockId = z.string().regex(/^blk_[A-Za-z0-9_-]{1,60}$/);
 const edgeId = z.string().regex(/^edg_[A-Za-z0-9_-]{1,60}$/);
-/** Até `maxFieldsPerRecord` chaves em `attributes`, `usage.values` e `overrides`. */
 const withinFieldLimit = (record: object) =>
   Object.keys(record).length <= DESIGN_LIMITS.maxFieldsPerRecord;
 
