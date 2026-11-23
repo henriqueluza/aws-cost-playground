@@ -1,6 +1,5 @@
 import type { ComponentPropsWithRef, ReactNode } from 'react';
-import { Field, fieldBoxClass, useFieldControl } from './Field';
-import type { FieldBaseProps } from './Field';
+import { Field, fieldBoxClass, useFieldControl, type FieldBaseProps } from './Field';
 import styles from './Field.module.css';
 
 type NativeSelectProps = Omit<

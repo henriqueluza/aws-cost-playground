@@ -1,6 +1,5 @@
 import type { ComponentPropsWithRef } from 'react';
-import { Field, fieldBoxClass, useFieldControl } from './Field';
-import type { FieldBaseProps } from './Field';
+import { Field, fieldBoxClass, useFieldControl, type FieldBaseProps } from './Field';
 
 /** Atributos nativos do `<input>` que o chamador pode passar; o resto o campo controla. */
 export type NativeInputProps = Omit<

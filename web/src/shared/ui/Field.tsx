@@ -1,5 +1,4 @@
-import { useId } from 'react';
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import styles from './Field.module.css';
 
 /** Altura: `panel` (padrão) usa `--control-height`; `form`, `--control-height-form` (diálogos). */
@@ -43,11 +42,9 @@ const errorIcon = (
   </svg>
 );
 
-type FieldProps = {
+type FieldProps = Pick<FieldBaseProps, 'label' | 'error'> & {
   controlId: string;
   errorId: string;
-  label: string;
-  error?: string;
   children: ReactNode;
 };
 

@@ -64,7 +64,7 @@ it('são <input type="text"> e <select> nativo; Tab os foca em ordem e onChange 
   expect(select).toHaveFocus();
   await userEvent.selectOptions(select, 'us-west-2');
   expect(select).toHaveValue('us-west-2');
-  expect(onChange).toHaveBeenCalledTimes(8);
+  expect(onChange).toHaveBeenCalledTimes(8); // 'api' + '12,5' + a seleção
 });
 it('NumberField: inputMode, unidade na caixa à direita e descrita antes do erro', async () => {
   render(<NumberField label="Uso" unit="GB/mês" />);
@@ -76,6 +76,8 @@ it('NumberField: inputMode, unidade na caixa à direita e descrita antes do erro
   expect(unit).toHaveClass(cls('unit'));
   expect(follows(input, unit)).toBe(true);
   expect(input).toHaveAccessibleDescription('GB/mês');
+  await userEvent.click(unit); // a unidade faz parte do alvo
+  expect(input).toHaveFocus();
   render(<NumberField label="Nós" unit="<i>nós</i>" inputMode="numeric" error={error} />);
   const count = screen.getByRole('textbox', { name: 'Nós' });
   expect(count).toHaveAttribute('inputmode', 'numeric');

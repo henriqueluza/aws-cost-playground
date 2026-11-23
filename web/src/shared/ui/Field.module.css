@@ -12,11 +12,10 @@
   color: var(--muted);
 }
 
-/* A borda de 1px cabe nos 12px entre a borda e o texto, como no botão. */
 .control {
   height: var(--control-height);
   margin: 0;
-  padding: 0 calc(var(--space-3) - var(--border-width));
+  padding: 0 calc(var(--space-3) - var(--border-width)); /* a borda de 1px cabe nos 12px, como no botão */
   background-color: var(--surface);
   border: var(--border-width) solid var(--control);
   border-radius: var(--radius-control);
@@ -29,11 +28,10 @@
 .form {
   height: var(--control-height-form);
 }
-/* O Firefox esmaece o placeholder; --faint já é o tom final. */
 .control::placeholder,
 .bare::placeholder {
   color: var(--faint);
-  opacity: 1;
+  opacity: 1; /* o Firefox esmaece o placeholder; --faint já é o tom final */
 }
 .control:focus-within {
   border-color: var(--accent);
@@ -92,10 +90,10 @@
   color: var(--faint);
   cursor: not-allowed;
 }
-/* O Safari esmaece o texto desabilitado com tinta e opacidade próprias. */
-.control:disabled {
+.control:disabled,
+.bare:disabled {
   opacity: 1;
-  -webkit-text-fill-color: currentColor;
+  -webkit-text-fill-color: currentColor; /* o Safari esmaece o desabilitado com tinta própria */
 }
 .error {
   display: flex;
@@ -111,12 +109,11 @@
   height: var(--icon-inline);
   margin-top: calc((var(--lh-small) - var(--icon-inline)) / 2);
 }
-/* Traço Lucide de 1,5px: o viewBox de cada ícone tem o tamanho em que ele aparece. */
 .chevron,
 .errorIcon {
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.5;
+  stroke-width: 1.5; /* traço Lucide de 1,5px: o viewBox de cada ícone tem o tamanho exibido */
   stroke-linecap: round;
   stroke-linejoin: round;
 }

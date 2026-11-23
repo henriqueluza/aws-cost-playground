@@ -1,6 +1,5 @@
-import { useId } from 'react';
-import { Field, fieldBoxClass, useFieldControl } from './Field';
-import type { FieldBaseProps } from './Field';
+import { useId, type MouseEvent } from 'react';
+import { Field, fieldBoxClass, useFieldControl, type FieldBaseProps } from './Field';
 import styles from './Field.module.css';
 import type { NativeInputProps } from './TextField';
 
@@ -12,6 +11,13 @@ export type NumberFieldProps = Omit<NativeInputProps, 'inputMode'> &
     inputMode?: 'decimal' | 'numeric';
   };
 
+// Fitts: a caixa inteira é o alvo; clicar na unidade ou na margem foca o input.
+function focusInput(e: MouseEvent<HTMLDivElement>) {
+  if (e.target instanceof HTMLInputElement) return;
+  e.preventDefault();
+  e.currentTarget.querySelector('input')?.focus();
+}
+
 /** Campo numérico: texto com `inputMode`, algarismos tabulares e a unidade dentro da caixa. */
 export function NumberField({ label, error, density, unit, inputMode, ...rest }: NumberFieldProps) {
   const unitId = useId();
@@ -19,7 +25,7 @@ export function NumberField({ label, error, density, unit, inputMode, ...rest }:
   const box = fieldBoxClass({ error, density, disabled: rest.disabled }, styles.affix);
   return (
     <Field controlId={aria.id} errorId={errorId} label={label} error={error}>
-      <div className={box}>
+      <div className={box} onMouseDown={focusInput}>
         <input
           autoComplete="off"
           {...rest}
