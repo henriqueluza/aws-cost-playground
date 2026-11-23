@@ -19,6 +19,7 @@ Só a biblioteca padrão: roda no runner do CI sem instalar nada.
 
 from __future__ import annotations
 
+import json
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -44,7 +45,9 @@ class DestructiveChange:
     @property
     def kind(self) -> str:
         """`replace` se as ações têm `delete` e `create`; senão `delete` ou `forget`."""
-        raise NotImplementedError
+        if "delete" in self.actions:
+            return "replace" if "create" in self.actions else "delete"
+        return "forget"
 
 
 def find_destructive(plan: Mapping[str, Any]) -> list[DestructiveChange]:
@@ -54,12 +57,53 @@ def find_destructive(plan: Mapping[str, Any]) -> list[DestructiveChange]:
     `resource_changes` existe e não é lista, ou um item não tem `address` (str) ou
     `change.actions` (lista de str).
     """
-    raise NotImplementedError
+    if not isinstance(plan, Mapping) or "format_version" not in plan:
+        raise InvalidPlanError("não é um plano do Terraform (falta `format_version`)")
+    changes = plan.get("resource_changes", [])
+    if not isinstance(changes, list):
+        raise InvalidPlanError("`resource_changes` não é uma lista")
+    found: list[DestructiveChange] = []
+    for index, item in enumerate(changes):
+        address = item.get("address") if isinstance(item, Mapping) else None
+        change = item.get("change") if isinstance(item, Mapping) else None
+        actions = change.get("actions") if isinstance(change, Mapping) else None
+        if (
+            not isinstance(address, str)
+            or not isinstance(actions, list)
+            or not all(isinstance(action, str) for action in actions)
+        ):
+            raise InvalidPlanError(f"`resource_changes[{index}]` sem `address` ou `change.actions`")
+        if BLOCKING_ACTIONS.intersection(actions):
+            found.append(DestructiveChange(address, tuple(actions)))
+    return found
+
+
+def _one_line(text: str) -> str:
+    """Escapa caracteres de controle: chave de `for_each` não pode forjar linhas do relatório."""
+    return "".join(char if char.isprintable() else f"\\x{ord(char):02x}" for char in text)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Lê o arquivo de `argv[0]` (padrão: sys.argv[1:]), imprime o relatório e devolve o código."""
-    raise NotImplementedError
+    args = sys.argv[1:] if argv is None else list(argv)
+    if len(args) != 1:
+        print("uso: plan_guard.py <plano.json>", file=sys.stderr)
+        return EXIT_INVALID
+    try:
+        with open(args[0], encoding="utf-8") as handle:
+            destructive = find_destructive(json.load(handle))
+    except (OSError, ValueError, RecursionError) as error:
+        # Só o tipo do erro e a mensagem do guard: nunca o conteúdo do plano.
+        detail = str(error) if isinstance(error, InvalidPlanError) else type(error).__name__
+        print(f"plan-guard: entrada inválida ({detail})", file=sys.stderr)
+        return EXIT_INVALID
+    if not destructive:
+        print("plan-guard: nenhuma ação destrutiva")
+        return EXIT_OK
+    for change in destructive:
+        actions = ",".join(change.actions)
+        print(f"{change.kind}\t{_one_line(change.address)}\t{_one_line(actions)}")
+    return EXIT_DESTRUCTIVE
 
 
 if __name__ == "__main__":
