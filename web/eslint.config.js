@@ -69,6 +69,8 @@ export default defineConfig([
                 '@xyflow/*',
                 '**/shared/lib/http',
                 '**/shared/lib/http/*',
+                '../http',
+                '../http/*',
               ],
               message: pureTsMessage,
             },
