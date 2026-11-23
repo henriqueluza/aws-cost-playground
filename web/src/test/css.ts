@@ -1,13 +1,16 @@
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Declarações por contexto: contexto → propriedade → valor. */
 export type CssDecls = Record<string, Record<string, string>>;
 
-const repoRoot = new URL('../../../', import.meta.url);
+// Caminho de arquivo, não `URL`: no jsdom o `URL` global é o do jsdom, que o `fs` recusa.
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 /** Lê um arquivo pelo caminho a partir da raiz do repositório (ex.: `DESIGN.md`). */
 export function readRepoFile(pathFromRepoRoot: string): string {
-  return readFileSync(new URL(pathFromRepoRoot, repoRoot), 'utf8');
+  return readFileSync(resolve(repoRoot, pathFromRepoRoot), 'utf8');
 }
 
 /** Junta o conteúdo de todos os blocos ```css de um Markdown, na ordem. */
