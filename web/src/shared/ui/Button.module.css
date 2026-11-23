@@ -1,0 +1,107 @@
+/* DESIGN.md, "Botões" e "Estados". Só tokens: nenhuma cor, tamanho ou tempo literal. */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  height: var(--control-height);
+  min-width: var(--hit-min);
+  margin: 0;
+  /* a borda de 1px fica dentro dos 12px que o desenho pede entre a borda e o texto */
+  padding: 0 calc(var(--space-3) - var(--border-width));
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-control);
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--t-hover) var(--ease-out),
+    color var(--t-hover) var(--ease-out),
+    transform var(--t-press) var(--ease-out);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Primário: tinta cheia. */
+.primary {
+  background-color: var(--primary);
+  color: var(--primary-ink);
+}
+
+/* Secundário: folha com borda de controle. */
+.secondary {
+  background-color: var(--surface);
+  border-color: var(--control);
+  color: var(--text);
+}
+
+/* Terciário: só texto; o sublinhado permanente é o que mostra que clica (WCAG 1.4.1).
+   1px, 2px e 2px de afastamento vêm dos tokens de borda e de foco, que têm esses valores. */
+.tertiary {
+  background-color: transparent;
+  color: var(--text);
+  padding-inline: var(--space-1);
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--border-width);
+  text-underline-offset: var(--focus-offset);
+}
+
+/* Destrutivo: contorno e texto em --negative. */
+.destructive {
+  background-color: var(--surface);
+  border-color: var(--negative);
+  color: var(--negative);
+}
+
+@media (hover: hover) {
+  .primary:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+  }
+
+  .secondary:hover:not(:disabled),
+  .destructive:hover:not(:disabled) {
+    background-color: var(--raised);
+  }
+
+  .tertiary:hover:not(:disabled) {
+    text-decoration-thickness: var(--focus-width);
+  }
+}
+
+/* Desabilitado legível, igual ao campo desabilitado: fundo, borda e texto próprios, não só
+   opacidade (--faint tem 5,26:1 sobre --raised no claro). O terciário mantém o sublinhado. */
+.button:disabled {
+  background-color: var(--raised);
+  border-color: var(--border);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.tertiary:disabled {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Botão de ícone: quadrado de 32 × 32 com o glifo de 16px. */
+.icon {
+  width: var(--control-height);
+  padding: 0;
+}
+
+.glyph {
+  display: inline-flex;
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.glyph > svg {
+  width: 100%;
+  height: 100%;
+}

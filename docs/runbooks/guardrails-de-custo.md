@@ -56,7 +56,7 @@ Concorrência reservada não tem custo; a **provisionada** é cobrada e seria cu
 
 ## 2. Limite de taxa no API Gateway
 
-O limite por rota é variável do módulo do API Gateway (#19), com valor por ambiente em `infra/envs/<env>`. Mude por PR: o que for mudado só no console volta no próximo `apply`.
+O limite é variável do módulo `http-api` (#19): `default_throttle` (obrigatório) vale para as demais rotas e `throttle` em cada entrada de `routes` troca o de uma rota, com valor por ambiente em `infra/envs/<env>`. Mude por PR: o que for mudado só no console volta no próximo `apply`.
 
 Valores sugeridos, iguais nos dois ambientes: `POST /estimates` com 1 req/s e rajada 5; demais rotas com 10 req/s e rajada 20. A quota global é de 300 estimativas por dia. Com 1 req/s sobra folga para o uso legítimo, e as invocações do proxy ficam limitadas sob abuso. Requisição acima do limite recebe 429 sem invocar a Lambda.
 
@@ -64,7 +64,7 @@ O limite é da rota, não de cada usuário: um usuário insistente pode fazer os
 
 **Conferir** depois do deploy de cada ambiente:
 
-`<API_ID>` sai do `terraform output` do ambiente (ou da lista de `aws apigatewayv2 get-apis --query 'Items[].[Name,ApiId]' --output table`).
+`<API_ID>` sai do output `api_id` do módulo (ou da lista de `aws apigatewayv2 get-apis --query 'Items[].[Name,ApiId]' --output table`).
 
 ```bash
 aws apigatewayv2 get-routes --api-id <API_ID> --query 'Items[].RouteKey'
@@ -199,7 +199,7 @@ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/acp- \
   --query 'logGroups[].[logGroupName,retentionInDays]' --output table
 ```
 
-Confira também o grupo do log de acesso do API Gateway (#19; retenção por variável e nome no `terraform output` foram pedidos em comentário na Issue). Se um grupo estiver sem retenção ou com valor diferente de 7:
+Confira também o grupo do log de acesso do API Gateway (módulo `http-api`, #19): o nome sai do output `access_log_group_name` (`/aws/vendedlogs/apigateway/<name_prefix>-http-api`) e a retenção vem de `log_retention_days` (default 7). Se um grupo estiver sem retenção ou com valor diferente de 7:
 
 - **ele está no Terraform:** corrija a variável por PR;
 - **ele não está:** foi criado pela própria AWS (a Lambda cria o seu na primeira invocação, se o Terraform não o criou antes). Ajuste com `aws logs put-retention-policy --log-group-name <grupo> --retention-in-days 7` e abra Issue para o módulo passar a criá-lo.
