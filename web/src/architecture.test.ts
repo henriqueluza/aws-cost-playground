@@ -31,6 +31,7 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     ["import { ReactFlow } from '@xyflow/react';", designLib],
     ["import { get } from '../../../shared/lib/http';", designLib],
     ["import { get } from '../http';", designLib],
+    ["import { get } from '../http';", './features/pricing/model/x.ts'],
     ["import { get } from '../../lib/http';", designLib],
   ])('proíbe %s em %s', async (line, file) => {
     const rules = await errorRules(`${line}\nexport const dep = 1;\n`, file);
@@ -39,12 +40,6 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
 
   it('permite react em ui/', async () => {
     const rules = await errorRules(reactImport, './features/pricing/ui/x.tsx');
-    expect(rules).not.toContain('no-restricted-imports');
-  });
-
-  it('permite em model/ um ../http que não é shared/lib/http', async () => {
-    const code = "import { x } from '../http';\nexport const dep = x;\n";
-    const rules = await errorRules(code, './features/pricing/model/x.ts');
     expect(rules).not.toContain('no-restricted-imports');
   });
 

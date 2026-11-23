@@ -15,11 +15,6 @@ const shared = { element: { type: 'shared' } };
 
 const pureTsMessage =
   'ADR-0001: application/, model/ e shared/lib/design são TypeScript puro (sem React, React Flow ou HTTP).';
-const purePaths = [
-  { name: 'react', message: pureTsMessage },
-  { name: 'react-dom', message: pureTsMessage },
-];
-const pureGroup = ['react/*', 'react-dom/*', '@xyflow/*', '**/lib/http', '**/lib/http/*'];
 
 export default defineConfig([
   globalIgnores(['dist', 'coverage', 'playwright-report', 'test-results']),
@@ -61,19 +56,24 @@ export default defineConfig([
     rules: {
       'no-restricted-imports': [
         'error',
-        { paths: purePaths, patterns: [{ group: pureGroup, message: pureTsMessage }] },
-      ],
-    },
-  },
-  {
-    // '../http' só é shared/lib/http a partir de shared/lib/design; este bloco substitui as opções.
-    files: ['src/shared/lib/design/**'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
         {
-          paths: purePaths,
-          patterns: [{ group: [...pureGroup, '../http', '../http/*'], message: pureTsMessage }],
+          paths: [
+            { name: 'react', message: pureTsMessage },
+            { name: 'react-dom', message: pureTsMessage },
+          ],
+          patterns: [
+            {
+              group: [
+                'react/*',
+                'react-dom/*',
+                '@xyflow/*',
+                // Qualquer módulo http, inclusive '../http' a partir de shared/lib.
+                '**/http',
+                '**/http/*',
+              ],
+              message: pureTsMessage,
+            },
+          ],
         },
       ],
     },
