@@ -1,0 +1,137 @@
+name: Terraform
+
+# Só leitura: este workflow nunca aplica nem altera estado. O gatilho é `pull_request`
+# (nunca `pull_request_target`); `labeled`/`unlabeled` reavaliam o plan-guard quando o
+# autor põe ou tira a label `infra:destroy-approved`.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_VERSION: "1.16.0"
+
+jobs:
+  static:
+    name: fmt, validate, tflint, trivy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - name: terraform fmt
+        run: terraform fmt -check -recursive infra
+      - name: Testes do plan-guard
+        run: python3 -m unittest discover -s infra/tools/tests
+      - name: terraform validate (sem backend)
+        run: |
+          for env in staging production; do
+            terraform -chdir="infra/envs/$env" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="infra/envs/$env" validate
+          done
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.66.0
+      - name: tflint
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # só evita o limite de taxa ao baixar o plugin
+        run: |
+          tflint --init --config="$GITHUB_WORKSPACE/infra/.tflint.hcl"
+          tflint --chdir=infra --recursive --config="$GITHUB_WORKSPACE/infra/.tflint.hcl"
+      - name: trivy config
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  plan:
+    name: plan + plan-guard (${{ matrix.env }})
+    # Sem a variável do papel de leitura (bootstrap ainda não aplicado) ou em PR de fork
+    # (sem OIDC), o job é pulado e o PR fica verde.
+    if: vars.AWS_PLAN_ROLE_ARN != '' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # OIDC para assumir o papel `plan` (somente leitura)
+      pull-requests: write # comentar e aplicar `needs-human`
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: staging
+            bucket_var: TF_STATE_BUCKET_STAGING
+          - env: production
+            bucket_var: TF_STATE_BUCKET_PRODUCTION
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: terraform plan
+        working-directory: infra/envs/${{ matrix.env }}
+        env:
+          TF_STATE_BUCKET: ${{ vars[matrix.bucket_var] }}
+        run: |
+          terraform init -input=false -lockfile=readonly -backend-config="bucket=$TF_STATE_BUCKET"
+          terraform plan -input=false -lock=false -out="$RUNNER_TEMP/tfplan"
+          terraform show -json "$RUNNER_TEMP/tfplan" > "$RUNNER_TEMP/plan.json"
+      - name: plan-guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          TF_ENV: ${{ matrix.env }}
+          APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'infra:destroy-approved') }}
+        run: |
+          code=0
+          report=$(python3 infra/tools/plan_guard.py "$RUNNER_TEMP/plan.json") || code=$?
+          printf '%s\n' "$report"
+          if [ "$code" -eq 0 ]; then exit 0; fi
+          if [ "$code" -ne 1 ]; then
+            echo "::error::plan-guard não conseguiu ler o plano de $TF_ENV (falha fechada)"
+            exit 1
+          fi
+          marker="<!-- plan-guard:$TF_ENV:$HEAD_SHA -->"
+          body=$(printf '%s\n' "$marker" \
+            "### plan-guard: o plano de \`$TF_ENV\` apaga, substitui ou esquece recursos" "" \
+            '```' "$report" '```' "" \
+            "O PR fica reprovado até receber a label \`infra:destroy-approved\`." \
+            "**Essa label é exclusiva do autor do projeto (@henriqueluza):** agentes e revisores automáticos nunca a aplicam.")
+          gh api "repos/$REPO/issues/$PR/labels" -f "labels[]=needs-human" --silent
+          if ! gh api --paginate "repos/$REPO/issues/$PR/comments" --jq '.[].body' | grep -qF -- "$marker"; then
+            gh api "repos/$REPO/issues/$PR/comments" -f body="$body" --silent
+          fi
+          if [ "$APPROVED" = "true" ]; then
+            echo "::warning::plano destrutivo de $TF_ENV liberado pela label infra:destroy-approved"
+            exit 0
+          fi
+          echo "::error::plano de $TF_ENV com delete/replace/forget; só o autor libera com infra:destroy-approved"
+          exit 1
