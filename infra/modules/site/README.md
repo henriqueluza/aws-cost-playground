@@ -39,7 +39,7 @@ module "site" {
   name_prefix         = "acp-stg"
   bucket_name         = "acp-stg-site-exemplo"
   aliases             = ["staging.exemplo.com"]
-  acm_certificate_arn = module.dns.certificate_arn # saída do módulo dns (Issue #15); nome a confirmar
+  acm_certificate_arn = module.dns.certificate_arns["site"] # saída do módulo dns
 
   connect_src_origins = [
     "https://api.staging.exemplo.com",
