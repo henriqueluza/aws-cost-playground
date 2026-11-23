@@ -8,11 +8,8 @@ type NativeSelectProps = Omit<
   'className' | 'style' | 'id' | 'size' | 'multiple' | 'aria-invalid' | 'aria-describedby'
 >;
 
-export type SelectFieldProps = NativeSelectProps &
-  FieldBaseProps & {
-    /** As opções, como `<option>` (e `<optgroup>`) filhos React. */
-    children: ReactNode;
-  };
+/** As opções vêm como filhos `<option>` (e `<optgroup>`). */
+export type SelectFieldProps = NativeSelectProps & FieldBaseProps & { children: ReactNode };
 
 /** Seleção com `<select>` nativo e seta própria, decorativa. */
 export function SelectField({ label, error, density, children, ...rest }: SelectFieldProps) {

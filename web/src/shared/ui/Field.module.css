@@ -1,5 +1,4 @@
 /* DESIGN.md, "Campos", "Estados" e "Regras de densidade". Só tokens: nenhuma cor ou tamanho literal. */
-
 .field {
   display: flex;
   flex-direction: column;
@@ -39,7 +38,6 @@
 .control:focus-within {
   border-color: var(--accent);
 }
-
 /* Numérico: input sem borda dentro da caixa da unidade; o anel vai para a caixa. */
 .affix {
   display: flex;
@@ -84,7 +82,6 @@
   color: var(--muted);
   pointer-events: none;
 }
-
 .invalid,
 .invalid:focus-within {
   border-color: var(--negative);
@@ -100,7 +97,6 @@
   opacity: 1;
   -webkit-text-fill-color: currentColor;
 }
-
 .error {
   display: flex;
   gap: var(--space-1);
