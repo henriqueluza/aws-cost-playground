@@ -27,6 +27,7 @@ export const usageValuesSchema = z.record(fieldKey, z.number().min(0));
 
 export const usageSchema = z.object({
   source: z.enum(USAGE_SOURCES),
+  /** ISO 8601 em UTC (`Z`); o `z.iso.datetime()` recusa outro fuso. */
   estimatedAt: z.iso.datetime().optional(),
   values: usageValuesSchema,
 });
