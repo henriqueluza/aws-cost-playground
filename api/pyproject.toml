@@ -23,7 +23,8 @@ dev = [
 
 [tool.uv]
 package = false
-exclude-newer = "7 days"
+exclude-newer = "7 days"  # cool-down de supply chain; relativo exige uv >= 0.13.8
+required-version = ">=0.13.8"
 
 [tool.ruff]
 line-length = 100

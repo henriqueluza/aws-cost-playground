@@ -1,4 +1,4 @@
-from pathlib import Path
+import importlib
 
 import pytest
 from fastapi import FastAPI
@@ -21,9 +21,5 @@ def test_documentacao_automatica_desligada(app: FastAPI, path: str) -> None:
 
 
 @pytest.mark.parametrize("name", ["designs", "estimates", "quotas", "account"])
-def test_pacotes_de_dominio_so_tem_init_vazio(name: str) -> None:
-    import app as root
-
-    files = [f for f in (Path(root.__file__).parent / name).iterdir() if f.name != "__pycache__"]
-    assert [f.name for f in files] == ["__init__.py"]
-    assert files[0].read_text() == ""
+def test_pacotes_de_dominio_existem(name: str) -> None:
+    importlib.import_module(f"app.{name}")

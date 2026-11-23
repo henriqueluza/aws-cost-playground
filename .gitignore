@@ -10,6 +10,8 @@ __pycache__/
 *.tfstate*
 
 # Python (api/ e pricing/)
+.env
+.env.*
 .venv/
 .coverage
 .mypy_cache/

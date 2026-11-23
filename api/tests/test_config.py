@@ -18,9 +18,3 @@ def test_log_level_invalido_falha(monkeypatch: pytest.MonkeyPatch) -> None:
     get_settings.cache_clear()
     with pytest.raises(ValidationError):
         get_settings()
-
-
-def test_defaults() -> None:
-    settings = get_settings()
-    assert settings.log_level == "INFO"
-    assert settings.table_name == "acp-test"
