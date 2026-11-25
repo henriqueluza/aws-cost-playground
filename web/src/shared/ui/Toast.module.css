@@ -1,7 +1,5 @@
-/* DESIGN.md, "Elevation & Depth" e "Movimento". Só tokens: nenhuma cor, tamanho ou tempo literal. */
-
-/* Flutuante no canto inferior esquerdo, longe do carimbo (inferior direito da folha). Fechado,
-   fica montado mas invisível e sem receber ponteiro. */
+/* DESIGN.md, "Elevation & Depth" e "Movimento"; só tokens. Flutua no canto inferior esquerdo,
+   longe do carimbo. Fechado, fica montado, invisível e sem receber ponteiro. */
 .toast {
   position: fixed;
   inset-inline-start: var(--space-4);
@@ -12,8 +10,7 @@
   gap: var(--space-2);
   box-sizing: border-box;
   max-inline-size: var(--stamp-width);
-  /* em tela estreita, a mesma folga de --space-4 do lado direito */
-  margin-inline-end: var(--space-4);
+  margin-inline-end: var(--space-4); /* em tela estreita, a mesma folga do lado direito */
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
   background-color: var(--surface);
   border: var(--border-width) solid transparent;
@@ -27,8 +24,7 @@
   pointer-events: none;
 }
 
-/* A transição só existe aberta: a entrada anima; a saída é instantânea, porque a caixa fecha
-   já vazia e animá-la mostraria uma caixa sem texto. */
+/* Só a entrada anima: a caixa fecha já vazia, e animar a saída mostraria uma caixa sem texto. */
 .toast[data-open] {
   opacity: 1;
   transform: none;
@@ -47,7 +43,6 @@
 .message {
   flex: 1;
   min-inline-size: 0;
-  margin: 0;
   overflow-wrap: anywhere;
 }
 

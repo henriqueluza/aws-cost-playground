@@ -46,7 +46,7 @@ describe('ToastProvider', () => {
   async function setup(...messages: string[]) {
     const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
     renderToast(...(messages.length ? messages : ['Projeto salvo.']));
-    const trigger = screen.getAllByRole('button')[0];
+    const trigger = screen.getAllByRole('button')[0]!;
     await user.click(trigger);
     return { user, trigger };
   }
