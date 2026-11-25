@@ -15,8 +15,50 @@ override_data {
   values          = { region = "us-east-1" }
 }
 variables {
-  name_prefix = "acp-stg"
-  alarm_email = "alarmes@exemplo.com"
+  name_prefix    = "acp-stg"
+  function_names = { "api" = "acp-stg-api", "llm-proxy" = "acp-stg-llm-proxy" }
+  api_id         = "a1b2c3d4e5"
+  alarm_email    = "alarmes@exemplo.com"
+}
+run "cinco_alarmes_com_chaves_e_dimensoes_exatas" {
+  command = plan
+  assert {
+    condition     = toset(keys(aws_cloudwatch_metric_alarm.this)) == toset(["api-errors", "api-throttles", "llm-proxy-errors", "llm-proxy-throttles", "http-api-5xx"])
+    error_message = "Devem existir exatamente os 5 alarmes: erro e throttle por Lambda e 5xx da API."
+  }
+  assert {
+    condition = alltrue([
+      for f in ["api", "llm-proxy"] : alltrue([
+        for m in ["Errors", "Throttles"] :
+        aws_cloudwatch_metric_alarm.this["${f}-${lower(m)}"].namespace == "AWS/Lambda" && aws_cloudwatch_metric_alarm.this["${f}-${lower(m)}"].metric_name == m && aws_cloudwatch_metric_alarm.this["${f}-${lower(m)}"].dimensions == tomap({ FunctionName = var.function_names[f] })
+      ])
+    ])
+    error_message = "Alarmes de Lambda devem usar AWS/Lambda, Errors/Throttles e a dimensão FunctionName da função certa."
+  }
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.this["http-api-5xx"].namespace == "AWS/ApiGateway" && aws_cloudwatch_metric_alarm.this["http-api-5xx"].metric_name == "5xx" && aws_cloudwatch_metric_alarm.this["http-api-5xx"].dimensions == tomap({ ApiId = var.api_id })
+    error_message = "O alarme de 5xx deve usar AWS/ApiGateway, métrica 5xx e a dimensão ApiId."
+  }
+  assert {
+    condition     = output.alarm_names == { for k in keys(aws_cloudwatch_metric_alarm.this) : k => "acp-stg-${k}" }
+    error_message = "alarm_names deve trazer o nome de cada alarme, por chave, com o prefixo do ambiente."
+  }
+}
+run "alarmes_so_com_metricas_padrao_do_nivel_gratuito" {
+  command = plan
+  assert {
+    condition = alltrue([for k, a in aws_cloudwatch_metric_alarm.this :
+      a.alarm_name == "acp-stg-${k}" && a.statistic == "Sum" && a.period == 300 && a.evaluation_periods == 1 && a.threshold == 0 &&
+      a.comparison_operator == "GreaterThanThreshold" && a.treat_missing_data == "notBreaching" && endswith(a.alarm_description, "Runbook: docs/runbooks/alarmes.md")
+    ])
+    error_message = "Todo alarme deve ter nome com prefixo, Sum/300s/limite 0, dado ausente sem violação e descrição com o runbook."
+  }
+  assert {
+    condition = alltrue([for a in aws_cloudwatch_metric_alarm.this :
+      length(a.metric_query) == 0 && a.extended_statistic == null && length(coalesce(a.ok_actions, [])) == 0 && length(coalesce(a.insufficient_data_actions, [])) == 0 && a.alarm_actions == toset(["arn:aws:sns:us-east-1:111111111111:acp-stg-alarms"])
+    ])
+    error_message = "Alarmes não podem usar metric_query nem extended_statistic e só notificam o tópico em ALARM."
+  }
 }
 run "topico_com_assinatura_de_email_da_variavel" {
   command = plan
@@ -67,4 +109,9 @@ run "rejeita_name_prefix_e_alarm_email_invalidos" {
 run "aceita_o_prefixo_de_producao" {
   command = plan
   variables { name_prefix = "acp-prod" }
+}
+run "rejeita_api_id_invalido" {
+  command = plan
+  variables { api_id = "API-INVALIDA" }
+  expect_failures = [var.api_id]
 }
