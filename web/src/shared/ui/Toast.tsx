@@ -20,7 +20,8 @@ export const TOAST_DURATION_MS = 5000;
 export const TOAST_CLOSE_LABEL = 'Fechar mensagem';
 
 export type ToastApi = {
-  /** Mostra a frase (texto, nunca HTML). Um toast por vez: substitui o atual e reinicia o tempo. */
+  /** Substitui o toast atual e reinicia o tempo. A frase é texto da interface (nunca HTML,
+   *  `error.message` nem texto da LLM) e também existe fora do toast. */
   show: (message: string) => void;
 };
 
@@ -38,17 +39,15 @@ const closeIcon = (
 /** `seq` muda a cada `show`: remonta o texto e o leitor de tela reanuncia a mesma frase. */
 type Shown = { message: string; seq: number };
 
-/**
- * Renderiza os filhos e, depois deles, a região do toast no canto inferior esquerdo. A região
- * `role="status"` fica sempre montada (vazia quando não há toast) e contém só o texto.
- */
+/** Renderiza os filhos e, depois deles, a região do toast. O `role="status"` fica sempre
+ *  montado (vazio quando não há toast) e contém só o texto. */
 export function ToastProvider({ children }: ToastProviderProps): ReactElement {
   const [shown, setShown] = useState<Shown | null>(null);
   const [hovered, setHovered] = useState(false);
   const [focusInside, setFocusInside] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   // Onde o foco estava antes de entrar no toast; volta para lá ao fechar com o foco dentro.
-  const restoreRef = useRef<HTMLElement | null>(null);
+  const restoreRef = useRef<HTMLElement | SVGElement | null>(null);
 
   const open = shown !== null;
   const seq = shown?.seq ?? 0;
@@ -80,7 +79,7 @@ export function ToastProvider({ children }: ToastProviderProps): ReactElement {
   function handleFocus(event: FocusEvent<HTMLDivElement>) {
     const from = event.relatedTarget;
     if (from instanceof Node && event.currentTarget.contains(from)) return;
-    restoreRef.current = from instanceof HTMLElement ? from : null;
+    restoreRef.current = from instanceof HTMLElement || from instanceof SVGElement ? from : null;
     setFocusInside(true);
   }
 

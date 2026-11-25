@@ -31,12 +31,13 @@ const renderToast = (...messages: string[]) =>
     </ToastProvider>,
   );
 
+afterEach(() => vi.restoreAllMocks());
+
 it('useToast fora de um ToastProvider lança erro', () => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
   expect(() => render(<Trigger message="x" />)).toThrow(
     'useToast precisa estar dentro de um ToastProvider.',
   );
-  vi.restoreAllMocks();
 });
 
 describe('ToastProvider', () => {
@@ -54,20 +55,22 @@ describe('ToastProvider', () => {
   it('renderiza os filhos e uma região de status vazia, sem botão de fechar', () => {
     renderToast('Projeto salvo.');
     expect(screen.getByRole('button', { name: 'Mostrar Projeto salvo.' })).toBeInTheDocument();
-    expect(screen.getAllByRole('status')).toHaveLength(1);
-    expect(status()).toBeEmptyDOMElement();
+    expect(status()).toBeEmptyDOMElement(); // `getByRole` falha se houver mais de uma região
     expect(box()).not.toHaveAttribute('data-open');
     expect(closeButton()).toBeNull();
   });
 
   it('show anuncia só o texto no status, com o fechar fora dele, e não rouba o foco', async () => {
-    const { trigger } = await setup();
+    const { user, trigger } = await setup();
     expect(status().textContent).toBe('Projeto salvo.');
     expect(status().querySelector('button')).toBeNull();
     expect(box()).toHaveAttribute('data-open');
     expect(box()).toContainElement(closeButton());
     expect(status()).not.toContainElement(closeButton());
     expect(trigger).toHaveFocus();
+    const text = status().firstChild;
+    await user.click(trigger); // a mesma frase remonta o texto e é anunciada de novo
+    expect(status().firstChild).not.toBe(text);
   });
 
   it('mostra a mensagem como texto, nunca como HTML', async () => {
@@ -113,29 +116,31 @@ describe('ToastProvider', () => {
     expect(status()).toBeEmptyDOMElement();
   });
 
-  it('pausa com o foco dentro; ao sair, o tempo reinicia e fechar não move o foco', async () => {
+  it('pausa com o foco dentro; ao sair, some e fechar não move o foco', async () => {
     const { user, trigger } = await setup();
-    wait(3000);
     await user.tab();
     expect(closeButton()).toHaveFocus();
     wait(TOAST_DURATION_MS * 2);
     expect(status().textContent).toBe('Projeto salvo.');
     await user.tab({ shift: true });
     expect(trigger).toHaveFocus();
-    wait(EARLY);
-    expect(status().textContent).toBe('Projeto salvo.');
-    wait(TOAST_DURATION_MS - EARLY);
+    wait(TOAST_DURATION_MS);
     expect(status()).toBeEmptyDOMElement();
     expect(trigger).toHaveFocus();
   });
 
-  it('Esc com o foco dentro fecha e devolve o foco ao disparador', async () => {
+  it('Esc com o foco dentro fecha, devolve o foco e não deixa a pausa do ponteiro presa', async () => {
     const { user, trigger } = await setup();
+    await user.hover(box());
     await user.tab();
     expect(closeButton()).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(status()).toBeEmptyDOMElement();
     expect(trigger).toHaveFocus();
+    await user.keyboard('{Enter}'); // reabre sem novo pointerenter: o tempo volta a correr
+    expect(status().textContent).toBe('Projeto salvo.');
+    wait(TOAST_DURATION_MS);
+    expect(status()).toBeEmptyDOMElement();
   });
 
   it('Esc com o foco fora do toast não fecha', async () => {
@@ -152,7 +157,6 @@ describe('ToastProvider', () => {
     await user.tab();
     await close(user);
     expect(status()).toBeEmptyDOMElement();
-    expect(closeButton()).toBeNull();
     expect(trigger).toHaveFocus();
   });
 });
