@@ -9,6 +9,11 @@ resource "aws_iam_role" "this" {
     Version   = "2012-10-17"
     Statement = [{ Effect = "Allow", Action = "sts:AssumeRole", Principal = { Service = "lambda.amazonaws.com" } }]
   })
+
+  lifecycle {
+    # Identidade: recriar o papel soltaria a política de corte que o Budgets anexa a ele.
+    prevent_destroy = true
+  }
 }
 
 # Cada função escreve só no próprio log group, que o Terraform já criou (sem logs:CreateLogGroup).
@@ -62,7 +67,7 @@ resource "aws_iam_role_policy" "llm_proxy" {
     Version = "2012-10-17"
     Statement = [
       { Sid = "Quota", Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"], Resource = var.table_arn },
-      { Sid = "ChaveDaClaudeApi", Effect = "Allow", Action = "ssm:GetParameter", Resource = aws_ssm_parameter.anthropic_api_key.arn },
+      { Sid = "ChaveDaClaudeApi", Effect = "Allow", Action = "ssm:GetParameter", Resource = local.api_key_parameter_arn },
     ]
   })
 }

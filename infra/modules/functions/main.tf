@@ -2,6 +2,12 @@ locals {
   prefix     = var.environment == "production" ? "acp-prod" : "acp-stg"
   table_name = element(split("/", var.table_arn), 1)
 
+  # Parâmetro da chave da Claude API. Fica FORA do Terraform: o autor o cria e o mantém à mão
+  # (docs/runbooks/rotacao-de-segredos.md). Assim nenhum papel de CI precisa ler a chave.
+  # Região e conta saem do ARN da tabela, que é do mesmo ambiente.
+  api_key_parameter_name = "/acp/${var.environment}/anthropic-api-key"
+  api_key_parameter_arn  = "arn:aws:ssm:${element(split(":", var.table_arn), 3)}:${element(split(":", var.table_arn), 4)}:parameter${local.api_key_parameter_name}"
+
   # Configuração das funções. Nenhum segredo aqui: o proxy recebe só o NOME do parâmetro e lê o valor em execução.
   functions = {
     "api" = {
@@ -18,26 +24,9 @@ locals {
       environment = {
         TABLE_NAME                  = local.table_name
         LLM_ENABLED                 = tostring(var.llm_enabled)
-        ANTHROPIC_API_KEY_PARAMETER = aws_ssm_parameter.anthropic_api_key.name
+        ANTHROPIC_API_KEY_PARAMETER = local.api_key_parameter_name
       }
     }
-  }
-}
-
-# Chave da Claude API. O Terraform cria o parâmetro com um valor de espera; o autor grava o valor real
-# pelo console (docs/runbooks/rotacao-de-segredos.md). `value_wo` é write-only: o valor não entra no
-# plano nem no state, nem depois do refresh. Criptografia com a chave gerenciada aws/ssm, sem custo.
-resource "aws_ssm_parameter" "anthropic_api_key" {
-  name             = "/acp/${var.environment}/anthropic-api-key"
-  description      = "Chave da Claude API do llm-proxy. Valor gravado à mão pelo autor."
-  type             = "SecureString"
-  value_wo         = "placeholder-o-autor-grava-o-valor-real"
-  value_wo_version = 1
-
-  lifecycle {
-    prevent_destroy = true
-    # Mudar a versão regravaria o valor de espera por cima da chave real.
-    ignore_changes = [value_wo, value_wo_version]
   }
 }
 

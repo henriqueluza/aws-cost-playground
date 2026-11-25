@@ -226,7 +226,7 @@ O repositório traz a infra como código Terraform, escrito pelos agentes e revi
 - **Mesmo artefato nos dois ambientes.** O zip das Lambdas e o bundle do site são construídos uma vez por commit e guardados por SHA. Por isso o site não recebe configuração em tempo de build: lê `/config.json` (URL da API, ids do Cognito) ao iniciar, e esse arquivo é o único que difere por ambiente.
 - **CI autentica por OIDC.** Papéis separados: `plan` (leitura, usado em PR), `apply-staging`, `apply-production` e `prices` (só `pricing:GetProducts`). Trust restrito a `repo:henriqueluza/aws-cost-playground:environment:<env>`.
 - `infra/bootstrap/` (buckets de estado, provedor OIDC, papéis) é aplicado uma vez pelo autor. Agentes não mexem nele.
-- **Segredos.** O Terraform cria o parâmetro `/acp/<env>/anthropic-api-key` com valor de espera por argumento write-only (`value_wo`) e `ignore_changes`; o autor insere o valor real, e nenhum dos dois entra no state. Em execução, só o papel do `llm-proxy` lê o parâmetro; os papéis de CI `plan` e `apply-*` o leem no refresh do provider, sem gravar o valor. Chaves diferentes por ambiente, cada uma num workspace do Console com limite de gasto próprio. Rotação em `docs/runbooks/rotacao-de-segredos.md`.
+- **Segredos.** O parâmetro `/acp/<env>/anthropic-api-key` fica fora do Terraform: o autor o cria e grava a chave à mão, e os módulos só conhecem o nome. O valor nunca passa pelo plano, pelo state nem pelo CI. Só o papel do `llm-proxy` tem `ssm:GetParameter` nesse caminho; nenhum papel de CI o lê, e o papel `plan` tem negação explícita (decisão do autor na #126). Chaves diferentes por ambiente, cada uma num workspace do Console com limite de gasto próprio. Rotação em `docs/runbooks/rotacao-de-segredos.md`.
 - **Rollback.** O workflow de produção recebe o SHA a publicar; rollback é dispará-lo com o SHA anterior. Documentado em `docs/runbooks/rollback.md`. Mudanças no formato do design são compatíveis com a versão anterior (`schemaVersion` + leitura tolerante).
 
 ### Travas contra destruição da infra
@@ -236,7 +236,7 @@ Exigência do autor no Gate 2: nenhum agente pode apagar a infra por acidente. A
 | Camada | Trava |
 |---|---|
 | Agente | Nunca roda `apply`, `destroy`, `import` nem comandos de estado; o hook do repositório bloqueia. O papel `plan` usado em PR é só leitura |
-| Código | `lifecycle { prevent_destroy = true }` em tudo que guarda dado ou identidade: tabela DynamoDB, User Pool do Cognito, buckets, zona do Route 53, parâmetro do SSM |
+| Código | `lifecycle { prevent_destroy = true }` em tudo que guarda dado ou identidade: tabela DynamoDB, User Pool do Cognito, buckets, zona do Route 53, papéis IAM das funções. O parâmetro do SSM é criado à mão e não é recurso do Terraform |
 | Serviço | Proteção contra exclusão ligada na tabela DynamoDB e no User Pool; versionamento nos buckets; PITR na tabela de produção |
 | CI | Um passo `plan-guard` lê o plano em JSON e reprova o PR se houver `delete` ou `replace` em qualquer recurso. Só o autor libera, com a label `infra:destroy-approved`, e o PR recebe `needs-human` |
 | IAM | Os papéis `apply-staging` e `apply-production` têm negação explícita para `dynamodb:DeleteTable`, `cognito-idp:DeleteUserPool`, `s3:DeleteBucket` e `route53:DeleteHostedZone`. Mesmo um plano destrutivo aprovado por engano falha no apply |
@@ -340,7 +340,7 @@ Mantido pelo autor. O motor de preço é TypeScript puro com testes de cenário,
 | Uso por aresta | A LLM devolve `gbPerMonth` por aresta; egress do API Gateway fora do MVP |
 | Riscos aceitos | Sem WAF; staging e produção na mesma conta |
 | Configuração de custo na AWS | Manual, pelo autor (ver "Guardrails de custo") |
-| Adapter ASGI → Lambda | Mangum ou AWS Lambda Web Adapter, decidido na Issue do esqueleto com checagem de manutenção e de supply chain |
+| Adapter ASGI → Lambda | Mangum ou AWS Lambda Web Adapter, decidido na Issue do esqueleto com checagem de manutenção e de supply chain. Decidido em #7: Mangum, ver `api/README.md` |
 
 **Regra de trabalho deste projeto:** os agentes decidem sozinhos o que couber neste ADR e no teto de US$ 20/mês de hospedagem. Qualquer decisão que envolva valores (serviço pago novo, mudança de modelo ou de quota, custo fixo) ou algo não previsto aqui é comunicada ao autor no PR, na seção "Decisões tomadas sem humano"; se criar custo, a Issue recebe `needs-human` antes do merge.
 

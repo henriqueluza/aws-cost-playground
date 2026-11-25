@@ -49,7 +49,7 @@ run "papeis_de_menor_privilegio" {
   assert {
     condition = jsondecode(aws_iam_role_policy.llm_proxy.policy).Statement == [
       { Sid = "Quota", Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"], Resource = var.table_arn },
-      { Sid = "ChaveDaClaudeApi", Effect = "Allow", Action = "ssm:GetParameter", Resource = aws_ssm_parameter.anthropic_api_key.arn },
+      { Sid = "ChaveDaClaudeApi", Effect = "Allow", Action = "ssm:GetParameter", Resource = "arn:aws:ssm:us-east-1:123456789012:parameter/acp/staging/anthropic-api-key" },
     ]
     error_message = "O llm-proxy só pode ter as ações de quota na tabela e ssm:GetParameter no parâmetro da chave."
   }
@@ -70,17 +70,12 @@ run "papeis_de_menor_privilegio" {
   }
 }
 
-run "parametro_da_chave" {
+run "parametro_da_chave_fica_fora_do_terraform" {
   command = plan
 
   assert {
-    condition     = aws_ssm_parameter.anthropic_api_key.name == "/acp/staging/anthropic-api-key" && aws_ssm_parameter.anthropic_api_key.type == "SecureString"
-    error_message = "O parâmetro deve ser SecureString em /acp/<env>/anthropic-api-key."
-  }
-
-  assert {
-    condition     = aws_ssm_parameter.anthropic_api_key.value_wo_version == 1
-    error_message = "O valor de espera entra pelo argumento write-only (value_wo), que o provider não aceita junto de value nem de insecure_value."
+    condition     = output.api_key_parameter_name == "/acp/staging/anthropic-api-key"
+    error_message = "O módulo só conhece o nome do parâmetro: quem cria e grava a chave é o autor, à mão."
   }
 }
 
@@ -126,7 +121,7 @@ run "producao_retencao_e_interruptor_por_variavel" {
   }
 
   assert {
-    condition     = aws_lambda_function.this["llm-proxy"].function_name == "acp-prod-llm-proxy" && aws_ssm_parameter.anthropic_api_key.name == "/acp/production/anthropic-api-key"
+    condition     = aws_lambda_function.this["llm-proxy"].function_name == "acp-prod-llm-proxy" && output.api_key_parameter_name == "/acp/production/anthropic-api-key"
     error_message = "Produção usa o prefixo acp-prod e o próprio caminho de parâmetro."
   }
 

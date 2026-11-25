@@ -1,14 +1,14 @@
 # Módulo `functions`
 
-As duas funções Lambda da API, os papéis IAM, os log groups e o parâmetro da chave da Claude API, conforme o `docs/architecture/aws-cost-playground/ADR-0001-stack.md` ("Hospedagem e ambientes").
+As duas funções Lambda da API, os papéis IAM e os log groups, conforme o `docs/architecture/aws-cost-playground/ADR-0001-stack.md` ("Hospedagem e ambientes").
 
 | Característica | Valor |
 |---|---|
 | Funções | `acp-<stg\|prod>-api` (timeout 10 s) e `acp-<stg\|prod>-llm-proxy` (timeout 29 s), do mesmo pacote zip |
 | Runtime | Python 3.13, `arm64`, 256 MB fixos |
 | Logs | Formato JSON; um log group por função, criado pelo Terraform, com retenção por variável (padrão 7 dias; aceita 1, 3, 5, 7, 14 ou 30) |
-| Papéis IAM | Um por função, com o mesmo nome dela, e políticas inline sem curinga em ação ou recurso |
-| Parâmetro da chave | `/acp/<env>/anthropic-api-key`, `SecureString`, `prevent_destroy` |
+| Papéis IAM | Um por função, com o mesmo nome dela, políticas inline sem curinga em ação ou recurso e `prevent_destroy` |
+| Parâmetro da chave | `/acp/<env>/anthropic-api-key`. **Fora do Terraform:** o autor o cria à mão; o módulo só usa o nome |
 
 As tags vêm do `default_tags` do provider de cada ambiente.
 
@@ -51,7 +51,7 @@ module "functions" {
 | `function_names` | Nome de cada função, por chave (`api`, `llm-proxy`) |
 | `function_invoke_arns` | ARN de invocação de cada função, para as integrações do API Gateway |
 | `role_names` | Nome do papel de cada função. O do `llm-proxy` é o alvo da ação de corte do Budgets |
-| `api_key_parameter_name` | Nome do parâmetro da chave. Só o nome: o valor nunca passa pelo Terraform |
+| `api_key_parameter_name` | Nome do parâmetro da chave, que o autor cria à mão. O parâmetro e o valor ficam fora do Terraform |
 
 ## Variáveis de ambiente das funções
 
@@ -72,13 +72,13 @@ Nenhum segredo vai em variável de ambiente.
 
 ## Parâmetro da chave
 
-O parâmetro `/acp/<env>/anthropic-api-key` é `SecureString`, cifrado com a chave gerenciada `aws/ssm` (sem custo de KMS). O módulo o cria com um valor de espera pelo argumento write-only `value_wo` (com `value_wo_version = 1`); o autor grava a chave real à mão, pelo console ([rotação de segredos](../../../docs/runbooks/rotacao-de-segredos.md)).
+O parâmetro `/acp/<env>/anthropic-api-key` **não é um recurso do Terraform**. O autor o cria e grava a chave à mão, pelo console ([rotação de segredos](../../../docs/runbooks/rotacao-de-segredos.md), "Criar o parâmetro pela primeira vez").
 
-- `lifecycle` tem `ignore_changes` em `value_wo` e `value_wo_version`, e `prevent_destroy`.
-- O valor, o de espera e o real, nunca entra no plano nem no state, nem depois do refresh.
-- **Limite:** o refresh do provider ainda chama `ssm:GetParameter` com decifragem. O valor passa pela memória do runner, mas não é gravado. Por isso os papéis de CI `plan` e `apply-*` (`infra/bootstrap/`, Issue #13) precisam de `ssm:GetParameter` nesse parâmetro. É uma diferença em relação ao ADR, que diz que só o papel do `llm-proxy` lê o parâmetro; em execução isso continua valendo.
-- **Nunca aumente `value_wo_version` nem remova o `ignore_changes`:** o `apply` regravaria o valor de espera por cima da chave real.
-- Enquanto o valor for o de espera, o `llm-proxy` precisa falhar fechado. Isso é do código do proxy, não deste módulo.
+- O módulo só conhece o **nome**: passa-o ao `llm-proxy` em `ANTHROPIC_API_KEY_PARAMETER` e monta o ARN para a política do papel. Região e conta do ARN saem de `table_arn`.
+- Em nenhum momento o valor passa pelo plano, pelo state ou por um runner do CI. Nenhum papel de CI (`plan`, `apply-*`) precisa de `ssm:GetParameter`, e só o papel do `llm-proxy` lê o parâmetro.
+- O parâmetro pode ser criado antes ou depois do `apply`: a política aponta para o ARN pelo nome.
+- Enquanto o parâmetro não existir, o `llm-proxy` precisa falhar fechado. Isso é do código do proxy, não deste módulo.
+- Motivo da escolha (decisão do autor na #126): com o parâmetro no Terraform, o refresh do provider o lê com decifragem, e o papel `plan` roda código de qualquer PR.
 
 ## O que o módulo deixa em paz
 
@@ -90,9 +90,9 @@ Itens de configuração de custo que o autor faz à mão ([guardrails de custo](
 
 Fora do módulo: API Gateway e a permissão de invocação (#19), alarmes (#20), composição nos ambientes (#21) e a concorrência reservada (manual).
 
-## Remover o parâmetro
+## Remover um papel
 
-O plano falha enquanto houver `prevent_destroy`. Remover de propósito segue a ordem do ADR ("Travas contra destruição"): PR que tira o `prevent_destroy`, label `infra:destroy-approved` do autor, e o autor aplica. A chave real é perdida; guarde-a antes se for preciso.
+O plano falha enquanto houver `prevent_destroy` nos papéis. Remover de propósito segue a ordem do ADR ("Travas contra destruição"): PR que tira o `prevent_destroy`, label `infra:destroy-approved` do autor, e o autor aplica. Depois, reanexe a política de corte do Budgets ao papel novo do proxy.
 
 ## Testes
 

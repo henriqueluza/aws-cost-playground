@@ -1,0 +1,45 @@
+/* DESIGN.md, "Pílulas de estado" e "Estados": fundo e tinta do par da pílula do mesmo tom. Só tokens. */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  margin: 0;
+  /* a borda de 1px cabe no espaçamento, como no botão e no campo */
+  padding: calc(var(--space-2) - var(--border-width)) calc(var(--space-3) - var(--border-width));
+  /* transparente: o mesmo tamanho nos três tons, e o contorno aparece no modo de alto contraste */
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-chip);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.negative {
+  background-color: var(--pill-negative-bg);
+  color: var(--pill-negative-ink);
+}
+/* o aviso ganha borda visível porque --pill-warning-bg fica perto do branco */
+.warning {
+  background-color: var(--pill-warning-bg);
+  border-color: var(--pill-warning-border);
+  color: var(--pill-warning-ink);
+}
+.neutral {
+  background-color: var(--pill-neutral-bg);
+  color: var(--pill-neutral-ink);
+}
+.icon {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  margin-top: calc((var(--lh-body) - var(--icon)) / 2); /* centra o ícone na primeira linha */
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5; /* traço Lucide de 1,5px: o viewBox tem o tamanho exibido */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.message {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere; /* id ou URL longos quebram em vez de vazar o contorno */
+}

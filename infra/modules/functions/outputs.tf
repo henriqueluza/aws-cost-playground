@@ -14,6 +14,6 @@ output "role_names" {
 }
 
 output "api_key_parameter_name" {
-  description = "Nome do parâmetro da chave da Claude API. Só o nome: o valor nunca passa pelo Terraform."
-  value       = aws_ssm_parameter.anthropic_api_key.name
+  description = "Nome do parâmetro da chave da Claude API, que o autor cria à mão. Só o nome: o parâmetro e o valor ficam fora do Terraform."
+  value       = local.api_key_parameter_name
 }

@@ -1,0 +1,61 @@
+/* DESIGN.md, "Elevation & Depth" e "Movimento"; só tokens. Flutua no canto inferior esquerdo,
+   longe do carimbo. Fechado, fica montado, invisível e sem receber ponteiro. */
+.toast {
+  position: fixed;
+  inset-inline-start: var(--space-4);
+  inset-block-end: var(--space-4);
+  z-index: 1; /* sem token de camada; acima da folha (o React Flow isola o próprio contexto) */
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-inline-size: calc(var(--sidebar-width) - var(--space-4)); /* não cobre o zoom da folha */
+  margin-inline-end: var(--space-4); /* em tela estreita, a mesma folga do lado direito */
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  background-color: var(--surface);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  opacity: 0;
+  transform: translateY(var(--space-2));
+  pointer-events: none;
+}
+
+/* Só a entrada anima: a caixa fecha já vazia, e animar a saída mostraria uma caixa sem texto. */
+.toast[data-open] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition:
+    opacity var(--t-ui) var(--ease-out),
+    transform var(--t-ui) var(--ease-out);
+}
+
+/* No escuro a sombra quase não aparece: o que flutua sobe de tom e ganha borda. */
+:global(:root[data-theme='dark']) .toast {
+  background-color: var(--raised);
+  border-color: var(--border);
+}
+
+.message {
+  flex: 1;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.closeIcon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5; /* traço Lucide de 1,5px: o viewBox tem o tamanho exibido */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Sem a transição, a caixa aparece direto na posição final. */
+@media (prefers-reduced-motion: reduce) {
+  .toast[data-open] {
+    transition: none;
+  }
+}

@@ -14,6 +14,8 @@ async function errorRules(code: string, file: string): Promise<string[]> {
 const reactImport = "import { useState } from 'react';\nexport const hook = useState;\n";
 const designsUi = './features/designs/ui/x.tsx';
 const designLib = './shared/lib/design/x.ts';
+const moneyLib = './shared/lib/money.ts';
+const apiLib = './shared/lib/api/x.ts';
 
 describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
   it('proíbe react em model/', async () => {
@@ -33,6 +35,12 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     ["import { get } from '../http';", designLib],
     ["import { get } from '../http';", './features/pricing/model/x.ts'],
     ["import { get } from '../../lib/http';", designLib],
+    ["import { useState } from 'react';", moneyLib],
+    ["import { ReactFlow } from '@xyflow/react';", moneyLib],
+    ["import { get } from './http';", moneyLib],
+    ["import { useState } from 'react';", apiLib],
+    ["import { ReactFlow } from '@xyflow/react';", apiLib],
+    ["import { get } from '../http';", apiLib],
   ])('proíbe %s em %s', async (line, file) => {
     const rules = await errorRules(`${line}\nexport const dep = 1;\n`, file);
     expect(rules).toContain('no-restricted-imports');
@@ -40,6 +48,12 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
 
   it('permite react em ui/', async () => {
     const rules = await errorRules(reactImport, './features/pricing/ui/x.tsx');
+    expect(rules).not.toContain('no-restricted-imports');
+  });
+
+  it('permite zod em shared/lib/api', async () => {
+    const code = "import { z } from 'zod';\nexport const s = z.string();\n";
+    const rules = await errorRules(code, apiLib);
     expect(rules).not.toContain('no-restricted-imports');
   });
 
