@@ -10,7 +10,7 @@ Terraform da AWS (us-east-1, 100% serverless). Decisões em `docs/architecture/a
 | `envs/staging` | Raiz do ambiente `staging` |
 | `envs/production` | Raiz do ambiente `production` |
 | `tools/` | `plan_guard.py` e seus testes |
-| `bootstrap/` | Buckets de estado, provedor OIDC e papéis de CI; é do autor e chega na #13. Agentes não tocam |
+| `bootstrap/` | Buckets de estado, provedor OIDC e papéis de CI, com README próprio; só o autor aplica. Agentes não tocam sem Issue que autorize |
 
 ## Regras para agentes
 
@@ -32,7 +32,7 @@ Estado no S3 com lock nativo (`use_lockfile`), sem DynamoDB. O nome do bucket **
 | staging | `acp-stg/terraform.tfstate` | `TF_STATE_BUCKET_STAGING` |
 | production | `acp-prod/terraform.tfstate` | `TF_STATE_BUCKET_PRODUCTION` |
 
-No CI, o papel de leitura vem de `AWS_PLAN_ROLE_ARN`. O workflow `terraform.yml` ainda não existe; chega na #90.
+No CI, o papel de leitura vem de `AWS_PLAN_ROLE_ARN` (workflow `terraform.yml`). Os buckets e o papel são criados por `bootstrap/`, que também gera essas variáveis: ver `bootstrap/README.md`.
 
 `.terraform.lock.hcl` é versionado em cada ambiente. Atualizar provider é um PR `chore` próprio.
 

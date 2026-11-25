@@ -8,3 +8,12 @@ __pycache__/
 **/.terraform/
 *.tfplan
 *.tfstate*
+
+# Python (api/ e pricing/)
+.env
+.env.*
+.venv/
+.coverage
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
