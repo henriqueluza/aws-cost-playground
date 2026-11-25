@@ -77,7 +77,7 @@ O authorizer valida assinatura, `iss` (igual a `jwt_issuer`), `exp` e a audiênc
 
 - `REGIONAL` e `TLS_1_2` são literais no módulo, não variáveis: são os únicos valores que a HTTP API aceita, e uma variável só permitiria afrouxar.
 - O mapeamento leva o domínio inteiro ao stage `$default`, sem `api_mapping_key`.
-- Com `disable_execute_api_endpoint = true`, o endpoint `execute-api` padrão responde 404. Quem chama a API usa só o domínio próprio; o `/config.json` do site aponta para `https://api.<domínio>` (#21).
+- Com `disable_execute_api_endpoint = true`, o endpoint `execute-api` padrão deixa de atender chamadas. Quem chama a API usa só o domínio próprio; o `/config.json` do site aponta para `https://api.<domínio>` (#21).
 - `domain_alias` sai só do recurso de domínio. O registro no Route 53 é do módulo `dns`: ligue `api_alias = module.http_api.domain_alias` lá. Não há ciclo, porque `domain_names` e `certificate_arns` do `dns` não dependem de `api_alias`.
 - Sem `prevent_destroy`: o domínio não guarda dado nem identidade e se recria do código. O plan-guard barra `delete` e `replace`. Trocar `domain_name` gera `replace` (`needs-human`); trocar o certificado é alteração in-place.
 
