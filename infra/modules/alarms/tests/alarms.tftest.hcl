@@ -64,3 +64,7 @@ run "rejeita_name_prefix_e_alarm_email_invalidos" {
   }
   expect_failures = [var.name_prefix, var.alarm_email]
 }
+run "aceita_o_prefixo_de_producao" {
+  command = plan
+  variables { name_prefix = "acp-prod" }
+}
