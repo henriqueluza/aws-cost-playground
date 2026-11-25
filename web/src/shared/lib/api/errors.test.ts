@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
-import { ApiError, isApiError } from './index';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import { ApiError, isApiError, type QuotaScope } from './index';
 
 describe('ApiError', () => {
   it('tem mensagem fixa, nome e é um Error', () => {
@@ -36,4 +36,12 @@ describe('isApiError', () => {
   ] as const)('%s', (_n, value, kind, expected) => {
     expect(isApiError(value, kind)).toBe(expected);
   });
+});
+
+it('isApiError com kind estreita o detail', () => {
+  const resetsAt = '2026-12-01T00:00:00Z';
+  const error: unknown = new ApiError({ kind: 'quota-exhausted', scope: 'global', resetsAt });
+  if (!isApiError(error, 'quota-exhausted')) throw new Error('esperava quota-exhausted');
+  expectTypeOf(error.detail.scope).toEqualTypeOf<QuotaScope>();
+  expect(error.detail).toEqual({ kind: 'quota-exhausted', scope: 'global', resetsAt });
 });

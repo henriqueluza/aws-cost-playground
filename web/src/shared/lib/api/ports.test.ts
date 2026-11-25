@@ -1,7 +1,14 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { adrExampleDesign } from '../../../test/designFixtures';
 import {
+  type AccountApi,
+  type Api,
+  type DesignsApi,
+  type EstimateRequest,
+  type EstimatesApi,
+  type QuotaApi,
+  type UpdateDesignInput,
   designIdSchema,
   designSchema,
   designSummarySchema,
@@ -28,8 +35,15 @@ describe('designIdSchema', () => {
   it.each([ULID, '1'.padStart(26, '0')])('aceita %s', (id) => {
     expect(designIdSchema.safeParse(id).success).toBe(true);
   });
-  it.each([ULID.slice(1), 'I', 'L', 'O', 'U', 'a'].map((x) => [x]))('recusa %s', (x) => {
-    const id = x.length === 25 ? x : `${ULID.slice(0, 25)}${x}`;
+  it.each([
+    ['25 caracteres', ULID.slice(1)],
+    ['27 caracteres', `${ULID}0`],
+    ['a letra I', `${ULID.slice(0, 25)}I`],
+    ['a letra L', `${ULID.slice(0, 25)}L`],
+    ['a letra O', `${ULID.slice(0, 25)}O`],
+    ['a letra U', `${ULID.slice(0, 25)}U`],
+    ['minúsculas', ULID.toLowerCase()],
+  ])('recusa %s', (_n, id) => {
     expect(designIdSchema.safeParse(id).success).toBe(false);
   });
 });
@@ -51,6 +65,11 @@ describe('designSummarySchema', () => {
 describe('designSchema', () => {
   it('aceita o item com doc', () => {
     expect(designSchema.safeParse({ ...summary, doc: adrExampleDesign }).success).toBe(true);
+  });
+  it('recusa doc inválido (bloco repetido)', () => {
+    const [block] = adrExampleDesign.blocks;
+    const doc = { ...adrExampleDesign, blocks: [block, block], edges: [] };
+    expect(designSchema.safeParse({ ...summary, doc }).success).toBe(false);
   });
 });
 
@@ -79,17 +98,42 @@ describe('estimateResponseSchema', () => {
   it('aceita só números com a quota', () => {
     expect(estimateResponseSchema.safeParse(ok).success).toBe(true);
   });
-  it('recusa valor não numérico', () => {
-    const bad = { ...ok, blocks: [{ id: 'blk_fn_api', values: { requestsPerMonth: 'muito' } }] };
+  it.each([
+    ['blocks', 'blk_fn_api'],
+    ['edges', 'edg_1'],
+  ])('recusa valor não numérico em %s', (key, id) => {
+    const bad = { ...ok, [key]: [{ id, values: { gbPerMonth: 'muito' } }] };
     expect(estimateResponseSchema.safeParse(bad).success).toBe(false);
   });
 });
 
 describe('quotaSchema', () => {
+  it('aceita a quota do servidor', () => {
+    expect(quotaSchema.parse(quota)).toEqual(quota);
+  });
   it.each([
     ['resetsAt fora de UTC', { resetsAt: '2026-12-01T00:00:00+02:00' }],
     ['remaining negativo', { remaining: -1 }],
   ])('recusa %s', (_n, patch) => {
     expect(quotaSchema.safeParse({ ...quota, ...patch }).success).toBe(false);
+  });
+});
+
+describe('portas', () => {
+  it('não recebem userId: a identidade vem só do JWT', () => {
+    expectTypeOf<keyof Api>().toEqualTypeOf<'designs' | 'estimates' | 'quota' | 'account'>();
+    expectTypeOf<Parameters<DesignsApi['get']>>().toEqualTypeOf<[id: string]>();
+    expectTypeOf<Parameters<DesignsApi['update']>>().toEqualTypeOf<
+      [id: string, input: UpdateDesignInput]
+    >();
+    expectTypeOf<Parameters<EstimatesApi['estimateUsage']>>().toEqualTypeOf<
+      [request: EstimateRequest]
+    >();
+    expectTypeOf<Parameters<QuotaApi['get']>>().toEqualTypeOf<[]>();
+    expectTypeOf<Parameters<AccountApi['deleteAccount']>>().toEqualTypeOf<[]>();
+  });
+  it('update exige name ou doc', () => {
+    expectTypeOf<{ expectedVersion: number }>().not.toExtend<UpdateDesignInput>();
+    expectTypeOf<{ expectedVersion: number; name: string }>().toExtend<UpdateDesignInput>();
   });
 });

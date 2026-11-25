@@ -37,7 +37,13 @@ export class ApiError extends Error {
   }
 }
 
-/** `true` se `error` é um `ApiError` (de qualquer tipo, ou do `kind` pedido). */
-export function isApiError(error: unknown, kind?: ApiErrorKind): error is ApiError {
+/**
+ * `true` se `error` é um `ApiError` (de qualquer tipo, ou do `kind` pedido). Com `kind`, o
+ * `detail` fica estreitado: depois de `isApiError(e, 'quota-exhausted')`, `e.detail.scope` existe.
+ */
+export function isApiError<K extends ApiErrorKind = ApiErrorKind>(
+  error: unknown,
+  kind?: K,
+): error is ApiError & { readonly detail: ApiErrorDetail & { kind: K } } {
   return error instanceof ApiError && (kind === undefined || error.kind === kind);
 }

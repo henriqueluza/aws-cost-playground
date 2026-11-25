@@ -71,8 +71,10 @@ export type EstimateRequest = z.infer<typeof estimateRequestSchema>;
 export type EstimateResponse = z.infer<typeof estimateResponseSchema>;
 
 export type CreateDesignInput = { name: string; doc: DesignDocument };
-/** `name` e `doc` são opcionais: renomear é um `update` só com `name`. */
-export type UpdateDesignInput = { expectedVersion: number; name?: string; doc?: DesignDocument };
+/** Ao menos um de `name` e `doc`: renomear é um `update` só com `name`. */
+export type UpdateDesignInput = { expectedVersion: number } & (
+  { name: string; doc?: DesignDocument } | { name?: string; doc: DesignDocument }
+);
 export type DuplicateDesignInput = { name: string };
 
 /** Erros: `ApiError` com `kind` (veja `errors.ts`). */
