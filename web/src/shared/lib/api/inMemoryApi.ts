@@ -1,4 +1,7 @@
-import type { Api } from './ports';
+import { z } from 'zod';
+import { designDocumentSchema, type DesignDocument } from '../design';
+import { ApiError, type ApiErrorKind } from './errors';
+import { designNameSchema, type Api, type Design, type DesignSummary } from './ports';
 
 /**
  * Fake em memória de `DesignsApi` e `AccountApi`, para testes e para o modo de desenvolvimento.
@@ -14,7 +17,150 @@ export type InMemoryApiOptions = {
   newId?: () => string;
 };
 
+/** A entrada chega como `unknown` em runtime: os tipos das portas não validam nada. */
+const createInputSchema = z.object({ name: designNameSchema, doc: designDocumentSchema });
+const updateInputSchema = z
+  .object({
+    expectedVersion: z.number().int().min(1),
+    name: designNameSchema.optional(),
+    doc: designDocumentSchema.optional(),
+  })
+  .refine((input) => input.name !== undefined || input.doc !== undefined);
+const duplicateInputSchema = z.object({ name: designNameSchema });
+
+const encoder = new TextEncoder();
+
+function fail(kind: Exclude<ApiErrorKind, 'quota-exhausted'>): never {
+  throw new ApiError({ kind });
+}
+
+function parse<T>(schema: z.ZodType<T>, input: unknown): T {
+  const result = schema.safeParse(input);
+  if (!result.success) fail('invalid-request');
+  return result.data;
+}
+
+/** Campos que o servidor deriva do `doc` gravado. */
+function derive(doc: DesignDocument) {
+  return {
+    region: doc.region,
+    schemaVersion: doc.schemaVersion,
+    blockCount: doc.blocks.length,
+    sizeBytes: encoder.encode(JSON.stringify(doc)).length,
+  };
+}
+
+function toSummary(design: Design): DesignSummary {
+  return {
+    id: design.id,
+    name: design.name,
+    region: design.region,
+    schemaVersion: design.schemaVersion,
+    blockCount: design.blockCount,
+    sizeBytes: design.sizeBytes,
+    createdAt: design.createdAt,
+    updatedAt: design.updatedAt,
+    version: design.version,
+  };
+}
+
+/** Ordem decrescente por ponto de código; as datas vêm de `toISOString` e comparam como texto. */
+function descending(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? 1 : -1;
+}
+
+function sequentialIds(): () => string {
+  let last = 0;
+  return () => String(++last).padStart(26, '0');
+}
+
 export function createInMemoryApi(options: InMemoryApiOptions): Pick<Api, 'designs' | 'account'> {
-  void options;
-  throw new Error('Não implementado.');
+  const { maxDesigns, maxDocBytes, now = () => new Date(), newId = sequentialIds() } = options;
+  const store = new Map<string, Design>();
+
+  function find(id: string): Design {
+    const design = store.get(id);
+    if (design === undefined) fail('not-found');
+    return design;
+  }
+
+  /** Guarda uma cópia e devolve outra: quem chama nunca segura uma referência ao estado. */
+  function save(design: Design): Design {
+    store.set(design.id, structuredClone(design));
+    return structuredClone(design);
+  }
+
+  return {
+    designs: {
+      async list() {
+        return [...store.values()]
+          .map(toSummary)
+          .sort((a, b) => descending(a.updatedAt, b.updatedAt) || descending(a.id, b.id));
+      },
+
+      async get(id) {
+        return structuredClone(find(id));
+      },
+
+      async create(input) {
+        const { name, doc } = parse(createInputSchema, input);
+        const derived = derive(doc);
+        if (derived.sizeBytes > maxDocBytes) fail('too-large');
+        if (store.size >= maxDesigns) fail('design-limit');
+        const timestamp = now().toISOString();
+        return save({
+          id: newId(),
+          name,
+          ...derived,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          version: 1,
+          doc,
+        });
+      },
+
+      async update(id, input) {
+        const { expectedVersion, name, doc } = parse(updateInputSchema, input);
+        const current = find(id);
+        if (expectedVersion !== current.version) fail('version-conflict');
+        const nextDoc = doc ?? current.doc;
+        const derived = derive(nextDoc);
+        if (derived.sizeBytes > maxDocBytes) fail('too-large');
+        return save({
+          ...current,
+          ...derived,
+          name: name ?? current.name,
+          updatedAt: now().toISOString(),
+          version: current.version + 1,
+          doc: nextDoc,
+        });
+      },
+
+      async duplicate(id, input) {
+        const { name } = parse(duplicateInputSchema, input);
+        const original = find(id);
+        if (store.size >= maxDesigns) fail('design-limit');
+        const timestamp = now().toISOString();
+        return save({
+          ...original,
+          id: newId(),
+          name,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          version: 1,
+        });
+      },
+
+      async remove(id) {
+        store.delete(id);
+      },
+    },
+
+    account: {
+      async deleteAccount() {
+        store.clear();
+      },
+    },
+  };
 }
