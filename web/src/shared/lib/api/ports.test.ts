@@ -4,6 +4,7 @@ import { adrExampleDesign } from '../../../test/designFixtures';
 import {
   type AccountApi,
   type Api,
+  type Design,
   type DesignsApi,
   type EstimateRequest,
   type EstimatesApi,
@@ -135,5 +136,11 @@ describe('portas', () => {
   it('update exige name ou doc', () => {
     expectTypeOf<{ expectedVersion: number }>().not.toExtend<UpdateDesignInput>();
     expectTypeOf<{ expectedVersion: number; name: string }>().toExtend<UpdateDesignInput>();
+    expectTypeOf<{ expectedVersion: number; doc: Design['doc'] }>().toExtend<UpdateDesignInput>();
+    expectTypeOf<{
+      expectedVersion: number;
+      name: string;
+      doc: Design['doc'];
+    }>().toExtend<UpdateDesignInput>();
   });
 });
