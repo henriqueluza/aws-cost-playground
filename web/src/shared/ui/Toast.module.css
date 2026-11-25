@@ -54,11 +54,8 @@
   stroke-linejoin: round;
 }
 
+/* Sem a transição, a caixa aparece direto na posição final. */
 @media (prefers-reduced-motion: reduce) {
-  .toast {
-    transform: none;
-  }
-
   .toast[data-open] {
     transition: none;
   }
