@@ -1,0 +1,31 @@
+/* DESIGN.md, "Estados" (Vazio): título, uma frase e a próxima ação num contorno tracejado de 1px em --control. Só tokens. */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* o botão da ação fica do tamanho do texto, sem esticar */
+  gap: var(--space-1); /* título e frase a 4px: proximidade, são uma unidade */
+  box-sizing: border-box;
+  padding: calc(var(--space-5) - var(--border-width)); /* a borda de 1px cabe nos 24px */
+  border: var(--border-width) dashed var(--control);
+  border-radius: var(--radius-card);
+  color: var(--text);
+  overflow-wrap: anywhere; /* palavra longa (nome de recurso, URL) quebra em vez de vazar */
+}
+
+/* Body 600, não Section: o Section é do painel que contém o vazio. */
+.title {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-semibold);
+  text-wrap: balance;
+}
+
+.description {
+  margin: 0 0 var(--space-2); /* a ação a 12px: 4 do gap + 8 desta margem */
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--muted);
+  text-wrap: pretty; /* sem palavra órfã na última linha */
+}

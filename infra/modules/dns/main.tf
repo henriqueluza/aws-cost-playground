@@ -44,3 +44,46 @@ resource "aws_acm_certificate_validation" "this" {
   certificate_arn         = each.value.arn
   validation_record_fqdns = [aws_route53_record.validation[each.key].fqdn]
 }
+
+# Um bloco por alias (não for_each): cada alvo é um nó próprio no grafo e evita ciclo com o Cognito.
+resource "aws_route53_record" "site" {
+  count = var.site_alias == null ? 0 : 1
+
+  zone_id = data.aws_route53_zone.this.zone_id
+  name    = local.domain_names.site
+  type    = "A"
+
+  alias {
+    name                   = var.site_alias.name
+    zone_id                = var.site_alias.zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "api" {
+  count = var.api_alias == null ? 0 : 1
+
+  zone_id = data.aws_route53_zone.this.zone_id
+  name    = local.domain_names.api
+  type    = "A"
+
+  alias {
+    name                   = var.api_alias.name
+    zone_id                = var.api_alias.zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "auth" {
+  count = var.auth_alias == null ? 0 : 1
+
+  zone_id = data.aws_route53_zone.this.zone_id
+  name    = local.domain_names.auth
+  type    = "A"
+
+  alias {
+    name                   = var.auth_alias.name
+    zone_id                = var.auth_alias.zone_id
+    evaluate_target_health = false
+  }
+}
