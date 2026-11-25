@@ -43,7 +43,7 @@ variable "alarm_email" {
 }
 ```
 
-O valor entra por `TF_VAR_alarm_email` no ambiente de quem roda o Terraform. Não escreva o endereço em `.tf`, `.tfvars` versionado, teste ou documentação.
+O valor entra por `TF_VAR_alarm_email` no ambiente de quem roda o Terraform. Não escreva o endereço real em `.tf`, `.tfvars` versionado, teste ou documentação; o teste usa um endereço fictício em `exemplo.com`.
 
 ## Confirmar a assinatura
 
@@ -74,4 +74,4 @@ terraform -chdir=infra/modules/alarms init -backend=false \
   && terraform -chdir=infra/modules/alarms test
 ```
 
-`tests/alarms.tftest.hcl` usa provider simulado e só faz `plan`, sem credenciais. Cobre o nome do tópico sem KMS, a assinatura por e-mail, a política (as duas regras e suas condições) e a rejeição de `name_prefix` e `alarm_email` inválidos. O `.terraform.lock.hcl` gerado no módulo não deve ser commitado. O CI roda tflint e trivy em todo `infra/`, mas `validate` só nos ambientes, e não roda `terraform test`.
+`tests/alarms.tftest.hcl` usa provider simulado e só faz `plan`, sem credenciais. Cobre o nome do tópico sem KMS, a assinatura por e-mail, a política (as duas regras e suas condições), a rejeição de `name_prefix` e `alarm_email` inválidos e a aceitação de `acp-prod`. O `.terraform.lock.hcl` gerado no módulo não deve ser commitado. O CI roda tflint e trivy em todo `infra/`, mas `validate` só nos ambientes, e não roda `terraform test`.
