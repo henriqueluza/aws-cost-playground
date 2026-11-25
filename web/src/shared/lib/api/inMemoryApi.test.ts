@@ -111,6 +111,7 @@ describe('createInMemoryApi: limites e precedência', () => {
     const s = setup({ maxDocBytes: await sizeOf(SMALL_DOC), maxDesigns: 1 });
     await rejectsWith(s.designs.create({ name: ' ', doc: LARGE_DOC }), 'invalid-request');
     await s.designs.create({ name: 'a', doc: SMALL_DOC });
+    await rejectsWith(s.designs.create({ name: ' ', doc: SMALL_DOC }), 'invalid-request');
     await rejectsWith(s.designs.create({ name: 'b', doc: LARGE_DOC }), 'too-large');
     await rejectsWith(s.designs.create({ name: 'b', doc: SMALL_DOC }), 'design-limit');
   });
