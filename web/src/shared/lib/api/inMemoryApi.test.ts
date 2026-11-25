@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { adrExampleDesign, designWithBlocks } from '../../../test/designFixtures';
+import { designDocumentSchema } from '../design';
 import {
   ApiError,
   type ApiErrorKind,
@@ -14,8 +15,9 @@ import { createInMemoryApi, type InMemoryApiOptions } from './inMemoryApi';
 
 const T0 = Date.parse('2026-11-25T10:00:00.000Z');
 const BIG = 10_000_000;
-const SMALL_DOC = designWithBlocks(1);
-const LARGE_DOC = designWithBlocks(5);
+const ADR_DOC = designDocumentSchema.parse(adrExampleDesign);
+const SMALL_DOC = designDocumentSchema.parse(designWithBlocks(1));
+const LARGE_DOC = designDocumentSchema.parse(designWithBlocks(5));
 const UNKNOWN = '0'.repeat(26);
 
 function setup(overrides: Partial<InMemoryApiOptions> = {}) {
@@ -39,7 +41,7 @@ const bad = (value: unknown) => value as unknown as CreateDesignInput;
 describe('createInMemoryApi: create', () => {
   it('devolve o design gravado, válido em designSchema', async () => {
     const { designs, iso } = setup();
-    const d = await designs.create({ name: '  Meu design  ', doc: adrExampleDesign });
+    const d = await designs.create({ name: '  Meu design  ', doc: ADR_DOC });
     expect(designSchema.safeParse(d).success).toBe(true);
     expect(designIdSchema.safeParse(d.id).success).toBe(true);
     expect(d).toMatchObject({
@@ -61,9 +63,10 @@ describe('createInMemoryApi: create', () => {
       ...adrExampleDesign,
       workload: { description: 'Descrição única', extra: 2 },
       blocks: [block],
+      edges: [],
       extra: 3,
     };
-    const d = await designs.create({ name: 'Acentos', doc: doc as CreateDesignInput['doc'] });
+    const d = await designs.create(bad({ name: 'Acentos', doc }));
     expect(d.doc).not.toHaveProperty('extra');
     expect(d.doc.blocks[0]).not.toHaveProperty('extra');
     expect(d.doc.workload).not.toHaveProperty('extra');
@@ -278,17 +281,16 @@ describe('createInMemoryApi: cópias defensivas', () => {
     const created = await designs.create(input);
     const original = structuredClone(created);
     input.name = 'mutado';
-    input.doc.blocks[0].label = 'mutado';
+    input.doc.workload.description = 'mutado';
     created.name = 'mutado';
-    created.doc.blocks[0].label = 'mutado';
+    created.doc.workload.description = 'mutado';
     expect(await designs.get(created.id)).toEqual(original);
     const got = await designs.get(created.id);
     got.doc.region = 'sa-east-1';
     got.version = 99;
     expect(await designs.get(created.id)).toEqual(original);
-    const [item] = await designs.list();
-    item.name = 'mutado';
-    expect((await designs.list())[0].name).toBe('a');
+    for (const item of await designs.list()) item.name = 'mutado';
+    expect(await designs.list()).toMatchObject([{ name: 'a' }]);
   });
 });
 
