@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type FocusEvent,
-  type KeyboardEvent,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -66,11 +65,10 @@ export function ToastProvider({ children }: ToastProviderProps): ReactElement {
     setFocusInside(false);
   }, []);
 
-  const show = useCallback((message: string) => {
-    setShown((current) => ({ message, seq: (current?.seq ?? 0) + 1 }));
-  }, []);
-
-  const api = useMemo<ToastApi>(() => ({ show }), [show]);
+  const api = useMemo<ToastApi>(
+    () => ({ show: (message) => setShown((s) => ({ message, seq: (s?.seq ?? 0) + 1 })) }),
+    [],
+  );
 
   // WCAG 2.2.1: o tempo para com o ponteiro em cima ou o foco dentro e recomeça inteiro depois.
   useEffect(() => {
@@ -92,11 +90,6 @@ export function ToastProvider({ children }: ToastProviderProps): ReactElement {
     setFocusInside(false);
   }
 
-  // O Esc só chega aqui com o foco dentro da caixa.
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape') close();
-  }
-
   return (
     <ToastContext.Provider value={api}>
       {children}
@@ -104,7 +97,8 @@ export function ToastProvider({ children }: ToastProviderProps): ReactElement {
         ref={boxRef}
         className={styles.toast}
         data-open={open ? '' : undefined}
-        onKeyDown={handleKeyDown}
+        // O Esc só chega aqui com o foco dentro da caixa.
+        onKeyDown={(event) => event.key === 'Escape' && close()}
         onFocus={handleFocus}
         onBlur={handleBlur}
         onPointerEnter={() => setHovered(true)}

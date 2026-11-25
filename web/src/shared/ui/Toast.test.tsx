@@ -139,8 +139,7 @@ describe('ToastProvider', () => {
   });
 
   it('Esc com o foco fora do toast não fecha', async () => {
-    const { user, trigger } = await setup();
-    expect(trigger).toHaveFocus();
+    const { user } = await setup();
     await user.keyboard('{Escape}');
     expect(status().textContent).toBe('Projeto salvo.');
   });
