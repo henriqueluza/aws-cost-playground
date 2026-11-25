@@ -340,7 +340,7 @@ Mantido pelo autor. O motor de preço é TypeScript puro com testes de cenário,
 | Uso por aresta | A LLM devolve `gbPerMonth` por aresta; egress do API Gateway fora do MVP |
 | Riscos aceitos | Sem WAF; staging e produção na mesma conta |
 | Configuração de custo na AWS | Manual, pelo autor (ver "Guardrails de custo") |
-| Adapter ASGI → Lambda | Mangum ou AWS Lambda Web Adapter, decidido na Issue do esqueleto com checagem de manutenção e de supply chain |
+| Adapter ASGI → Lambda | Mangum ou AWS Lambda Web Adapter, decidido na Issue do esqueleto com checagem de manutenção e de supply chain. Decidido em #7: Mangum, ver `api/README.md` |
 
 **Regra de trabalho deste projeto:** os agentes decidem sozinhos o que couber neste ADR e no teto de US$ 20/mês de hospedagem. Qualquer decisão que envolva valores (serviço pago novo, mudança de modelo ou de quota, custo fixo) ou algo não previsto aqui é comunicada ao autor no PR, na seção "Decisões tomadas sem humano"; se criar custo, a Issue recebe `needs-human` antes do merge.
 
