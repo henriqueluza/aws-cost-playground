@@ -32,7 +32,6 @@ const renderToast = (...messages: string[]) =>
   );
 
 afterEach(() => vi.restoreAllMocks());
-
 it('useToast fora de um ToastProvider lança erro', () => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
   expect(() => render(<Trigger message="x" />)).toThrow(
