@@ -28,7 +28,7 @@ Os testes usam `moto` para o DynamoDB; não precisam de credenciais AWS.
 | Variável | Obrigatória | Descrição |
 |---|---|---|
 | `TABLE_NAME` | sim | Nome da tabela única do DynamoDB (3 a 255 caracteres). Sem ela, a função falha ao iniciar. |
-| `LOG_LEVEL` | não | `DEBUG`, `INFO` (padrão), `WARNING` ou `ERROR`. |
+| `LOG_LEVEL` | não | `DEBUG`, `INFO` (padrão), `WARNING` ou `ERROR`. Vale só para os loggers `app.*`. |
 
 Nenhum segredo vai em código nem em variável commitada.
 
@@ -75,7 +75,7 @@ Uma linha JSON por registro, em stdout (`app/logs.py`). Campos fixos: `timestamp
 - Toda exceção não tratada gera uma linha `app.error` (nível ERROR) no middleware, com `error_type` e `stack`. O `stack` traz só arquivo, linha e função de cada frame, sem a mensagem nem o texto da linha. Vale também para falha depois de a resposta começar.
 - `exc_info` é sempre descartado, inclusive em `logger.exception` de bibliotecas.
 - O mesmo id aparece como `requestId` no corpo do erro e como `request_id` no log: é a chave para correlacionar a resposta com o registro.
-- O logger `mangum` fica em WARNING, para a linha de acesso ser só a do middleware.
+- O `LOG_LEVEL` vale só para os loggers `app.*`. As bibliotecas (botocore, httpx, anthropic, mangum) ficam em WARNING: em DEBUG elas registrariam cabeçalhos assinados e corpos de requisição. A linha de acesso é só a do middleware.
 
 ## Lint de arquitetura
 

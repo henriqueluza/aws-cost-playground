@@ -52,13 +52,15 @@ class JsonFormatter(logging.Formatter):
 
 
 def configure_logging(level: str) -> None:
-    """Idempotente. Substitui os handlers do logger raiz por um StreamHandler(stdout) em JSON."""
+    """Idempotente. Troca os handlers do logger raiz por um StreamHandler(stdout) em JSON."""
     handler = logging.StreamHandler(sys.stdout)  # liga ao stdout vigente na chamada
     handler.setFormatter(JsonFormatter())
     root = logging.getLogger()
     root.handlers[:] = [handler]
-    root.setLevel(level.upper())
-    logging.getLogger("mangum").setLevel(logging.WARNING)  # a linha de acesso é a de app.request
+    # Bibliotecas (botocore, httpx, anthropic, mangum) ficam em WARNING: em DEBUG elas registram
+    # cabeçalhos assinados e corpos. O nível configurado vale só para os loggers `app.*`.
+    root.setLevel(logging.WARNING)
+    logging.getLogger("app").setLevel(level.upper())
 
 
 class RequestLogMiddleware:

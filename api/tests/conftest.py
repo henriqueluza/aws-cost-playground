@@ -70,11 +70,11 @@ def env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 @pytest.fixture(autouse=True)
 def restore_logging() -> Iterator[None]:
     """`configure_logging` troca os handlers do root; cada teste começa e termina igual."""
-    root, mangum = logging.getLogger(), logging.getLogger("mangum")
-    saved = (root.handlers[:], root.level, mangum.level)
+    root, app_logger = logging.getLogger(), logging.getLogger("app")
+    saved = (root.handlers[:], root.level, app_logger.level)
     yield
     root.handlers[:], root.level = saved[0], saved[1]
-    mangum.setLevel(saved[2])
+    app_logger.setLevel(saved[2])
 
 
 @pytest.fixture

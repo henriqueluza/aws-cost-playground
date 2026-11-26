@@ -1,4 +1,5 @@
 import json
+import logging
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -55,6 +56,7 @@ def test_unhandled_error_is_500_and_logs_no_message(
     probe: FastAPI, capsys: pytest.CaptureFixture[str]
 ) -> None:
     configure_logging("DEBUG")  # o stdout capturado recebe as linhas JSON de verdade
+    logging.getLogger("botocore.endpoint").debug("authorization: leak")  # biblioteca não loga DEBUG
     status, headers, body = invoke(probe, make_event("/boom"))
     out = capsys.readouterr().out
     assert (status, headers["content-type"], "detail" in body) == (500, PROBLEM, False)
