@@ -82,7 +82,7 @@ async function readText(response: Response): Promise<string> {
 async function readJson(response: Response): Promise<unknown> {
   const text = await readText(response);
   if (text === '') return undefined;
-  if (!/^application\/([\w.-]+\+)?json\b/i.test(response.headers.get('content-type') ?? '')) {
+  if (!/^application\/([\w.-]+\+)?json\s*(;|$)/i.test(response.headers.get('content-type') ?? '')) {
     fail('invalid-response');
   }
   try {
@@ -102,7 +102,7 @@ async function toApiError(response: Response, request: HttpRequest): Promise<Api
       quota.success ? { kind: 'quota-exhausted', ...quota.data } : { kind: 'unavailable' },
     );
   }
-  void response.body?.cancel();
+  void response.body?.cancel().catch(() => undefined);
   if (status === 409) return new ApiError({ kind: request.conflict ?? 'version-conflict' });
   const fallback = status >= 500 ? 'unavailable' : 'invalid-response';
   return new ApiError({ kind: STATUS_KINDS[status] ?? fallback });

@@ -58,22 +58,25 @@ describe('requisição', () => {
     const seen = respond(() => HttpResponse.json({ ok: true, extra: 'descartado' }));
     const body = { name: 'Meu design' };
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const result = await transport().request(
-      { method: 'POST', path: ['designs', 'a/b ?c#d'], body },
-      schema,
-    );
-    expect(result).toEqual({ ok: true });
+    try {
+      const result = await transport().request(
+        { method: 'POST', path: ['designs', 'a/b ?c#d'], body },
+        schema,
+      );
+      expect(result).toEqual({ ok: true });
+      expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
+        credentials: 'omit',
+        redirect: 'error',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+      });
+    } finally {
+      fetchSpy.mockRestore();
+    }
     const [request] = seen;
     expect(request?.url).toBe(`${BASE}/designs/a%2Fb%20%3Fc%23d`);
     expect(request?.headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
     expect(request?.headers.get('cookie')).toBeNull();
-    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
-      credentials: 'omit',
-      redirect: 'error',
-      cache: 'no-store',
-      referrerPolicy: 'no-referrer',
-    });
-    fetchSpy.mockRestore();
     expect(request?.headers.get('content-type')).toBe('application/json');
     expect(await request?.json()).toEqual(body);
   });
@@ -91,6 +94,41 @@ describe('requisição', () => {
       'Bearer segundo.token.b',
     ]);
     expect(third.kind).toBe('unauthenticated');
+  });
+
+  it('não grava em armazenamento nem em cookie, com sucesso e com 401', async () => {
+    // Leitura é livre (o MSW lê `localStorage`); toda escrita fica registrada.
+    const writes: string[] = [];
+    const record = (call: string) => () => void writes.push(call);
+    const storage = (area: string) => ({
+      length: 0,
+      key: () => null,
+      getItem: () => null,
+      setItem: record(`${area}.setItem`),
+      removeItem: record(`${area}.removeItem`),
+      clear: record(`${area}.clear`),
+    });
+    vi.stubGlobal('localStorage', storage('localStorage'));
+    vi.stubGlobal('sessionStorage', storage('sessionStorage'));
+    vi.stubGlobal('indexedDB', { open: record('indexedDB.open') });
+    vi.stubGlobal('caches', { open: record('caches.open') });
+    vi.stubGlobal('document', {
+      get cookie() {
+        return '';
+      },
+      set cookie(_value: string) {
+        writes.push('document.cookie');
+      },
+    });
+    try {
+      respond(() => HttpResponse.json({ ok: true }));
+      await expect(transport().request(get, schema)).resolves.toEqual({ ok: true });
+      respond(() => problem(401));
+      expect((await failure(transport().request(get, schema))).kind).toBe('unauthenticated');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(writes).toEqual([]);
   });
 
   it.each([
@@ -126,6 +164,22 @@ describe('requisição', () => {
     '/relativa',
   ])('recusa a URL base %s', (baseUrl) => {
     expect(() => createHttpTransport({ baseUrl, getAccessToken: () => TOKEN })).toThrow();
+  });
+
+  it.each([
+    ['https://api.example.com', 'https://api.example.com/quota'],
+    ['https://api.example.com/', 'https://api.example.com/quota'],
+    ['https://api.example.com/v1/', 'https://api.example.com/v1/quota'],
+  ])('URL base %s chama %s', async (baseUrl, expected) => {
+    const seen: string[] = [];
+    server.use(
+      http.all('https://api.example.com/*', ({ request }) => {
+        seen.push(request.url);
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+    await createHttpTransport({ baseUrl, getAccessToken: () => TOKEN }).request(get, schema);
+    expect(seen).toEqual([expected]);
   });
 });
 
@@ -177,12 +231,29 @@ describe('resposta', () => {
     await expect(transport().request(request, z.void())).resolves.toBeUndefined();
   });
 
+  it('aceita Content-Type JSON com parâmetros', async () => {
+    respond(
+      () =>
+        new HttpResponse('{"ok":true}', {
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        }),
+    );
+    await expect(transport().request(get, schema)).resolves.toEqual({ ok: true });
+  });
+
   const big = 'x'.repeat(MAX_RESPONSE_BYTES);
+  const typed = (contentType: string, headers: Record<string, string> = {}) =>
+    new HttpResponse('{"ok":true}', { headers: { 'Content-Type': contentType, ...headers } });
   it.each([
     ['fora do schema', () => HttpResponse.json({ ok: 'sim' })],
     ['vazia onde o schema pede corpo', () => new HttpResponse(null, { status: 200 })],
     ['que não é JSON', () => HttpResponse.html('<p>{"ok":true}</p>')],
+    ['com tipo parecido com JSON', () => typed('application/json-foo')],
     ['com JSON quebrado', () => json('{')],
+    [
+      'com Content-Length acima do limite',
+      () => typed('application/json', { 'Content-Length': String(MAX_RESPONSE_BYTES + 1) }),
+    ],
     ['maior que o limite', () => HttpResponse.json({ ok: true, big })],
     ['maior que o limite, em fluxo', () => json(new Blob([`{"ok":true,"big":"${big}"}`]).stream())],
   ])('%s vira invalid-response', async (_name, resolver) => {
@@ -208,8 +279,11 @@ describe('rede', () => {
         init?.signal?.addEventListener('abort', () => c.error(new Error('abortado')));
       return Promise.resolve(new Response(new ReadableStream({ start })));
     });
-    expect((await failure(transport().request(get, schema))).kind).toBe('network');
-    fetchSpy.mockRestore();
+    try {
+      expect((await failure(transport().request(get, schema))).kind).toBe('network');
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it('não segue redirecionamento: o token não chega a outra origem', async () => {
