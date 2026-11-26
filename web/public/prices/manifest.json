@@ -53,7 +53,7 @@
     },
     {
       "path": "sa-east-1/route53.json",
-      "sha256": "e4d1b2f175fab25d9c06622aaa190387df98f2cd2c92b6d81544b9f22c88ab7d"
+      "sha256": "a41957abdc99530e9440d165f0dfa7abcacbeb6331bf7aa2abcc439a1291f1d7"
     },
     {
       "path": "sa-east-1/s3.json",
@@ -69,7 +69,7 @@
     },
     {
       "path": "sa-east-1/waf.json",
-      "sha256": "fbfb49ecb9a43910b79932151ec470c2b109499555e9298751e6aa3c5e7c2846"
+      "sha256": "ce6c08050b14afdead4936fc2e076153e2e25eb9f2e8849ea5cd9dfbe3357a1f"
     },
     {
       "path": "us-east-1/alb.json",
@@ -121,7 +121,7 @@
     },
     {
       "path": "us-east-1/route53.json",
-      "sha256": "c2f9b5aff70ab83aabf16b24db71550654bff8ec697353e1a49704921b81de20"
+      "sha256": "b55658a79686a5823058c70fae8e8a68740e2c8f2910317f781e3f3d6dbbef01"
     },
     {
       "path": "us-east-1/s3.json",
@@ -137,7 +137,7 @@
     },
     {
       "path": "us-east-1/waf.json",
-      "sha256": "749d911e738d8b280bda17c8263edce2fdc2e2b25863277f8f87ac52c1002a6b"
+      "sha256": "078bc4f4fd2bab668b3855e7d0bb86540efeedcfcc6ae54e7c7bf09f4430938b"
     }
   ]
 }
