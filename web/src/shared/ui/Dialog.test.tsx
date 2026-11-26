@@ -83,14 +83,13 @@ describe('Dialog', () => {
     expect(save).toHaveFocus();
   });
 
-  it('sem controles, o foco fica no próprio diálogo; perdido no body, Esc ainda fecha', async () => {
+  it('sem controles, o foco fica no próprio diálogo com Tab e Shift+Tab; Esc fecha', async () => {
     const { user, trigger, dialog } = await open(<p>Nada a fazer aqui.</p>);
     expect(dialog).toHaveFocus();
     await user.tab();
     expect(dialog).toHaveFocus();
     await user.tab({ shift: true });
     expect(dialog).toHaveFocus();
-    dialog.blur(); // como um controle focado que sai da página: o foco cai no body
     await user.keyboard('{Escape}');
     expectClosed();
     expect(trigger).toHaveFocus();
@@ -137,14 +136,16 @@ describe('Dialog', () => {
     },
   );
 
-  it('Esc chama onClose uma vez e nenhuma tecla do diálogo chega ao document', async () => {
+  it('Esc fecha uma vez, mesmo do body, e nenhuma tecla do diálogo chega ao document', async () => {
     const onDocumentKey = vi.fn();
     document.addEventListener('keydown', onDocumentKey);
     onTestFinished(() => document.removeEventListener('keydown', onDocumentKey));
     const { user } = await open();
     fireEvent.keyDown(field(), { key: 'Escape', isComposing: true }); // o IME encerra a composição
     expect(onClose).not.toHaveBeenCalled();
-    await user.keyboard('a{Backspace}{Delete}{Tab}{Shift>}{Tab}{/Shift}{Escape}');
+    await user.keyboard('a{Backspace}{Delete}{Tab}{Shift>}{Tab}{/Shift}');
+    field().blur(); // como um controle focado que sai da página: o foco cai no body
+    await user.keyboard('{Backspace}{Escape}'); // do body, a tecla também não passa
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onDocumentKey).not.toHaveBeenCalled();
     await user.keyboard('{Backspace}'); // fechado, a tecla volta a chegar ao document

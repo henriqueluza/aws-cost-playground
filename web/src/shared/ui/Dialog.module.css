@@ -11,7 +11,6 @@
   animation: scrimIn var(--t-ui) var(--ease-out);
 }
 
-/* Flutua: raio de cartão e --shadow-float; rola por dentro sem vazar para a página. */
 .dialog {
   inline-size: min(100%, var(--rail-width));
   max-block-size: calc(100dvh - 2 * var(--space-4));

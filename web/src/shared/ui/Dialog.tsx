@@ -56,8 +56,7 @@ function DialogSurface({ onClose, title, children }: Omit<DialogProps, 'open'>):
     const dialog = dialogRef.current;
     if (dialog === null) return;
     const focusFirst = () => (tabbables(dialog)[0] ?? dialog).focus();
-    // Ignora o `autoFocus` dos filhos: dev e StrictMode se comportam igual.
-    focusFirst();
+    focusFirst(); // ignora o `autoFocus` dos filhos: dev e StrictMode se comportam igual
     // Adiada: se a feature levou o foco para fora ao fechar, o diálogo já saiu do DOM e o foco
     // fica onde ela pôs. Um diálogo por vez: duas guardas disputariam o foco em loop.
     const guard = () =>
@@ -74,13 +73,15 @@ function DialogSurface({ onClose, title, children }: Omit<DialogProps, 'open'>):
     };
   }, [trigger]);
 
-  // Controle com foco removido ou desabilitado: o foco cai no `body` e o Esc só chega ao `document`.
+  // Controle focado removido ou desabilitado: o foco cai no `body`. A tecla não passa à página.
   useEffect(() => {
-    const escapeFromBody = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape' && event.target === document.body) onClose();
+    const fromBody = (event: globalThis.KeyboardEvent) => {
+      if (event.target !== document.body) return;
+      event.stopPropagation();
+      if (event.key === 'Escape') onClose();
     };
-    document.addEventListener('keydown', escapeFromBody);
-    return () => document.removeEventListener('keydown', escapeFromBody);
+    window.addEventListener('keydown', fromBody, true);
+    return () => window.removeEventListener('keydown', fromBody, true);
   }, [onClose]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -102,7 +103,6 @@ function DialogSurface({ onClose, title, children }: Omit<DialogProps, 'open'>):
     <div
       className={styles.scrim}
       onKeyDown={handleKeyDown}
-      // Clique no fundo não tira o foco do diálogo e não fecha.
       onMouseDown={(event) => event.target === event.currentTarget && event.preventDefault()}
     >
       <div
