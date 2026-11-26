@@ -15,6 +15,7 @@ export type StepKind =
   | 'edit-block'
   | 'connect'
   | 'remove-edge'
+  | 'set-edge-kind'
   | 'set-usage'
   | 'set-override'
   | 'set-region'
@@ -27,6 +28,7 @@ const STEP_TEXT: Record<StepKind, string> = {
   'edit-block': 'editar bloco',
   connect: 'conectar blocos',
   'remove-edge': 'remover conexão',
+  'set-edge-kind': 'mudar tipo da conexão',
   'set-usage': 'mudar uso',
   'set-override': 'mudar valor',
   'set-region': 'mudar região',
