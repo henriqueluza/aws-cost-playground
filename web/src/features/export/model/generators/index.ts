@@ -1,17 +1,20 @@
 import type { BlockType } from '../../../pricing';
 import type { BlockGenerator } from '../generator';
+import { dynamodb } from './dynamodb';
 import { ec2 } from './ec2';
+import { lambda } from './lambda';
 import { notSupportedYet } from './provisional';
+import { sqs } from './sqs';
 
 /**
  * Registro dos geradores: um por tipo de bloco, cada um no seu arquivo. O compilador recusa um
  * bloco do PRD sem entrada. Os que ainda não têm gerador real ficam no provisório (#65, #66 e #67).
  */
 export const BLOCK_GENERATORS: Readonly<Record<BlockType, BlockGenerator>> = {
-  'aws.lambda': notSupportedYet,
+  'aws.lambda': lambda,
   'aws.s3': notSupportedYet,
-  'aws.sqs': notSupportedYet,
-  'aws.dynamodb': notSupportedYet,
+  'aws.sqs': sqs,
+  'aws.dynamodb': dynamodb,
   'aws.ec2': ec2,
   'aws.rds': notSupportedYet,
   'aws.elasticache': notSupportedYet,
