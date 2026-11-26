@@ -3,5 +3,424 @@
   "service": "rds",
   "region": "sa-east-1",
   "currency": "USD",
-  "prices": []
+  "prices": [
+    {
+      "sku": "rds-mysql-backup",
+      "description": "Backup MySQL além do incluído",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.095"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.m5.large-multi-az",
+      "description": "Instância db.m5.large MySQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.462"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.m5.large-single-az",
+      "description": "Instância db.m5.large MySQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.231"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.r5.large-multi-az",
+      "description": "Instância db.r5.large MySQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "1"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.r5.large-single-az",
+      "description": "Instância db.r5.large MySQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.5"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t3.medium-multi-az",
+      "description": "Instância db.t3.medium MySQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.28"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t3.medium-single-az",
+      "description": "Instância db.t3.medium MySQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.14"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t3.micro-multi-az",
+      "description": "Instância db.t3.micro MySQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.07"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t3.micro-single-az",
+      "description": "Instância db.t3.micro MySQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.035"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t3.small-multi-az",
+      "description": "Instância db.t3.small MySQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.14"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t3.small-single-az",
+      "description": "Instância db.t3.small MySQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.07"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t4g.medium-multi-az",
+      "description": "Instância db.t4g.medium MySQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.275"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t4g.medium-single-az",
+      "description": "Instância db.t4g.medium MySQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.137"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t4g.micro-multi-az",
+      "description": "Instância db.t4g.micro MySQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.069"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t4g.micro-single-az",
+      "description": "Instância db.t4g.micro MySQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.034"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t4g.small-multi-az",
+      "description": "Instância db.t4g.small MySQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.137"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-db.t4g.small-single-az",
+      "description": "Instância db.t4g.small MySQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.069"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-gp3-multi-az",
+      "description": "Armazenamento gp3 MySQL Multi-AZ",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.438"
+        }
+      ]
+    },
+    {
+      "sku": "rds-mysql-gp3-single-az",
+      "description": "Armazenamento gp3 MySQL Single-AZ",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.219"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-backup",
+      "description": "Backup PostgreSQL além do incluído",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.095"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.m5.large-multi-az",
+      "description": "Instância db.m5.large PostgreSQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.466"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.m5.large-single-az",
+      "description": "Instância db.m5.large PostgreSQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.233"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.r5.large-multi-az",
+      "description": "Instância db.r5.large PostgreSQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "1.047"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.r5.large-single-az",
+      "description": "Instância db.r5.large PostgreSQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.524"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t3.medium-multi-az",
+      "description": "Instância db.t3.medium PostgreSQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.302"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t3.medium-single-az",
+      "description": "Instância db.t3.medium PostgreSQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.151"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t3.micro-multi-az",
+      "description": "Instância db.t3.micro PostgreSQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.076"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t3.micro-single-az",
+      "description": "Instância db.t3.micro PostgreSQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.038"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t3.small-multi-az",
+      "description": "Instância db.t3.small PostgreSQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.151"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t3.small-single-az",
+      "description": "Instância db.t3.small PostgreSQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.076"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t4g.medium-multi-az",
+      "description": "Instância db.t4g.medium PostgreSQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.275"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t4g.medium-single-az",
+      "description": "Instância db.t4g.medium PostgreSQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.137"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t4g.micro-multi-az",
+      "description": "Instância db.t4g.micro PostgreSQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.069"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t4g.micro-single-az",
+      "description": "Instância db.t4g.micro PostgreSQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.034"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t4g.small-multi-az",
+      "description": "Instância db.t4g.small PostgreSQL Multi-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.137"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-db.t4g.small-single-az",
+      "description": "Instância db.t4g.small PostgreSQL Single-AZ",
+      "unit": "instance-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.069"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-gp3-multi-az",
+      "description": "Armazenamento gp3 PostgreSQL Multi-AZ",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.438"
+        }
+      ]
+    },
+    {
+      "sku": "rds-postgres-gp3-single-az",
+      "description": "Armazenamento gp3 PostgreSQL Single-AZ",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.219"
+        }
+      ]
+    }
+  ]
 }

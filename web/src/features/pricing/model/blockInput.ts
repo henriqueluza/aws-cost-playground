@@ -6,11 +6,12 @@ import type { BlockDefinition, BlockPriceInput } from './blockContract';
  * Uso: o efetivo (override vence), só com as chaves do contrato; chave ausente recebe o padrão,
  * valor fora da faixa é limitado a ela e chave inteira é arredondada para cima. Atributos: só os
  * do contrato; ausente recebe o padrão, se houver. Atributo com valor fora das opções não tem
- * preço: devolve `undefined`, e o bloco sai `unavailable`.
+ * preço: devolve `undefined`, e o bloco sai `unavailable`. O uso das arestas segue a mesma regra
+ * (`edgeCharges`), com as chaves de `contracts/edges.json`.
  */
 export function blockPriceInput(
-  definition: BlockDefinition,
-  block: Block,
+  definition: Pick<BlockDefinition, 'attributes' | 'usage'>,
+  block: Pick<Block, 'attributes' | 'usage' | 'overrides'>,
 ): BlockPriceInput | undefined {
   const attributes: Record<string, string | number> = {};
   for (const { key, options, default: fallback } of definition.attributes) {
