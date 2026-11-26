@@ -53,7 +53,27 @@ Nenhuma variável tem default: sem o valor, o `plan` falha fechado.
 | `package_bucket` | `TF_VAR_package_bucket`, variável do GitHub Environment: bucket de artefatos com o zip das funções. Ainda não existe em nenhum módulo; quem cria é decisão pendente (#22) |
 | `package_key` | `TF_VAR_package_key`, variável do GitHub Environment: montada pelo pipeline com o SHA |
 
-Atenção: o job `plan` do `terraform.yml` hoje não passa `TF_VAR_*`. Quando `AWS_PLAN_ROLE_ARN` for cadastrada, o plano falhará até o workflow passar essas variáveis (mudança de workflow, só com autorização do autor: #171).
+Esses são os valores do deploy (#22). O job `plan` do `terraform.yml` não lê GitHub Environment: ver a seção seguinte.
+
+## Variáveis do job plan
+
+O job `plan` roda em `pull_request` e sem `environment:` (o trust do papel `plan` exige `sub = repo:<dono>/<repo>:pull_request`, ver `bootstrap/README.md`). Por isso ele lê os valores no nível do **repositório**, e o autor os cadastra uma vez para os dois ambientes:
+
+| Nome no GitHub | Tipo | Vira | Para quê |
+|---|---|---|---|
+| `TF_VAR_ZONE_NAME` | variável de repositório | `TF_VAR_zone_name` | Domínio da zona pública do Route 53. Tem de ser o real: o plano lê a zona (`data "aws_route53_zone"`) |
+| `TF_VAR_ALARM_EMAIL` | secret de repositório | `TF_VAR_alarm_email` | E-mail dos alarmes. Tem de ser o mesmo do apply: outro valor apareceria como `replace` da assinatura do SNS e o plan-guard reprovaria todo PR |
+| (nenhum) | valor fixo no workflow | `TF_VAR_package_bucket=acp-plan-placeholder`, `TF_VAR_package_key=plan/placeholder.zip` | Fictícios: o plano não lê o S3. Depois do primeiro apply o plano mostra `update` nas funções por causa deles; `update` não reprova |
+
+```bash
+gh variable set TF_VAR_ZONE_NAME --body "<zona>" --repo henriqueluza/aws-cost-playground
+gh secret set TF_VAR_ALARM_EMAIL --repo henriqueluza/aws-cost-playground   # pede o valor; não o passe na linha de comando
+```
+
+- Cadastre os dois **antes** de `AWS_PLAN_ROLE_ARN`. Com o papel cadastrado e um deles faltando, o passo `terraform plan` falha fechado e a mensagem cita só o nome do que falta.
+- Sem `AWS_PLAN_ROLE_ARN` o job continua pulado e o PR fica verde.
+- O e-mail é o único secret do workflow e só entra no passo `terraform plan`. O GitHub o mascara no log, o Terraform o trata como `sensitive`, e o plan-guard imprime só endereço e ações. O `plan.json` (que tem o valor) fica em `$RUNNER_TEMP` e não vira artefato.
+- Limite conhecido: o job roda o Terraform do próprio PR, então um PR do repositório consegue ler esse secret. PR de fork não roda o job nem recebe secrets. A defesa é a revisão; por isso o job não recebe nenhum outro secret.
 
 ## Saídas para o deploy
 
