@@ -65,7 +65,7 @@ function renderPage(docs: DesignDocument[] = [], api: Api = newApi(), signedIn =
     { initialEntries: ['/comparar'] },
   );
   const auth = fakeAuth(signedIn ? SIGNED_IN : { status: 'anonymous' });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <ApiProvider api={api}>
         <AuthProvider service={auth.service}>
@@ -74,6 +74,7 @@ function renderPage(docs: DesignDocument[] = [], api: Api = newApi(), signedIn =
       </ApiProvider>
     </QueryClientProvider>,
   );
+  return { ...view, auth };
 }
 
 const file = (doc: unknown, name = 'cenario.json') =>
@@ -286,6 +287,19 @@ describe('ComparePage com designs salvos (sessão)', () => {
     expect(screen.queryByRole('option', { name: 'Salvo na conta' })).toBeNull();
     await pickB(file(designStore.getState().document));
     expect(calls.every((call) => call.mock.calls.length === 0)).toBe(true);
+  });
+
+  it('ao sair da conta, a origem "salvo" deixa de valer: nada de salvo na tela', async () => {
+    const app = scenario('app-classico');
+    const { api, ids } = await savedApi(['App', app]);
+    const { auth } = renderPage([app], api, true);
+    await origin('B', 'saved');
+    await pickSaved('B', ids[0]!);
+    expect(await screen.findByRole('table')).toBeInTheDocument();
+    act(() => auth.set({ status: 'anonymous' }));
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Salvo na conta' })).toBeNull();
+    expect(screen.getByText('Escolha o design B')).toBeInTheDocument();
   });
 
   it('lista vazia: diz o que fazer', async () => {

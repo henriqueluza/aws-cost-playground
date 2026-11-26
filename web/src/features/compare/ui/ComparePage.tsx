@@ -118,7 +118,7 @@ export function ComparePage(): ReactElement {
         {waiting.length > 0 && (
           <EmptyState
             title={`Escolha o design ${waiting.join(' e ')}`}
-            description="Escolha a origem: o design em edição, um arquivo JSON baixado do editor ou, com sessão, um design salvo na conta."
+            description={`Escolha a origem: o design em edição, um arquivo JSON baixado do editor${signedIn ? ' ou um design salvo na conta' : ''}.`}
             action={null}
           />
         )}
