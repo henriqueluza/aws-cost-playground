@@ -34,6 +34,19 @@ Workflow `deploy-staging.yml`, disparado por `push` em `main`.
 | `smoke` | Site responde 200; `/config.json` igual ao publicado; `GET /quota` sem token devolve 401 |
 | `summary` | Resumo do deploy |
 
+## Rotas do API Gateway
+
+Todas atrás do authorizer JWT do Cognito (nenhuma anônima). `/estimates` e `/quota` vão para a função `llm-proxy`; o resto, para `api`. Os métodos do CORS (`GET`, `POST`, `PATCH`, `DELETE`) saem das chaves de `routes`; rota ausente responde 404 no gateway.
+
+| Rota | Função |
+|---|---|
+| `POST /estimates` | `llm-proxy` |
+| `GET /quota` | `llm-proxy` |
+| `DELETE /me` | `api` |
+| `GET /designs`, `POST /designs` | `api` |
+| `GET /designs/{design_id}`, `PATCH /designs/{design_id}`, `DELETE /designs/{design_id}` | `api` |
+| `POST /designs/{design_id}/duplicate` | `api` |
+
 ## Sem configuração
 
 - Sem `AWS_APPLY_ROLE_ARN`, o `gate` emite um aviso e o workflow termina verde. O GitHub registra um deployment em `staging` mesmo assim e, se o Environment ainda não existir, o cria sem regras. Restrinja-o a `main` (#77) antes de cadastrar as variáveis. O trust do papel já exige `ref` igual a `refs/heads/main`, e essa restrição é a segunda camada.
