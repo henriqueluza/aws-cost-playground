@@ -20,8 +20,9 @@ export const authUserSchema = z.strictObject({
 });
 
 /**
- * Sessão do usuário. Fica só em memória e no `sessionStorage` da aba (nunca em `localStorage` nem
- * em cookie). O ID token não é guardado: dele só saem `sub` e `email`.
+ * Sessão do usuário. Fica só em memória (nunca em `localStorage`, `sessionStorage` nem cookie): só a
+ * tentativa de login em andamento atravessa o redirecionamento, e ela não tem token. O ID token
+ * não é guardado: dele só saem `sub` e `email`.
  */
 export const sessionSchema = z.strictObject({
   user: authUserSchema,

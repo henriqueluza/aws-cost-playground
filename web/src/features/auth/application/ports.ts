@@ -33,7 +33,7 @@ export interface IdentityProvider {
   endSession(session: Session | null): Promise<string>;
 }
 
-/** Porta de onde a sessão fica guardada. Nenhum método lança. */
+/** Porta de onde a sessão fica guardada (hoje, só memória). Nenhum método lança. */
 export interface SessionStore {
   /** Valor ausente, ilegível ou fora do schema devolve `null` e apaga o que estava guardado. */
   read(): Session | null;
