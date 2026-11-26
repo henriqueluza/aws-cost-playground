@@ -241,7 +241,6 @@ describe('WorkloadPanel: erros', () => {
 
 describe('WorkloadPanel: quota e trava', () => {
   const at = (ms: number) => new Date(Date.now() + ms).toISOString();
-
   it.each([
     ['no futuro trava', 86_400_000, 'true'],
     ['já passada solta', -86_400_000, 'false'],
@@ -249,18 +248,19 @@ describe('WorkloadPanel: quota e trava', () => {
     setup({ quota: { limit: 20, remaining: 0, resetsAt: at(ms) } });
     expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
     expect(button()).toHaveAttribute('aria-disabled', locked);
+    expect(screen.queryByText(/Você usou as estimativas/) !== null).toBe(locked === 'true');
   });
 
   it('resposta sem valor aproveitável mostra a frase e mantém a marca de desatualizada', async () => {
     const quota = { limit: 20, remaining: 5, resetsAt: at(86_400_000) };
-    let empty = false;
-    setup({
-      estimate: () => Promise.resolve(empty ? { blocks: [], edges: [], quota } : { ...LLM, quota }),
-    });
+    const estimate = vi
+      .fn()
+      .mockResolvedValueOnce({ ...LLM, quota })
+      .mockResolvedValueOnce({ blocks: [], edges: [], quota });
+    setup({ estimate });
     await userEvent.click(button());
     await screen.findByText(/Estimativa aplicada/);
     fireEvent.change(screen.getByLabelText('Descrição da carga'), { target: { value: 'Mais' } });
-    empty = true;
     await userEvent.click(button());
     expect(await screen.findByText(/não trouxe valores utilizáveis/)).toBeInTheDocument();
     expect(screen.getByText('Estimativa desatualizada')).toBeInTheDocument();
