@@ -43,5 +43,13 @@ terraform fmt -check -recursive infra && tflint --recursive && trivy config infr
 - **Infra.** Agentes nunca aplicam nem destroem infra, não importam recursos, não mexem no estado do Terraform e não tocam em `infra/bootstrap/`. Recurso com dado ou identidade leva `prevent_destroy`. Plano com `delete` ou `replace` é `needs-human`. A configuração de custo na AWS (Budgets, limites, concorrência) é feita à mão pelo autor: não a automatize.
 - **Prazo.** O produto completo é apresentado em 08/12/2026.
 
+### Regras temporárias de sprint (valem até 28/11/2026)
+
+Decididas pelo autor em 25/11/2026 para terminar o código até 28/11. Depois dessa data voltam a valer as regras da casa.
+
+- **Tamanho.** Um PR pode ter até 800 linhas (código + testes, por `scripts/pr-size.py`), qualquer que seja a label `size:*` da Issue. Não fatie abaixo disso; acima, fatie. Reetiquete o PR e a Issue para a faixa medida.
+- **Workflows.** Agentes podem editar `.github/workflows` quando a Issue pedir, sem `needs-human`. Continuam obrigatórios: actions fixadas por SHA, `permissions` mínimas, gatilho `pull_request` (nunca `pull_request_target`) e nada de `${{ }}` dentro de `run:`. Produção segue só por disparo manual do autor.
+- **Revisão seletiva.** O autor do PR aplica a label `skip-review` já no `gh pr create` quando as duas condições valem: a Issue não é `security:sensitive`, e todo arquivo do diff está em `web/src/`, `web/e2e/`, `web/public/`, `web/README.md`, `contracts/`, `docs/` ou `scenarios/`. Com essa label a revisão automática não roda e o auto-merge entra com o CI verde; ele confere as duas condições de novo e recusa o que estiver fora. Qualquer outro caminho (`api/`, `pricing/`, `infra/`, `.github/`, `package.json`, lockfiles, configuração) passa pela revisão normal. A revisão interna antes do PR (qa-tester e, se tocar UI, ui-reviewer) continua obrigatória. `review:approved` segue exclusiva da revisão automática.
+
 ## Proibido
-- Merge em main, deploy, `git push --force`, remover/pular testes para o CI passar, editar `.github/workflows` sem autorização explícita, ler `.env`/segredos.
+- Merge em main, deploy, `git push --force`, remover/pular testes para o CI passar, editar `.github/workflows` sem autorização explícita (ver a regra de sprint acima), ler `.env`/segredos.
