@@ -8,12 +8,10 @@ import {
 import { memo, type ReactElement } from 'react';
 import type { EdgeKind } from '../../../shared/lib/design';
 import { EDGE_STYLE } from '../model/edgeKinds';
-import { MIN_TAG_LENGTH, type PlannedEdge } from '../model/geometry/edgeRouting';
 import styles from './CanvasPanel.module.css';
 import { Icon, type IconName } from './CategoryIcon';
 
-/** `route`: corredor e etiqueta calculados para o diagrama todo (`planEdges`); sem ele, o traçado padrão. */
-export type TypedFlowEdge = Edge<{ kind: EdgeKind; route?: PlannedEdge }, 'typed'>;
+export type TypedFlowEdge = Edge<{ kind: EdgeKind }, 'typed'>;
 
 /** Classe do traçado de cada tipo: contínuo, tracejado, pontilhado (DESIGN.md, "Arestas"). */
 export const STROKE_CLASS: Record<EdgeKind, string> = {
@@ -21,6 +19,8 @@ export const STROKE_CLASS: Record<EdgeKind, string> = {
   'runs-on': styles.strokeRunsOn ?? '',
   logs: styles.strokeLogs ?? '',
 };
+/** Abaixo disto (px do traço) a etiqueta não cabe sem cobrir os blocos. */
+const MIN_TAG_LENGTH = 48;
 export const EDGE_ICON: Record<EdgeKind, IconName> = {
   data: 'edge-data',
   'runs-on': 'edge-runs-on',
@@ -44,8 +44,7 @@ export const TypedEdge = memo(function TypedEdge({
   data,
 }: EdgeProps<TypedFlowEdge>): ReactElement {
   const kind = data?.kind ?? 'data';
-  const route = data?.route;
-  const [path, centerLabelX, centerLabelY] = getSmoothStepPath({
+  const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
@@ -53,10 +52,7 @@ export const TypedEdge = memo(function TypedEdge({
     sourcePosition,
     targetPosition,
     borderRadius: 6,
-    centerX: route?.centerX,
   });
-  const labelX = route?.label?.x ?? centerLabelX;
-  const labelY = route?.label?.y ?? centerLabelY;
   // DESIGN.md: em aresta com menos de 48px a etiqueta só aparece quando ela está selecionada.
   const short = Math.hypot(targetX - sourceX, targetY - sourceY) < MIN_TAG_LENGTH;
   return (

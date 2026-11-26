@@ -39,7 +39,6 @@ import {
   toCanvasEdges,
   toCanvasNodes,
 } from '../model/canvasModel';
-import { planDiagram } from '../model/geometry/diagram';
 import { fitInsets } from '../model/geometry/fitInsets';
 import { dropBlock, isBlockDrag } from '../model/palette';
 import { BlockNode, ClientNode, type BlockFlowNode, type ClientFlowNode } from './BlockNode';
@@ -95,14 +94,10 @@ function Canvas(): ReactElement {
     () => toCanvasNodes(document, layout, selection, costs) as unknown as AppNode[],
     [document, layout, selection, costs],
   );
-  const edges = useMemo(() => {
-    const canvasEdges = toCanvasEdges(document, selection);
-    const plan = planDiagram(nodes, canvasEdges);
-    return canvasEdges.map((edge) => ({
-      ...edge,
-      data: { ...edge.data, route: plan.get(edge.id) },
-    })) as unknown as Edge[];
-  }, [document, selection, nodes]);
+  const edges = useMemo(
+    () => toCanvasEdges(document, selection) as unknown as Edge[],
+    [document, selection],
+  );
 
   // Ajuste ao diagrama inteiro: a área útil é o canvas sem a legenda, os controles e a atribuição.
   const fit = useCallback(() => {
