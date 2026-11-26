@@ -31,7 +31,7 @@ uv run python -m app seed
 uv run ruff format --check . && uv run ruff check . && uv run mypy app && uv run lint-imports && uv run pytest -q --cov
 ```
 
-Os testes não fazem rede nem precisam de credenciais AWS: simulam o `GetProducts` com `botocore.stub.Stubber`.
+Os testes não fazem rede nem precisam de credenciais AWS: simulam o `GetProducts` com `botocore.stub.Stubber`, e os de serviço leem respostas reais gravadas em `tests/fixtures/`.
 
 ## Estrutura de `app/`
 
@@ -51,7 +51,7 @@ Os testes não fazem rede nem precisam de credenciais AWS: simulam o `GetProduct
 
 O registro fica em `app/services/` (e não em `pricing/services/`, como diz o texto da #28 e das Issues de bloco). Motivo: mypy, cobertura e import-linter já cobrem `app`; fora dele o código ficaria sem essas checagens.
 
-Os 17 módulos já existem e já estão em `SERVICES`, todos provisórios (não consultam a AWS e não geram preço). O nome do módulo é o slug com `_` no lugar de `-` (`nat_gateway.py`, `secrets_manager.py`); `lambda` é `lambda_.py`. O slug é o tipo do bloco sem `aws.` e vira o nome do arquivo do catálogo.
+Os 17 módulos já existem e já estão em `SERVICES`. `lambda_.py` e `sqs.py` consultam a Price List (#30, em [Serviços implementados](#serviços-implementados)); os outros 15 são provisórios (não consultam a AWS e não geram preço). O nome do módulo é o slug com `_` no lugar de `-` (`nat_gateway.py`, `secrets_manager.py`); `lambda` é `lambda_.py`. O slug é o tipo do bloco sem `aws.` e vira o nome do arquivo do catálogo.
 
 A Issue de um bloco edita só o módulo do próprio serviço e cria o teste dele em `tests/test_service_<slug com _>.py`. Não edita `services/__init__.py` nem `tests/test_services.py`: o teste do registro vale para serviço provisório e para serviço implementado.
 
@@ -61,6 +61,33 @@ No módulo do serviço:
 2. `build(region, products)` monta os `Price` com SKU, descrição e unidade do catálogo, usando `tiers(product.dimensions)` para as faixas.
 3. `expected_skus` lista os SKUs que não podem faltar no arquivo.
 
+Padrão dos serviços implementados (siga nos próximos blocos):
+
+- **Consultas estreitas:** só `TERM_MATCH`, uma `Query` por produto: `regionCode` (ou `usagetype`, no produto global) mais o atributo que separa o produto (`group`, `queueType`…). Só entra o conjunto fechado de atributos que o módulo conhece.
+- **Franquia do produto global, quando existir:** lida da Price List, não fixada no código. O produto deve ter 1 dimensão, início 0, preço 0 e fim finito (o fim é a franquia); senão, `PricingError`.
+- **Recusa:** produto duplicado, unidade AWS fora do conjunto esperado ou 1ª faixa do produto regional com preço 0 dão `PricingError`. Com erro, nada é gravado e o arquivo versionado continua.
+- **Testes:** `tests/test_service_<slug com _>.py` lê fixtures reais em `tests/fixtures/<slug>-<região>.jsonl` (formato PriceList, um item por linha, tirado do bulk offer file; os de Lambda e SQS são de 26/11/2026). O teste de `generate()` compara com a semente só `sku`, `description`, `unit` e `freeTier`, não as faixas: o workflow semanal (#29) atualiza preço sem quebrar teste.
+
+## Serviços implementados
+
+Preços semente da Price List pública (bulk offer file de 26/11/2026).
+
+**`lambda`** (`lambda_.py`)
+
+- Consultas: 4 regionais (`regionCode` + `group` `AWS-Lambda-Requests`, `AWS-Lambda-Requests-ARM`, `AWS-Lambda-Duration` ou `AWS-Lambda-Duration-ARM`) e 2 globais de franquia (`usagetype` `Global-Request` ou `Global-Lambda-GB-Second`, + `group`).
+- SKUs: `lambda-requests-x86`, `lambda-requests-arm64` (`request`); `lambda-duration-x86`, `lambda-duration-arm64` (`GB-second`).
+- Franquia: 1.000.000 requisições (pool `lambda-requests`) e 400.000 GB-s (pool `lambda-duration`), divididas entre x86 e arm64.
+- Faixas de duração por arquitetura: x86 até 6e9 e 15e9 GB-s; arm64 até 7,5e9 e 18,75e9 GB-s.
+
+**`sqs`** (`sqs.py`)
+
+- Consultas: 2 regionais (`regionCode` + `queueType` `Standard` ou `FIFO (first-in, first-out)`) e 1 global de franquia (`usagetype` `Global-Requests`).
+- SKUs: `sqs-requests-standard` e `sqs-requests-fifo` (`request`).
+- Franquia: 1.000.000 requisições (pool `sqs-requests`), dividida entre fila padrão e FIFO.
+- Faixas: até 1e11 e 2e11 requisições.
+
+Fora de escopo: no Lambda, provisioned concurrency, Lambda@Edge, armazenamento efêmero, SnapStart e managed instances; no SQS, fila Fair, cobrança por blocos de 64 KB e transferência de dados.
+
 ## Serviço provisório e gravação
 
 No `generate`, serviço provisório (sem consulta) não gera arquivo: o arquivo já versionado é exigido (ausente é erro), validado, mantido e entra no manifest, que então sai com `source: seed`. O manifest só sai `price-list` quando todos os serviços registrados têm consulta. Sem nenhum serviço com consulta, nada é gravado.
@@ -69,7 +96,7 @@ O `write` passa as chaves pela allowlist de `file_key`, grava tudo primeiro em a
 
 ## Catálogo semente e manifest
 
-Os arquivos `web/public/prices/us-east-1/<slug>.json` e `web/public/prices/sa-east-1/<slug>.json` já existem, com `prices: []`. As Issues de bloco (#30 a #42) rodam em paralelo; para os PRs fazerem merge sem conflito, cada bloco:
+Os arquivos `web/public/prices/us-east-1/<slug>.json` e `web/public/prices/sa-east-1/<slug>.json` já existem. Os de `lambda` e `sqs` têm preços semente (#30); os outros ainda têm `prices: []`. As Issues de bloco (#30 a #42) rodam em paralelo; para os PRs fazerem merge sem conflito, cada bloco:
 
 1. edita só `app/services/<slug com _>.py`;
 2. cria `tests/test_service_<slug com _>.py`;
