@@ -30,6 +30,8 @@ export interface GeneratorInput {
   readonly links: readonly ExportLink[];
   /** Todos os blocos exportáveis do design, para o que é gerado uma vez só (rede, AZs). */
   readonly blocks: readonly ExportBlock[];
+  /** Arestas de todos os blocos, por id do bloco: o que é gerado uma vez só enxerga quem fala com quem. */
+  readonly designLinks: ReadonlyMap<string, readonly ExportLink[]>;
   readonly region: Region;
 }
 
