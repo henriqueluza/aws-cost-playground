@@ -1,0 +1,27 @@
+npm notice run build
+npm notice run vite build
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 341 modules transformed.
+rendering chunks...
+[plugin seo] VITE_SITE_URL ausente: sem canonical, og:url nem URLs no sitemap
+computing gzip size...
+dist/robots.txt                                                  0.02 kB │ gzip:   0.04 kB
+dist/sitemap.xml                                                 0.11 kB │ gzip:   0.12 kB
+dist/index.html                                                  2.35 kB │ gzip:   0.88 kB
+dist/fonts/OFL-ibm-plex-sans.txt                                 4.42 kB │ gzip:   1.98 kB
+dist/fonts/OFL-ibm-plex-mono.txt                                 5.29 kB │ gzip:   2.02 kB
+dist/assets/ibm-plex-mono-latin-ext-400-normal-BmRBH3aV.woff2   13.34 kB
+dist/assets/ibm-plex-mono-latin-ext-500-normal-CAhNIIs5.woff2   13.43 kB
+dist/assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2       14.70 kB
+dist/assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2       14.88 kB
+dist/assets/ibm-plex-sans-latin-ext-400-normal-C5H60-Va.woff2   15.98 kB
+dist/assets/ibm-plex-sans-latin-ext-600-normal-DOrvGEcy.woff2   16.44 kB
+dist/assets/ibm-plex-sans-latin-ext-500-normal-DakdToA3.woff2   16.45 kB
+dist/assets/ibm-plex-sans-latin-400-normal-CDDApCn2.woff2       22.58 kB
+dist/assets/ibm-plex-sans-latin-500-normal-6ng42L7E.woff2       24.18 kB
+dist/assets/ibm-plex-sans-latin-600-normal-CuJfVYMP.woff2       24.25 kB
+dist/assets/index-DyDGaEd2.css                                  20.49 kB │ gzip:   4.66 kB
+dist/assets/index-rRGNF3zF.js                                  491.57 kB │ gzip: 151.60 kB
+
+✓ built in 137ms

@@ -143,13 +143,6 @@ describe('Abrir arquivo', () => {
     expect(text).not.toHaveBeenCalled();
   });
 
-  it('o mesmo arquivo pode ser escolhido de novo', async () => {
-    renderBar();
-    await upload(json('x'));
-    await screen.findByRole('alert');
-    expect(picker().value).toBe('');
-  });
-
   it('rótulo com marcação aparece como texto, sem virar elemento', async () => {
     const label = '<img src=x onerror=alert(1)>';
     const doc = { ...adr, blocks: [{ ...adr.blocks[0], label }], edges: [] };

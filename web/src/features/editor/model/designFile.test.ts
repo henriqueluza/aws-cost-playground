@@ -100,8 +100,11 @@ describe('categorias de erro', () => {
     });
     expect(r).toEqual({ ok: false, error: 'unreadable' });
   });
-  it('mais de 100 blocos é recusado, 100 abrem', () => {
+  it('mais de 100 blocos é recusado antes do JSON.parse, 100 abrem', () => {
+    const parse = vi.spyOn(JSON, 'parse');
     expect(errorOf(withBlocks(DESIGN_LIMITS.maxBlocks + 1))).toBe('not-design');
+    expect(parse).not.toHaveBeenCalled();
+    parse.mockRestore();
     expect(parseDesignFile(withBlocks(DESIGN_LIMITS.maxBlocks)).ok).toBe(true);
   });
   it('a mensagem é texto próprio e nunca eco do arquivo', () => {

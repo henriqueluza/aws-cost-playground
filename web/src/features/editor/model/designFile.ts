@@ -20,11 +20,12 @@ export type DesignFileSource = { readonly size: number; text(): Promise<string> 
 
 /** Texto fixo da interface por categoria de erro. */
 const MESSAGES: Record<DesignFileError, string> = {
-  'too-large': `O arquivo passa de ${DESIGN_LIMITS.maxDocBytes / 1024} KB, o tamanho máximo de um design.`,
+  'too-large': `O arquivo passa de ${DESIGN_LIMITS.maxDocBytes / 1024} KB, o tamanho máximo de um design. Escolha outro arquivo.`,
   unreadable: 'Não foi possível ler o arquivo.',
-  'not-json': 'O arquivo não é um JSON válido.',
-  'not-design': 'O arquivo não é um design deste produto.',
-  'unsupported-version': 'O arquivo é de uma versão do design que este editor não abre.',
+  'not-json': 'O arquivo não é um JSON válido. Escolha um arquivo baixado deste editor.',
+  'not-design': 'O arquivo não é um design deste produto. Escolha um arquivo baixado deste editor.',
+  'unsupported-version':
+    'O arquivo é de uma versão do design que este editor não abre. Atualize o editor ou baixe o design de novo.',
 };
 export const designFileMessage = (error: DesignFileError): string => MESSAGES[error];
 
@@ -69,9 +70,22 @@ export function migrateDesign(
   return { ok: true, raw: migrated };
 }
 
+/**
+ * Conta, no texto, as chaves `"id": "blk_..."` (só aparecem fora de string: dentro dela a aspa vem
+ * escapada) e para ao passar de `maxBlocks`: o limite de blocos vale antes do parse completo.
+ */
+function exceedsBlockLimit(text: string): boolean {
+  let count = 0;
+  for (const _ of text.matchAll(/"id"\s*:\s*"blk_/g)) {
+    if (++count > DESIGN_LIMITS.maxBlocks) return true;
+  }
+  return false;
+}
+
 /** JSON.parse puro e depois o schema; o primeiro erro vira só uma categoria. */
 export function parseDesignFile(text: string): DesignFileResult {
   if (text.length > DESIGN_LIMITS.maxDocBytes) return { ok: false, error: 'too-large' };
+  if (exceedsBlockLimit(text)) return { ok: false, error: 'not-design' };
   let raw: unknown;
   try {
     raw = JSON.parse(text);

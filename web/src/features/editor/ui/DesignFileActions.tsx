@@ -119,7 +119,8 @@ export function DesignFileActions() {
         {pending !== null && (
           <p className={styles.text}>
             O design atual ({plural(current.blocks.length, 'bloco', 'blocos')}) será trocado pelo do
-            arquivo ({plural(pending.blocks.length, 'bloco', 'blocos')}).
+            arquivo ({plural(pending.blocks.length, 'bloco', 'blocos')}). Baixe o design atual antes
+            se quiser guardá-lo.
           </p>
         )}
         <div className={styles.actions}>
