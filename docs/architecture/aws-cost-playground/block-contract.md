@@ -119,7 +119,7 @@ Valores copiados de `contracts/blocks.json`. Atributo sem `default` é opcional.
 | `aws.ec2` | `hoursPerMonth` | hours | `730` | `0` | `744` | não |
 | `aws.ec2` | `rootVolumeGb` | GB | `30` | `8` | `16384` | sim |
 | `aws.rds` | `storageGb` | GB | `20` | `20` | `65536` | sim |
-| `aws.rds` | `backupStorageGb` | GB | `20` | `0` | `1000000` | não |
+| `aws.rds` | `backupStorageGb` | GB | `0` | `0` | `1000000` | não |
 | `aws.elasticache` | `nodeCount` | nodes | `1` | `1` | `500` | sim |
 | `aws.cloudfront` | `requestsPerMonth` | requests | `1000000` | `0` | `100000000000` | sim |
 | `aws.alb` | `newConnectionsPerSecond` | connections/s | `10` | `0` | `1000000` | não |
@@ -132,7 +132,7 @@ Valores copiados de `contracts/blocks.json`. Atributo sem `default` é opcional.
 | `aws.cloudwatch` | `alarms` | alarms | `10` | `0` | `100000` | sim |
 | `aws.nat-gateway` | `processedGbPerMonth` | GB | `100` | `0` | `100000000` | não |
 
-`backupStorageGb` do `aws.rds` é só o backup além do incluído (o campo "Additional backup storage" da AWS Pricing Calculator), cobrado inteiro por GB-mês: o backup gratuito, até 100% do armazenamento provisionado na região, não entra na chave.
+`backupStorageGb` do `aws.rds` é só o backup além do incluído (o campo "Additional backup storage" da AWS Pricing Calculator), cobrado inteiro por GB-mês: o backup gratuito, até 100% do armazenamento provisionado na região, não entra na chave. O padrão é `0`: um RDS recém-criado não tem backup pago (#241).
 
 ## Blocos de nível B e C
 
