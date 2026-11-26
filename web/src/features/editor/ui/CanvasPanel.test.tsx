@@ -57,17 +57,14 @@ describe('CanvasPanel', () => {
 
   it('mostra o ícone da categoria e o resumo "serviço · SKU" no nó', async () => {
     renderCanvas();
-    const lambda = await screen.findByLabelText(/^Lambda, API handler/);
-    expect(lambda.querySelector('svg')).toHaveAttribute('data-icon', 'compute');
-    expect(lambda).toHaveTextContent(/Lambda · \S/);
-    expect(screen.getByLabelText(/^S3, Uploads/).querySelector('svg')).toHaveAttribute(
-      'data-icon',
+    const icon = (re: RegExp) => screen.getByLabelText(re).querySelector('svg')?.dataset.icon;
+    await screen.findByLabelText(/^Lambda, API handler/);
+    expect([icon(/^Lambda,/), icon(/^S3,/), icon(/^Internet/)]).toEqual([
+      'compute',
       'data',
-    );
-    expect(screen.getByLabelText(/^Internet/).querySelector('svg')).toHaveAttribute(
-      'data-icon',
       'globe',
-    );
+    ]);
+    expect(screen.getByLabelText(/^Lambda,/)).toHaveTextContent(/Lambda · \S/);
   });
 
   it('não tem violação de acessibilidade', async () => {
