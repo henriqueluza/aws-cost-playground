@@ -8,7 +8,7 @@ Terraform da AWS (us-east-1, 100% serverless). Decisões em `docs/architecture/a
 |---|---|
 | `modules/` | Módulos reutilizáveis, cada um com README próprio (hoje: `alarms`, `auth`, `database`, `dns`, `functions`, `http-api` e `site`, o bucket privado + CloudFront da SPA) |
 | `envs/staging` | Raiz do ambiente `staging`: compõe os sete módulos (`main.tf`, `variables.tf` e `outputs.tf` genéricos; valores em `terraform.tfvars`) |
-| `envs/production` | Raiz do ambiente `production`: os mesmos `main.tf`, `variables.tf` e `outputs.tf` de staging, byte a byte; só o `terraform.tfvars` muda |
+| `envs/production` | Raiz do ambiente `production`: os mesmos `main.tf`, `variables.tf` e `outputs.tf` de staging, byte a byte; `backend.tf`, `versions.tf` e `terraform.tfvars` mudam (ver "Diferença entre os ambientes") |
 | `tools/` | `plan_guard.py` e seus testes |
 | `bootstrap/` | Buckets de estado, provedor OIDC e papéis de CI, com README próprio; só o autor aplica. Agentes não tocam sem Issue que autorize |
 
