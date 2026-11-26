@@ -3,6 +3,7 @@ import {
   Background,
   BackgroundVariant,
   ConnectionMode,
+  MarkerType,
   Panel,
   ReactFlow,
   ReactFlowProvider,
@@ -11,7 +12,7 @@ import {
   type Edge,
   type FinalConnectionState,
 } from '@xyflow/react';
-import { useCallback, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { CLIENT_NODE_ID } from '../../../shared/lib/design';
 import { IconButton, Notice } from '../../../shared/ui';
 import { applyEdgeChanges, applyNodeChanges, type FlowChange } from '../hooks/canvasHandlers';
@@ -27,6 +28,7 @@ type AppNode = BlockFlowNode | ClientFlowNode;
 
 const NODE_TYPES = { block: BlockNode, client: ClientNode };
 const FIT_OPTIONS = { padding: 0.2, maxZoom: 1 };
+const ARROW = { markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 } };
 const GRID: [number, number] = [8, 8];
 
 /** O canvas: nós e arestas saem do design da store; cada gesto vira uma ação dela. */
@@ -54,6 +56,13 @@ function Canvas(): ReactElement {
     () => toCanvasEdges(document, selection) as unknown as Edge[],
     [document, selection],
   );
+
+  // Design carregado de fora (sem layout): ajusta o zoom aos blocos novos.
+  const idsKey = document.blocks.map((block) => block.id).join();
+  const unplaced = Object.keys(layout).length === 0;
+  useEffect(() => {
+    if (unplaced && idsKey) void flow.fitView(FIT_OPTIONS);
+  }, [flow, idsKey, unplaced]);
 
   const onNodesChange = useCallback((changes: FlowChange[]) => {
     const { selection: current, ...actions } = designStore.getState();
@@ -109,6 +118,8 @@ function Canvas(): ReactElement {
         snapToGrid
         snapGrid={GRID}
         fitView
+        defaultEdgeOptions={ARROW}
+        defaultMarkerColor={null}
         fitViewOptions={FIT_OPTIONS}
         minZoom={0.25}
         maxZoom={2}

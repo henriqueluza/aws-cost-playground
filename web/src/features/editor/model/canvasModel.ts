@@ -73,13 +73,37 @@ export type CanvasEdge = {
   readonly data: { readonly kind: EdgeKind };
 };
 
-const COLUMNS = 3;
 const CELL = { x: 288, y: 144 };
-const CLIENT_DEFAULT = { x: 0, y: 0 };
 
-/** Posição de um bloco sem entrada no layout: grade de 3 colunas à direita do `client`. */
-export function defaultPosition(index: number): { x: number; y: number } {
-  return { x: CELL.x * (1 + (index % COLUMNS)), y: CELL.y * Math.floor(index / COLUMNS) };
+/**
+ * Posição de quem não tem entrada no layout: uma coluna por profundidade (o maior caminho desde
+ * um bloco sem entrada) e o `client` na última coluna, para o desenho ler da esquerda para a direita.
+ */
+export function defaultLayout(doc: DesignDocument): Record<string, { x: number; y: number }> {
+  const depth = new Map<string, number>();
+  const visiting = new Set<string>();
+  // Aresta que fecha um ciclo é ignorada: o bloco já está na pilha.
+  const depthOf = (id: string): number => {
+    const known = depth.get(id);
+    if (known !== undefined) return known;
+    visiting.add(id);
+    const sources = doc.edges.filter((edge) => edge.target === id && !visiting.has(edge.source));
+    const value = Math.max(-1, ...sources.map((edge) => depthOf(edge.source))) + 1;
+    visiting.delete(id);
+    depth.set(id, value);
+    return value;
+  };
+  const rows = new Map<number, number>();
+  const place = (id: string, column: number) => {
+    const row = rows.get(column) ?? 0;
+    rows.set(column, row + 1);
+    return [id, { x: CELL.x * column, y: CELL.y * row }] as const;
+  };
+  const blocks = doc.blocks.map((block) => place(block.id, depthOf(block.id)));
+  return Object.fromEntries([
+    ...blocks,
+    place(CLIENT_NODE_ID, Math.max(0, ...doc.blocks.map((block) => depthOf(block.id))) + 1),
+  ]);
 }
 
 const KIND_LABELS: Record<EdgeKind, string> = {
@@ -107,17 +131,18 @@ export function toCanvasNodes(
   selection: Selection,
   costs: ReadonlyMap<string, CostView>,
 ): CanvasNode[] {
+  const fallback = defaultLayout(doc);
   const client: CanvasNode = {
     id: CLIENT_NODE_ID,
     type: 'client',
-    position: layout[CLIENT_NODE_ID] ?? CLIENT_DEFAULT,
+    position: layout[CLIENT_NODE_ID] ?? fallback[CLIENT_NODE_ID]!,
     selected: false,
     selectable: false,
     deletable: false,
     ariaLabel: 'Internet. Destino fixo do tráfego para fora da AWS.',
     data: { kind: 'client', label: 'Internet' },
   };
-  const blocks = doc.blocks.map((block, index): CanvasNode => {
+  const blocks = doc.blocks.map((block): CanvasNode => {
     const service = serviceName(block.type);
     const category = canvasCategory(block.type);
     const cost = costs.get(block.id);
@@ -129,7 +154,7 @@ export function toCanvasNodes(
     return {
       id: block.id,
       type: 'block',
-      position: layout[block.id] ?? defaultPosition(index),
+      position: layout[block.id] ?? fallback[block.id]!,
       selected: selection?.kind === 'block' && selection.id === block.id,
       selectable: true,
       deletable: true,

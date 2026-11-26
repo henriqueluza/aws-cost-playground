@@ -5,7 +5,7 @@ import { adrExampleDesign } from '../../../test/designFixtures';
 import {
   canvasCategory,
   checkConnection,
-  defaultPosition,
+  defaultLayout,
   formatUsd,
   toCanvasEdges,
   toCanvasNodes,
@@ -39,7 +39,34 @@ describe('toCanvasNodes', () => {
   it('usa a posição do layout e, sem ela, a grade padrão', () => {
     const placed = toCanvasNodes(doc, { blk_assets: { x: 7, y: 9 } }, null, costs);
     expect(placed[2]?.position).toEqual({ x: 7, y: 9 });
-    expect(placed[1]?.position).toEqual(defaultPosition(0));
+    expect(placed[1]?.position).toEqual(defaultLayout(doc).blk_fn_api);
+  });
+
+  it('põe o fluxo da esquerda para a direita, com o client na última coluna', () => {
+    const chain = {
+      ...doc,
+      blocks: ['blk_a', 'blk_b', 'blk_c'].map((id) => ({ ...doc.blocks[0]!, id })),
+      edges: [
+        { ...doc.edges[0]!, id: 'edg_1', source: 'blk_a', target: 'blk_b' },
+        { ...doc.edges[0]!, id: 'edg_2', source: 'blk_b', target: 'blk_c' },
+        { ...doc.edges[0]!, id: 'edg_3', source: 'blk_a', target: 'blk_c' },
+        { ...doc.edges[0]!, id: 'edg_5', source: 'blk_c', target: 'client' },
+      ],
+    };
+    const at = defaultLayout(chain);
+    expect([at.blk_a?.x, at.blk_b?.x, at.blk_c?.x, at.client?.x]).toEqual([0, 288, 576, 864]);
+  });
+
+  it('termina com um ciclo no design', () => {
+    const loop = {
+      ...doc,
+      blocks: ['blk_a', 'blk_b'].map((id) => ({ ...doc.blocks[0]!, id })),
+      edges: [
+        { ...doc.edges[0]!, id: 'edg_1', source: 'blk_a', target: 'blk_b' },
+        { ...doc.edges[0]!, id: 'edg_2', source: 'blk_b', target: 'blk_a' },
+      ],
+    };
+    expect(Object.keys(defaultLayout(loop))).toEqual(['blk_a', 'blk_b', 'client']);
   });
 
   it('marca só o bloco selecionado', () => {
