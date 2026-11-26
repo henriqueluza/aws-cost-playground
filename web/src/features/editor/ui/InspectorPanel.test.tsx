@@ -105,13 +105,16 @@ describe('InspectorPanel', () => {
     await user.clear(label);
     await user.click(label);
     await user.paste('a'.repeat(81));
-    expect(screen.getByRole('alert')).toHaveTextContent('Use até 80 caracteres (tem 81).');
+    expect(screen.getByRole('alert')).toHaveTextContent('Use até 80 caracteres.');
     expect(block().label).toBe('');
 
     await user.clear(label);
     await user.paste('a‮b');
     expect(screen.getByRole('alert')).toHaveTextContent('caracteres de controle');
     expect(block().label).toBe('');
+    await user.tab(); // o texto inválido não fica no campo: a store é a verdade
+    expect(label).toHaveValue('');
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('sem violações de acessibilidade, com e sem erro', async () => {

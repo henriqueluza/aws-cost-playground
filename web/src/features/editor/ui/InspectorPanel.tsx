@@ -43,11 +43,7 @@ export function InspectorPanel() {
     <EmptyState
       title="Nenhum bloco selecionado"
       description="Selecione um bloco no canvas para ver e editar seus atributos e valores de uso."
-      action={
-        <span className={styles.hint}>
-          Teclado: Tab percorre os blocos e Enter abre o inspetor.
-        </span>
-      }
+      action={<span className={styles.hint}>Clique em um bloco no canvas.</span>}
     />
   );
 }
