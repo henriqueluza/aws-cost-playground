@@ -22,7 +22,7 @@ export {
   type CostStatus,
   type EdgeCost,
 } from './model/engine';
-export { PricingPanel, type CostSelection, type PricingPanelProps } from './ui/PricingPanel';
+export { PricingPanel } from './ui/PricingPanel';
 export { catalogServices } from './application/catalogServices';
 export { createCatalogSession, type LoadCatalog } from './application/catalogSession';
 export { priceCatalogKey, usePriceCatalog, type PriceCatalogState } from './hooks/usePriceCatalog';
