@@ -36,7 +36,8 @@ EXIT_INVALID = 2
 SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 MAIN_REF = "refs/heads/main"
 STAGING_WORKFLOW = ".github/workflows/deploy-staging.yml"
-# Nomes do job e do passo em deploy-staging.yml; o teste do workflow de produção os trava.
+# Nomes do job e do passo em deploy-staging.yml. O teste do workflow de produção (#320)
+# confere os dois contra o arquivo; renomear um deles sem ajustar aqui recusa todo deploy.
 STAGING_DEPLOY_JOB = "deploy (staging)"
 STAGING_SMOKE_STEP = "Smoke test"
 MANIFEST_PATH = Path("site") / "prices" / "manifest.json"
@@ -58,15 +59,27 @@ def load_json(path: str | Path) -> Any:
         raise InvalidInputError(f"não foi possível ler o JSON de {Path(path).name}") from exc
 
 
+def git(repo: str, *args: str) -> int:
+    try:
+        return subprocess.run(["git", "-C", repo, *args], capture_output=True, check=False).returncode
+    except OSError as exc:
+        raise InvalidInputError("não foi possível executar o git") from exc
+
+
 def check_sha(sha: str, ref: str, repo: str, main: str) -> str:
     if not SHA_PATTERN.fullmatch(sha):
         raise RefusedError("o SHA informado não tem 40 caracteres hexadecimais minúsculos")
     if ref != MAIN_REF:
         raise RefusedError(f"o workflow de produção só roda a partir de {MAIN_REF}")
-    for args in (["cat-file", "-e", f"{sha}^{{commit}}"], ["merge-base", "--is-ancestor", sha, main]):
-        done = subprocess.run(["git", "-C", repo, *args], capture_output=True, check=False)
-        if done.returncode != 0:
-            raise RefusedError(f"o commit {sha} não pertence a main")
+    not_in_main = RefusedError(f"o commit {sha} não pertence a main")
+    if git(repo, "cat-file", "-e", f"{sha}^{{commit}}") != 0:
+        raise not_in_main
+    # 0 é ancestral, 1 não é; outro código é erro do git (ex.: checkout raso, sem `main`).
+    code = git(repo, "merge-base", "--is-ancestor", sha, main)
+    if code == 1:
+        raise not_in_main
+    if code != 0:
+        raise InvalidInputError("o git não conseguiu comparar o commit com main (o checkout precisa do histórico)")
     return sha
 
 

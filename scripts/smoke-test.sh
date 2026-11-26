@@ -36,7 +36,10 @@ curl_opts=(--fail --silent --show-error --max-time 15 --retry 5 --retry-delay "$
 
 curl "${curl_opts[@]}" --output /dev/null "$site_url/"
 curl "${curl_opts[@]}" --output "$tmp/config.json" "$site_url/config.json"
-if [ "$(jq -S . "$tmp/config.json")" != "$(jq -S . "$config")" ]; then
+# Cada jq roda sozinho: JSON inválido de qualquer lado aborta, em vez de comparar dois vazios.
+jq -S . "$tmp/config.json" > "$tmp/served.json"
+jq -S . "$config" > "$tmp/expected.json"
+if ! cmp -s "$tmp/served.json" "$tmp/expected.json"; then
   echo "::error::smoke: o /config.json servido difere do publicado" >&2
   exit 1
 fi

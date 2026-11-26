@@ -122,6 +122,23 @@ class StagingTest(TempDirTest):
                 self.assertEqual(done.returncode, 1, done.stderr)
                 self.assertEqual(done.stdout, "")
 
+    def test_no_message_shows_paths_or_environment(self) -> None:
+        os.environ["GH_TOKEN"] = TOKEN
+        self.addCleanup(os.environ.pop, "GH_TOKEN", None)
+        outputs = [
+            self.run_id({"workflow_runs": []}),
+            self.run_id({"message": "Not Found"}),
+            gate("staging-jobs", self.write("jobs.json", jobs(smoke="skipped"))),
+            gate("staging-jobs", str(self.tmp / "ausente.json")),
+            gate("prices", str(self.tmp / "vazio")),
+            gate("sha", "x", "--ref", MAIN, "--repo", str(self.tmp)),
+            gate("sha", SHA, "--ref", MAIN, "--repo", str(self.tmp)),
+        ]
+        for done in outputs:
+            self.assertNotEqual(done.returncode, 0)
+            for value in (TOKEN, str(self.tmp)):
+                self.assertNotIn(value, done.stdout + done.stderr)
+
     def test_unexpected_payload_is_invalid_input(self) -> None:
         self.assertEqual(self.run_id({"message": "Not Found"}).returncode, 2)
         self.assertEqual(gate("staging-run", SHA, self.write("runs.json", "{")).returncode, 2)
@@ -150,21 +167,37 @@ class StagingTest(TempDirTest):
 FAKE_GH = """#!/bin/sh
 echo "$*" >> "$FAKE/log"
 case "$4" in
-  repos/dono/repo/actions/workflows/deploy-staging.yml/runs) cat "$FAKE/runs.json" ;;
-  repos/dono/repo/actions/runs/9/jobs) cat "$FAKE/jobs.json" ;;
-  *) exit 1 ;;
+  repos/dono-xyz/repo-xyz/actions/workflows/deploy-staging.yml/runs) cat "$FAKE/runs.json" ;;
+  repos/dono-xyz/repo-xyz/actions/runs/9/jobs) cat "$FAKE/jobs.json" ;;
+  *) echo "HTTP 403" >&2; exit 1 ;;
 esac
 """
 
 
+REPO, TOKEN = "dono-xyz/repo-xyz", "token-secreto-xyz"
+
+
 class FindStagingReleaseTest(TempDirTest):
+    repo = REPO
+
     def find(self, sha: str = SHA, runs: object = None, jobs_payload: object = None) -> subprocess.CompletedProcess[str]:
         Path(self.write("bin/gh", FAKE_GH)).chmod(0o755)
         self.write("fake/runs.json", runs or {"workflow_runs": [run(id=9, run_attempt=2)]})
         self.write("fake/jobs.json", jobs_payload or jobs())
         env = {"PATH": f"{self.tmp / 'bin'}:{os.environ['PATH']}", "FAKE": str(self.tmp / "fake"),
-               "GITHUB_REPOSITORY": "dono/repo", "GH_TOKEN": "x"}  # fmt: skip
+               "GITHUB_REPOSITORY": self.repo, "GH_TOKEN": TOKEN}  # fmt: skip
         return subprocess.run(["bash", str(FIND), sha], env=env, capture_output=True, text=True, timeout=30, check=False)
+
+    def test_api_failure_is_exit_2_and_no_message_shows_configuration(self) -> None:
+        self.repo = "outro-xyz/repo-xyz"  # o gh falso devolve erro para este repositório
+        failed = self.find()
+        self.assertEqual((failed.returncode, failed.stdout), (2, ""), failed.stderr)
+        self.repo = REPO
+        refused = [self.find(runs={"workflow_runs": []}), self.find(jobs_payload=jobs(smoke="skipped")), self.find("main")]
+        for done in (failed, *refused):
+            self.assertNotEqual(done.returncode, 0)
+            for value in (TOKEN, REPO, "outro-xyz", str(self.tmp)):
+                self.assertNotIn(value, done.stdout + done.stderr)
 
     def test_prints_run_and_attempt_after_asking_for_the_sha_and_the_latest_jobs(self) -> None:
         done = self.find()
@@ -293,6 +326,13 @@ class SmokeTest(TempDirTest):
                 self.assertEqual(done.returncode, 22 if content is None else 1, done.stderr)
                 if content is not None:
                     self.assertIn(expected, done.stderr)
+                for value in ("example.invalid", "abc", str(self.tmp)):
+                    self.assertNotIn(value, done.stdout + done.stderr, "a mensagem mostra URL, configuração ou caminho")
+
+    def test_invalid_json_on_either_side_fails_instead_of_comparing_empties(self) -> None:
+        (self.tmp / "fake" / "config.json").write_text("<html>", "utf-8")
+        Path(self.config).write_text("<html>", "utf-8")
+        self.assertNotEqual(self.smoke().returncode, 0)
 
     def test_wrong_usage_is_refused_before_any_request(self) -> None:
         site, api = "https://site.example.invalid", "https://api.example.invalid"

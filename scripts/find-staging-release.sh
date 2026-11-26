@@ -8,7 +8,7 @@
 # deploy e o smoke test de staging passaram (infra/tools/release_gate.py). O workflow de
 # produção chama este script antes e depois de baixar o artefato: a mesma saída nas duas
 # vezes prova que o artefato baixado é o da tentativa conferida.
-# Saída: 0 achou; 1 recusado; 2 uso incorreto ou resposta inválida da API.
+# Saída: 0 achou; 1 recusado; 2 uso incorreto, falha da API ou resposta inválida.
 set -euo pipefail
 
 if [ "$#" -ne 1 ] || ! [[ "$1" =~ ^[0-9a-f]{40}$ ]]; then
@@ -21,10 +21,14 @@ gate="$(cd "$(dirname "$0")/.." && pwd)/infra/tools/release_gate.py"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-staging.yml/runs" \
+api() {
+  gh api --method GET "$@" || { echo "::error::falha ao consultar a API do GitHub" >&2; exit 2; }
+}
+
+api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-staging.yml/runs" \
   -f head_sha="$sha" -f per_page=100 > "$tmp/runs.json"
 release=$(python3 "$gate" staging-run "$sha" "$tmp/runs.json")
-gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/${release%% *}/jobs" \
+api "repos/$GITHUB_REPOSITORY/actions/runs/${release%% *}/jobs" \
   -f filter=latest -f per_page=100 > "$tmp/jobs.json"
 python3 "$gate" staging-jobs "$tmp/jobs.json"
 echo "$release"
