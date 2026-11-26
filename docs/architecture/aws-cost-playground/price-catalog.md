@@ -116,4 +116,4 @@ Ficam para outras Issues: o adaptador HTTP que implementa `ReadPriceFile` (#173)
 
 - Adaptador HTTP da porta `ReadPriceFile` (#173) e hook com TanStack Query (#174).
 - Calcular custo com o catálogo: é o motor, em [cost-estimate.md](cost-estimate.md) (`PriceCatalog` é só o que ele recebe).
-- Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest.
+- Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest. O gerador está em construção nas Issues #195 (cliente e parse), #202 (registro de serviços e render) e #196 (CLI e gravação). O contrato acima não muda.
