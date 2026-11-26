@@ -103,7 +103,7 @@ class ClaudeClient:
         ssm_factory: Callable[[], Any] = _ssm_client,
         anthropic_factory: Callable[[str], anthropic.Anthropic] = _anthropic_client,
     ) -> None:
-        self._enabled, self._model, self._key_parameter = enabled, model, key_parameter
+        self._enabled, self._model, self._parameter_name = enabled, model, key_parameter
         self._contracts, self._schema = contracts, output_schema(contracts)
         self._ssm_factory, self._anthropic_factory = ssm_factory, anthropic_factory
         self._sdk: anthropic.Anthropic | None = None
@@ -165,11 +165,10 @@ class ClaudeClient:
         if not self._enabled:
             raise EstimateError("disabled")
         key = ""
-        if self._key_parameter is not None:
+        if self._parameter_name is not None:
             try:
-                parameter = self._ssm_factory().get_parameter(
-                    Name=self._key_parameter, WithDecryption=True
-                )
+                name = self._parameter_name
+                parameter = self._ssm_factory().get_parameter(Name=name, WithDecryption=True)
                 key = str(parameter["Parameter"]["Value"]).strip()
             except _SSM_ERRORS:
                 key = ""  # parâmetro ausente, sem permissão ou SSM fora do ar: falha fechada
