@@ -221,3 +221,11 @@ def test_rotas_novas_usam_so_a_particao_do_sub(app: FastAPI, table: Any) -> None
 def test_repositorio_recusa_atualizar_chave_ou_versao(attributes: dict[str, Any]) -> None:
     with pytest.raises(ValueError, match="invalid update attributes"):
         repository.update(USER_A, MISSING, 1, attributes)
+
+
+def test_atualizar_sem_expected_version_e_422_sem_gravar(app: FastAPI, table: Any) -> None:
+    design = create(app)
+    before = stored(table)
+    status, problem = call(app, "PATCH", f"/designs/{design['id']}", {"name": "sem versão"})
+    assert (status, problem["errors"][0]["loc"]) == (422, ["body", "expectedVersion"])
+    assert stored(table) == before
