@@ -173,9 +173,10 @@ describe('estimate', () => {
     expect(catalog).toEqual(before);
   });
 
-  it('com o registro real e o exemplo do ADR, os blocos saem com preço e a Lambda com as cobranças dela', () => {
+  it('com o registro real e o exemplo do ADR, a Lambda sai com as cobranças dela e o S3 sem preço', () => {
     // Lambda arm64: (3.000.000 − 1.000.000) × US$ 0,0000002 = US$ 0,40; 3.000.000 × 0,080 s ×
-    // 0,5 GB = 120.000 GB-s, dentro da franquia de 400.000. O S3 ainda é provisório, sem cobranças.
+    // 0,5 GB = 120.000 GB-s, dentro da franquia de 400.000. O S3 cobra SKUs que este catálogo
+    // não tem e sai `unavailable`, fora dos totais.
     const arm64 = catalogOf({
       lambda: [
         {
@@ -193,7 +194,7 @@ describe('estimate', () => {
     const result = estimate(designDocumentSchema.parse(adrExampleDesign), arm64);
     expect(result.blocks.map((b) => [b.blockId, b.blockType, b.status, b.lines.length])).toEqual([
       ['blk_fn_api', 'aws.lambda', 'priced', 2],
-      ['blk_assets', 'aws.s3', 'priced', 0],
+      ['blk_assets', 'aws.s3', 'unavailable', 0],
     ]);
     expect(lines(result.blocks[0]!)).toEqual([
       'lambda-requests-arm64 2000000.000000 0.400000 variable',
