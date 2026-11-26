@@ -1,7 +1,7 @@
 import { design } from './generatorHarness';
 
 /**
- * Design de teste com os blocos de nível B e C (#67) e os blocos em VPC a que eles se ligam.
+ * Design de teste com os nove blocos de nível B e C (#67) e os blocos em VPC a que eles se ligam.
  * Fica aqui, e não em `contracts/scenarios/`, porque não é um cenário de referência do produto.
  */
 export const levelBcDesign = design(
@@ -16,6 +16,19 @@ export const levelBcDesign = design(
     { id: 'firewall', type: 'aws.waf', label: 'Firewall' },
     { id: 'login', type: 'aws.cognito', label: 'Login', attributes: { tier: 'plus' } },
     { id: 'auditoria', type: 'aws.cloudtrail', label: 'Auditoria' },
+    {
+      id: 'entrega',
+      type: 'aws.codepipeline',
+      label: 'Entrega',
+      attributes: { pipelineType: 'V2' },
+    },
+    { id: 'cluster', type: 'aws.ecs', label: 'Contêineres' },
+    {
+      id: 'nos',
+      type: 'aws.ec2',
+      label: 'Nós do cluster',
+      attributes: { instanceType: 't4g.small', az: 'b' },
+    },
   ],
   [
     ['dns', 'lb'],
@@ -26,5 +39,8 @@ export const levelBcDesign = design(
     ['firewall', 'lb'],
     ['web', 'login'],
     ['auditoria', 'logs', 'logs'],
+    ['cluster', 'nos', 'runs-on'],
+    ['lb', 'nos'],
+    ['entrega', 'logs', 'logs'],
   ],
 );
