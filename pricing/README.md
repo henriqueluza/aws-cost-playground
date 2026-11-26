@@ -2,7 +2,7 @@
 
 Script Python executado no CI que vai gerar o catálogo de preços (`web/public/prices/<region>/<service>.json`) a partir da AWS Price List API. Stack e decisões: `docs/architecture/aws-cost-playground/ADR-0001-stack.md`. Nível de arquitetura: `simple`.
 
-O gerador está completo (Issue #28, partes #195, #202, #196 e #214): cliente da Price List Query API (`GetProducts`, região `us-east-1`, credenciais da cadeia padrão do ambiente: variáveis `AWS_*`, perfil ou role do CI), registro dos 17 serviços, serialização, schema em Python, checagens, geração, gravação e CLI. Os filtros reais de cada serviço entram nas Issues de bloco (#30 a #42); o workflow semanal é a #29.
+O gerador está completo (Issue #28, partes #195, #202, #196 e #214): cliente da Price List Query API (`GetProducts`, região `us-east-1`, credenciais da cadeia padrão do ambiente: variáveis `AWS_*`, perfil ou role do CI), registro dos 18 serviços, serialização, schema em Python, checagens, geração, gravação e CLI. Os filtros reais de cada serviço entram nas Issues de bloco (#30 a #42); o workflow semanal é a #29.
 
 ## Pré-requisitos
 
@@ -63,13 +63,13 @@ Os testes não fazem rede nem precisam de credenciais AWS: simulam o `GetProduct
 - `generate.py` — `generate(specs, fetch, prices_dir, now)` (monta e confere em memória, não grava), `seed(specs, prices_dir)`, `write(prices_dir, files)`, `Result` (`files` e `report`) e `Fetch` (função que atende uma `Query`).
 - `__main__.py` — a CLI (`generate` e `seed`, `--root`).
 - `summary.py` — `pr_body(report)` e `python -m app.summary`: corpo do PR semanal a partir do relatório (seção abaixo).
-- `services/` — registro: um módulo por serviço, cada um exporta `SERVICE = ServiceSpec(...)`; `SERVICES` junta os 17, em ordem de slug.
+- `services/` — registro: um módulo por serviço, cada um exporta `SERVICE = ServiceSpec(...)`; `SERVICES` junta os 18, em ordem de slug.
 
 ## Registro de serviços
 
 O registro fica em `app/services/` (e não em `pricing/services/`, como diz o texto da #28 e das Issues de bloco). Motivo: mypy, cobertura e import-linter já cobrem `app`; fora dele o código ficaria sem essas checagens.
 
-Os 17 módulos já existem e já estão em `SERVICES`. Módulo sem consulta é provisório (não consulta a AWS e não gera preço); o implementado consulta a Price List; o docstring diz o que fica de fora e as constantes do módulo dizem o que é consultado e os SKUs gerados. O nome do módulo é o slug com `_` no lugar de `-` (`nat_gateway.py`, `secrets_manager.py`); `lambda` é `lambda_.py`. O slug é o tipo do bloco sem `aws.` e vira o nome do arquivo do catálogo.
+Os 17 módulos dos blocos já existem e já estão em `SERVICES`; o 18º, `data_transfer.py`, não tem bloco: são os preços dos custos de aresta (#42). Módulo sem consulta é provisório (não consulta a AWS e não gera preço); o implementado consulta a Price List; o docstring diz o que fica de fora e as constantes do módulo dizem o que é consultado e os SKUs gerados. O nome do módulo é o slug com `_` no lugar de `-` (`nat_gateway.py`, `secrets_manager.py`); `lambda` é `lambda_.py`. O slug é o tipo do bloco sem `aws.` e vira o nome do arquivo do catálogo.
 
 A Issue de um bloco edita só o módulo do próprio serviço e cria o teste dele em `tests/test_service_<slug com _>.py`. Não edita `services/__init__.py` nem `tests/test_services.py`: o teste do registro vale para serviço provisório e para serviço implementado.
 
