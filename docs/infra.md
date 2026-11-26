@@ -74,6 +74,6 @@ Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 - O artefato do GitHub dura 90 dias (máximo em repositório público). O zip continua no bucket, por SHA.
 - Arquivos antigos do site não são apagados (regra do módulo `site`).
 - A invalidação `/*` conta como 1 caminho na cota grátis de 1000/mês.
-- O workflow está em `.github/workflows-pending/` até o autor fazer o `git mv` (ver o README da pasta).
+- O workflow está em `.github/workflows/deploy-staging.yml` e roda a cada merge em `main`. Sem a variável `AWS_APPLY_ROLE_ARN` no Environment `staging`, o job de deploy só avisa e termina verde.
 - Os ajustes de `validate.yml` e `terraform.yml` ficam na #211.
 - Produção e rollback ficam na #23.
