@@ -9,22 +9,26 @@ override_data {
   }
 }
 
+# Os papéis são lidos por `aws_iam_role.apply["<env>"].<atributo>`, sem índice dinâmico: com o
+# mapa inteiro na condição, o Terraform 1.16 entra em panic ao imprimir um assert que falha.
 run "trust_dos_papeis_apply" {
   command = apply
 
   assert {
-    condition     = { for env, r in aws_iam_role.apply : env => r.name } == { staging = "acp-ci-apply-staging", production = "acp-ci-apply-production" }
+    condition     = [aws_iam_role.apply["staging"].name, aws_iam_role.apply["production"].name] == ["acp-ci-apply-staging", "acp-ci-apply-production"]
     error_message = "Cada ambiente tem o seu papel apply, chamado acp-ci-apply-<ambiente>."
   }
 
   assert {
-    condition     = alltrue([for r in aws_iam_role.apply : r.max_session_duration == 3600])
+    condition     = aws_iam_role.apply["staging"].max_session_duration == 3600 && aws_iam_role.apply["production"].max_session_duration == 3600
     error_message = "A sessão do papel apply dura no máximo uma hora."
   }
 
   assert {
-    condition = alltrue([
-      for env in ["staging", "production"] : jsondecode(aws_iam_role.apply[env].assume_role_policy).Statement == [{
+    condition = [
+      jsondecode(aws_iam_role.apply["staging"].assume_role_policy).Statement,
+      jsondecode(aws_iam_role.apply["production"].assume_role_policy).Statement,
+      ] == [for env in ["staging", "production"] : [{
         Sid       = "GitHubEnvironment"
         Effect    = "Allow"
         Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
@@ -36,8 +40,7 @@ run "trust_dos_papeis_apply" {
             "token.actions.githubusercontent.com:sub" = "repo:henriqueluza/aws-cost-playground:environment:${env}"
           }
         }
-      }]
-    ])
+    }]]
     error_message = "O trust do apply aceita só a branch main e o environment do próprio ambiente deste repositório, por igualdade exata."
   }
 }
@@ -185,7 +188,7 @@ run "saidas_e_limites_da_aws" {
   }
 
   assert {
-    condition     = alltrue([for r in aws_iam_role.apply : length(r.assume_role_policy) <= 2048])
+    condition     = length(aws_iam_role.apply["staging"].assume_role_policy) <= 2048 && length(aws_iam_role.apply["production"].assume_role_policy) <= 2048
     error_message = "O trust do papel não pode passar de 2048 caracteres, o limite da AWS."
   }
 }
