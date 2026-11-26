@@ -36,4 +36,4 @@ O PITR guarda dados por 35 dias (padrão do DynamoDB: `infra/modules/database` l
 
 ## Retenção de logs
 
-Os logs da aplicação e o log de acesso do API Gateway têm retenção de 7 dias (padrão de `log_retention_days` em `infra/modules/functions` e `infra/modules/http-api`) O log da aplicação não tem e-mail nem `sub`. O log de acesso do API Gateway (`infra/modules/http-api/stage.tf`) registra o `sub` de toda requisição autenticada, inclusive do `DELETE /me`: depois da exclusão, esse pseudônimo ainda aparece ali até a retenção vencer.
+Os logs da aplicação e o log de acesso do API Gateway têm retenção de 7 dias (padrão de `log_retention_days` em `infra/modules/functions` e `infra/modules/http-api`) O log da aplicação não tem e-mail. O evento da exclusão (`app.account`) não leva `sub`; os eventos de quota e de estimativa do `llm-proxy` (`app.quota`, `app.estimate`) levam o `sub`, pseudônimo, e ficam até a retenção vencer. O log de acesso do API Gateway (`infra/modules/http-api/stage.tf`) registra o `sub` de toda requisição autenticada, inclusive do `DELETE /me`: depois da exclusão, esse pseudônimo ainda aparece ali até a retenção vencer.

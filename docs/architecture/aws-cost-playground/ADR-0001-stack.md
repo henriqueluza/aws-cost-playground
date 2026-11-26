@@ -159,7 +159,7 @@ Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `mod
 - `ttl` de 35 dias nos itens de quota, para sobrar histórico do gatilho de revisão (100 estimativas/mês por não-autor).
 - Exclusão de conta: apaga a partição `USER#<sub>` inteira e depois o usuário no Cognito.
   - Apaga: todos os itens de `USER#<sub>` (designs e contadores de quota) e o usuário no Cognito (e-mail e refresh tokens).
-  - Não apaga: a quota global (`PK = GLOBAL`); backups de PITR (só produção, 35 dias pelo padrão do DynamoDB, depois somem sozinhos; o dado apagado continua recuperável nessa janela); logs do CloudWatch até a retenção de 7 dias (o log da aplicação não tem e-mail nem `sub`; o log de acesso do API Gateway registra o `sub`, pseudônimo, em toda requisição, inclusive nesta); o que já foi enviado à Anthropic.
+  - Não apaga: a quota global (`PK = GLOBAL`); backups de PITR (só produção, 35 dias pelo padrão do DynamoDB, depois somem sozinhos; o dado apagado continua recuperável nessa janela); logs do CloudWatch até a retenção de 7 dias (o log da aplicação não tem e-mail; o evento de exclusão não leva `sub`, mas os eventos de quota e de estimativa do `llm-proxy` levam o `sub`, pseudônimo; o log de acesso do API Gateway registra o `sub`, pseudônimo, em toda requisição, inclusive nesta); o que já foi enviado à Anthropic.
   - Janela do token: o access token vale até 15 min após a exclusão e uma escrita nesse intervalo recria itens de `USER#<sub>`. Sem revogação; mitigação no cliente (descartar os tokens após o 204). Decisão pendente do autor (#284).
 
 ### Fluxo da estimativa de carga

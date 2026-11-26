@@ -34,7 +34,7 @@ def raw_response(app: FastAPI, event: dict[str, Any]) -> dict[str, Any]:
     return response
 
 
-# CORS é só do API Gateway (uma origem, a do site): a aplicação não responde preflight nem ecoa origem.
+# CORS é só do API Gateway (a origem do site): a aplicação não responde preflight nem ecoa origem.
 @pytest.mark.parametrize("method", ["OPTIONS", "GET", "POST", "DELETE"])
 @pytest.mark.parametrize("path", ["/estimates", "/quota", "/designs", "/me", "/nao-existe"])
 @pytest.mark.parametrize("claims", [None, {"sub": "3f1c2b9e-8d47-4a6b-9c11-5e2a7d0b4f63"}])
