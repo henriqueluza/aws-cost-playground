@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
 interface Box {
@@ -34,9 +35,9 @@ async function boxes(page: Page) {
   });
 }
 
-async function expectLegible(page: Page) {
+async function expectLegible(page: Page, nodeCount = 21) {
   const { canvas, legend, tools, nodes } = await boxes(page);
-  expect(nodes).toHaveLength(21);
+  expect(nodes).toHaveLength(nodeCount);
   // 1. todo nó está dentro da área visível do canvas
   expect(nodes.filter((node) => !inside(node, canvas))).toEqual([]);
   // 2. nenhum nó sob a legenda nem sob os controles
@@ -65,3 +66,37 @@ test('ao redimensionar a janela de 1440 para 1024 o diagrama continua inteiro', 
   await page.setViewportSize({ width: 1024, height: 768 });
   await expectLegible(page);
 });
+
+const SCENARIOS = [
+  ['api-serverless', 6],
+  ['app-classico', 10],
+  ['pipeline-de-filas', 9],
+] as const;
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`${theme}: os cenários abrem inteiros e centralizados, e Novo design volta ao template`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto('/');
+    await expectLegible(page);
+    for (const [name, count] of SCENARIOS) {
+      await page.locator('input[type="file"]').setInputFiles({
+        name: `${name}.json`,
+        mimeType: 'application/json',
+        buffer: readFileSync(`../contracts/scenarios/${name}.json`),
+      });
+      const replace = page.getByRole('button', { name: 'Substituir design' });
+      if (await replace.isVisible().catch(() => false)) await replace.click();
+      await expectLegible(page, count);
+      // centralizado na horizontal: as folgas à esquerda e à direita diferem em poucos px
+      const { canvas, nodes } = await boxes(page);
+      const left = Math.min(...nodes.map((n) => n.x)) - canvas.x;
+      const right = canvas.x + canvas.width - Math.max(...nodes.map((n) => n.x + n.width));
+      expect(Math.abs(left - right)).toBeLessThanOrEqual(4);
+    }
+    await page.getByRole('button', { name: 'Novo design' }).click();
+    await expectLegible(page);
+  });
+}
