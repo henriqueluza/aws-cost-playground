@@ -2,7 +2,7 @@
 
 Script Python executado no CI que vai gerar o catálogo de preços (`web/public/prices/<region>/<service>.json`) a partir da AWS Price List API. Stack e decisões: `docs/architecture/aws-cost-playground/ADR-0001-stack.md`. Nível de arquitetura: `simple`.
 
-O gerador está em construção (Issue #28, em partes: #195, #202 e #196). Hoje há o cliente da Price List Query API (`GetProducts`, região `us-east-1`), que usa as credenciais da cadeia padrão do ambiente (variáveis `AWS_*`, perfil ou role do CI), o registro dos 17 serviços e a serialização do arquivo de preço. Ainda não há CLI nem gravação dos JSON (#196).
+O gerador está em construção (Issue #28, em partes: #195, #202, #196 e #214). Hoje há o cliente da Price List Query API (`GetProducts`, região `us-east-1`), que usa as credenciais da cadeia padrão do ambiente (variáveis `AWS_*`, perfil ou role do CI), o registro dos 17 serviços, a serialização do arquivo de preço e do manifest, o schema do catálogo em Python e as checagens antes de gravar. Ainda não há CLI nem gravação dos JSON (#214).
 
 ## Pré-requisitos
 
@@ -25,12 +25,14 @@ Os testes não fazem rede nem precisam de credenciais AWS: simulam o `GetProduct
 
 ## Estrutura de `app/`
 
-- `catalog.py` — `REGIONS` (`us-east-1` e `sa-east-1`) e `output_path(root, region, service)`, que devolve o caminho do JSON de um serviço em uma região.
+- `catalog.py` — `REGIONS` (`us-east-1` e `sa-east-1`), `file_key(region, service)` (`<region>/<service>.json`, a chave do arquivo no manifest) e `output_path(root, region, service)`, que devolve o caminho do JSON de um serviço em uma região.
 - `model.py` — tipos do gerador (`Filter`, `Query`, `Dimension`, `Product`, `Tier`, `FreeTier`, `Price`, `ServiceSpec`), `region_filter`, `PricingError` e `decimal_text`.
 - `products.py` — `parse_product` (parse defensivo de um item do PriceList) e `tiers` (faixas de preço de uma dimensão).
 - `client.py` — `make_client` (cliente boto3 `pricing` em `us-east-1`) e `fetch_products` (`GetProducts` paginado, com filtros).
 
-- `render.py` — `render_price_file(service, region, prices)` (bytes do arquivo de preço, sempre os mesmos para a mesma entrada) e `sha256_hex(content)`.
+- `render.py` — `render_price_file(service, region, prices)` (bytes do arquivo de preço, sempre os mesmos para a mesma entrada), `render_manifest(hashes, generated_at, source)` (bytes do `manifest.json`: `files` em ordem de `path`, data em UTC com `Z` e precisão de segundos) e `sha256_hex(content)`.
+- `schema.py` — `validate_price_file(doc)` e `validate_manifest(doc)`: espelho em Python do zod de `web/src/features/pricing/model/catalog.ts`, igual ou mais estrito. Devolvem a lista de erros (`[]` é válido), cada um como `caminho: mensagem fixa`, sem o valor recusado.
+- `checks.py` — `blocking` (impede a gravação: nenhum preço, SKU esperado ausente, preço negativo, arquivo de 500 KB ou mais), `regression` (também impede: mais da metade dos SKUs do arquivo anterior sumiu, ou um preço positivo virou zero) e `variation` (só relata: SKU novo, SKU removido, faixa com variação maior que 30%).
 - `services/` — registro: um módulo por serviço, cada um exporta `SERVICE = ServiceSpec(...)`; `SERVICES` junta os 17, em ordem de slug.
 
 ## Registro de serviços
@@ -49,7 +51,7 @@ No módulo do serviço:
 
 ## Validação de caminho
 
-`output_path` só aceita região da lista fechada `REGIONS` e serviço no formato `[a-z0-9-]{1,64}`. Qualquer outra entrada levanta `ValueError`, o que impede que `..` ou separadores de caminho façam a escrita escapar de `web/public/prices/`.
+`file_key` e `output_path` só aceitam região da lista fechada `REGIONS` e serviço no formato `[a-z][a-z0-9-]{0,39}` (o mesmo slug do zod do `web/`). Qualquer outra entrada levanta `ValueError`, o que impede que `..` ou separadores de caminho façam a escrita escapar de `web/public/prices/`.
 
 ## Lint de arquitetura
 
