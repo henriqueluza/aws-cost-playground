@@ -36,9 +36,11 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       const refreshed = await provider.refresh(current);
       if (generation !== started) return session;
       const checked = sessionSchema.safeParse(refreshed);
-      if (!checked.success) throw new AuthError('invalid-response');
+      // A renovação troca os tokens, nunca a identidade.
+      if (!checked.success || checked.data.user.sub !== current.user.sub) {
+        throw new AuthError('invalid-response');
+      }
       const next = checked.data;
-      // Mesmo usuário: a renovação não troca a identidade, só os tokens.
       store.write(next);
       session = next;
       return next;
@@ -75,7 +77,9 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         existing = provider.completeSignIn(callbackUrl).then((result) => {
           // Saiu enquanto a troca estava em voo: o resultado não vale mais.
           if (generation !== started) throw new AuthError('session-expired');
-          setSession(result.session);
+          const checked = sessionSchema.safeParse(result.session);
+          if (!checked.success) throw new AuthError('invalid-response');
+          setSession(checked.data);
           return safeReturnTo(result.returnTo);
         });
         completions.set(callbackUrl, existing);

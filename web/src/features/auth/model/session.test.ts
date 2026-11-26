@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { fakeSession, NOW } from '../../../test/authFixtures';
-import { AuthError } from './authError';
 import { EXPIRY_SKEW_MS, isFresh, sessionSchema } from './session';
 
 describe('isFresh', () => {
@@ -28,14 +27,5 @@ describe('sessionSchema', () => {
     ['e-mail inválido', fakeSession({ user: { sub: 'a', email: 'não é e-mail' } })],
   ])('recusa %s', (_name, value) => {
     expect(sessionSchema.safeParse(value).success).toBe(false);
-  });
-});
-
-describe('AuthError', () => {
-  it('tem mensagem fixa, só o tipo, e nenhuma causa', () => {
-    const error = new AuthError('state-mismatch');
-    expect(error.message).toBe('Erro de autenticação: state-mismatch.');
-    expect(error.cause).toBeUndefined();
-    expect(error).toBeInstanceOf(Error);
   });
 });

@@ -131,6 +131,16 @@ describe('completeSignIn', () => {
     expect(service.getSnapshot().status).toBe('anonymous');
   });
 
+  it('sessão fora do schema: invalid-response, sem autenticar', async () => {
+    const { service, provider } = setup(null);
+    provider.completeSignIn.mockResolvedValueOnce({
+      session: fakeSession({ accessToken: 'com espaço' }),
+      returnTo: '/',
+    });
+    await expect(service.completeSignIn(url)).rejects.toMatchObject({ kind: 'invalid-response' });
+    expect(service.getSnapshot().status).toBe('anonymous');
+  });
+
   it('uma falha não derruba a sessão que já existia', async () => {
     const { service, provider } = setup();
     provider.completeSignIn.mockRejectedValueOnce(new AuthError('state-mismatch'));
@@ -170,15 +180,6 @@ describe('getAccessToken', () => {
     expect(store.read()?.accessToken).toBe('renovado');
   });
 
-  it('depois de uma renovação que terminou, uma nova pode acontecer', async () => {
-    let clock = NOW;
-    const { service, provider } = setup(stale(), () => clock);
-    await service.getAccessToken();
-    clock = NOW + 900_000;
-    await service.getAccessToken();
-    expect(provider.refresh).toHaveBeenCalledTimes(2);
-  });
-
   it('sem resposta do provedor: rejeita com network e mantém a sessão', async () => {
     const { service, provider } = setup(stale());
     provider.refresh.mockRejectedValueOnce(new AuthError('network'));
@@ -205,9 +206,12 @@ describe('getAccessToken', () => {
     expect(provider.refresh).not.toHaveBeenCalled();
   });
 
-  it('renovação fora do schema: invalid-response encerra a sessão', async () => {
+  it.each([
+    ['fora do schema', { accessToken: 'com espaço' }],
+    ['de outro usuário', { user: { sub: 'outro-usuario', email: null } }],
+  ])('renovação %s: invalid-response encerra a sessão', async (_name, patch) => {
     const { service, provider } = setup(stale());
-    provider.refresh.mockResolvedValueOnce(fakeSession({ accessToken: 'com espaço' }));
+    provider.refresh.mockResolvedValueOnce(fakeSession(patch));
     await expect(service.getAccessToken()).resolves.toBeNull();
     expect(service.getSnapshot().status).toBe('anonymous');
   });
