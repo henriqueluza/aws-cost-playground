@@ -15,10 +15,11 @@ import { INJECTION_PAYLOADS } from './injectionPayloads';
 import { levelBcDesign } from './levelBcDesign';
 
 /**
- * Conferência local e opcional com o binário `terraform` (não roda no CI nem no `npm test`):
+ * Conferência com o binário `terraform`, fora do `npm test`. Local e opcional:
  *   EXPORT_TERRAFORM_CHECK=1 npx vitest run src/features/export/test/terraform.local.test.ts
- * O arquivo só tem `locals` e `output`, então não baixa provider nem usa credencial. A validação
- * do export inteiro, com o provider da AWS, é o job da #68.
+ * O arquivo só tem `locals` e `output`, então não baixa provider nem usa credencial. Com
+ * `EXPORT_TERRAFORM_AWS=1` é o que o job `export-validate` do CI roda (#68): o script
+ * `infra/tools/export_validate_report.py` procura o título dos testes de cenário abaixo.
  */
 const enabled = process.env.EXPORT_TERRAFORM_CHECK === '1';
 /** Com `EXPORT_TERRAFORM_AWS=1` também valida o export dos cenários com o provider da AWS (baixa o plugin). */
@@ -56,7 +57,8 @@ const SCENARIOS = {
   apiComInterpolacaoNosRotulos: relabel(apiServerless, INJECTION_PAYLOADS[1]?.[1] ?? ''),
 };
 
-describe.skipIf(!enabled)('conferência com o binário terraform', { timeout: 120_000 }, () => {
+// Folga para um runner frio: o primeiro `init` baixa o provider da AWS (centenas de MB).
+describe.skipIf(!enabled)('conferência com o binário terraform', { timeout: 300_000 }, () => {
   it('as cargas de injeção viram HCL bem formado e voltam com o mesmo valor', () => {
     const dir = mkdtempSync(join(tmpdir(), 'acp-export-'));
     const terraform = (args: string[], input?: string) =>
@@ -130,6 +132,8 @@ describe.skipIf(!enabled)('conferência com o binário terraform', { timeout: 12
         terraform(['fmt', '-check', 'main.tf']);
         terraform(['init', '-backend=false', '-input=false']);
         expect(terraform(['validate', '-no-color'])).toContain('Success');
+        // Bloco que vira só comentário passaria no validate sem validar nada.
+        expect(exported.files[0]?.content).toMatch(/^# Blocos exportados: (\d+) de \1\.$/m);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
