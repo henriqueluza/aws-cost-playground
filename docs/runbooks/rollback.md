@@ -14,12 +14,11 @@ Se o problema é só a LLM, desligue-a antes de pensar em rollback ([`guardrails
 
 ## 1. Achar o SHA anterior
 
-O SHA anterior é o do último deploy de produção que terminou verde antes do atual. O resumo de cada run mostra o "Commit publicado".
+O SHA anterior é o do último deploy de produção que terminou verde antes do atual. O título de cada run é `Deploy production <sha>`, e o resumo do run, na interface do GitHub, mostra o "Commit publicado". O `headSha` do run não serve: é o commit de `main` de onde o workflow foi disparado.
 
 ```bash
 gh run list --workflow deploy-production.yml --status success --limit 5 \
-  --repo henriqueluza/aws-cost-playground
-gh run view <id do run> --repo henriqueluza/aws-cost-playground   # o resumo traz o commit publicado
+  --json displayTitle,createdAt,url --repo henriqueluza/aws-cost-playground
 ```
 
 Use o SHA completo, com 40 caracteres. SHA curto, tag ou nome de branch são recusados.
@@ -46,7 +45,7 @@ O job `check` confere o SHA, o deploy de staging e os preços sem credencial da 
 
 | Item | Efeito |
 |---|---|
-| Código das funções | Volta para `functions/<SHA anterior>.zip`, que já está no bucket de artefatos de produção |
+| Código das funções | Volta para `functions/<SHA anterior>.zip` no bucket de artefatos de produção. Se o objeto já existe, tem de ser byte a byte o zip do artefato; se não existe, é enviado a partir do artefato |
 | Site | O `index.html` e os arquivos do SHA anterior são enviados de novo e o CloudFront é invalidado. Os assets com hash nunca são apagados |
 | Preços | Voltam para os do SHA anterior, porque fazem parte do site |
 | Infraestrutura | O Terraform aplicado é o de `infra/envs/production` no SHA anterior. Mudanças que só alteram recursos voltam; ver o plan-guard abaixo |
@@ -61,6 +60,8 @@ O job `check` confere o SHA, o deploy de staging e os preços sem credencial da 
 | Artefato não encontrado | O artefato `release-<sha>` dura 90 dias | Faça o rollback por PR de `git revert` (abaixo) |
 | `manifest.json` de preços com `source: seed` | O SHA é de antes dos preços gerados | Escolha um SHA mais novo, ou faça o rollback por `git revert` |
 | plan-guard reprovou o plano | Voltar a infraestrutura para o SHA anterior apagaria ou substituiria um recurso | Não force. Se só o código tem problema, faça o rollback por `git revert` do commit com problema; se a infraestrutura também precisa voltar, a decisão é do autor |
+| `functions/<sha>.zip` já existe com outro conteúdo | O SHA já foi publicado em produção e, depois, o deploy de staging dele foi refeito com "Re-run all jobs", que gera outro zip | Escolha outro SHA, ou faça o rollback por `git revert` |
+| O passo `terraform` falha sem chegar ao plan-guard | O SHA é de antes de `infra/envs/production` existir, ou de antes das saídas que o deploy lê | Esse SHA não serve para este workflow: escolha um mais novo, ou faça o rollback por `git revert` |
 | Faltam variáveis | Environment `production` sem configuração | Cadastre as variáveis de [`docs/infra.md`](../infra.md) |
 
 ## Rollback por `git revert`

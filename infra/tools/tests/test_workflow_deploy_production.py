@@ -75,10 +75,14 @@ class TriggerAndPermissionsTest(unittest.TestCase):
             self.assertNotIn(token, CHECK)
 
     def test_every_action_is_pinned_by_a_sha_already_used_in_staging(self) -> None:
-        uses = re.findall(r"(?m)^\s*(?:- )?uses:\s*(\S+@[0-9a-f]{40})\s+# v\S+$", TEXT)
+        pinned = r"(?m)^\s*(?:- )?(uses:\s*\S+@[0-9a-f]{40}\s+# v\S+)$"
+        uses = re.findall(pinned, TEXT)
         self.assertEqual(len(uses), len(re.findall(r"(?m)^\s*(?:- )?uses:", TEXT)))
-        for action in uses:
-            self.assertIn(action, STAGING, f"{action} não é a versão fixada em deploy-staging.yml")
+        # A linha inteira (action, SHA e comentário da versão) tem de existir em staging: um
+        # SHA de staging colado em outra action não passa.
+        staging = set(re.findall(pinned, STAGING))
+        for line in uses:
+            self.assertIn(line, staging, f"`{line}` não é uma linha `uses:` de deploy-staging.yml")
 
     def test_no_expression_inside_any_run_block_and_no_static_credentials(self) -> None:
         for run in all_runs(CHECK) + all_runs(DEPLOY):
@@ -87,7 +91,10 @@ class TriggerAndPermissionsTest(unittest.TestCase):
             self.assertNotIn(token, CODE)
 
     def test_the_raw_input_only_reaches_the_validation_step(self) -> None:
-        self.assertEqual(CODE.count("inputs.sha"), 1)
+        # Fora do passo de validação, a entrada só aparece no título do run (texto de exibição).
+        self.assertEqual(CODE.count("inputs.sha"), 2)
+        self.assertRegex(TEXT, r"(?m)^run-name: Deploy production \$\{\{ inputs\.sha \}\}$")
+        self.assertNotIn("inputs.", DEPLOY)
         chunk = next(s for sid, s in steps(CHECK) if sid == "sha")
         self.assertIn("INPUT_SHA: ${{ inputs.sha }}", chunk)
         self.assertIn('release_gate.py sha "$INPUT_SHA" --ref "$GITHUB_REF"', run_block(chunk))
@@ -199,7 +206,7 @@ class DeployStepsTest(unittest.TestCase):
     def test_runbook_explains_rollback_through_this_workflow(self) -> None:
         self.assertTrue(RUNBOOK.exists(), "docs/runbooks/rollback.md não existe")
         runbook = RUNBOOK.read_text(encoding="utf-8")
-        for token in ("deploy-production.yml", "SHA anterior", "workflow_dispatch", "plan-guard", "90 dias"):
+        for token in ("deploy-production.yml", "SHA anterior", "workflow_dispatch", "plan-guard", "90 dias", "displayTitle"):
             self.assertIn(token, runbook)
         how = runbook.split("## 2. Disparar o workflow\n", 1)[1].split("\n## ", 1)[0]
         self.assertIn("deploy-production.yml --ref main -f sha=<SHA anterior>", how)

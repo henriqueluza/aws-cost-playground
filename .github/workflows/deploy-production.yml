@@ -25,6 +25,11 @@ name: Deploy production
 # Variáveis do GitHub Environment `production`: AWS_APPLY_ROLE_ARN e TF_VAR_PACKAGE_BUCKET.
 # Do repositório: TF_STATE_BUCKET_PRODUCTION, TF_VAR_ZONE_NAME e o secret TF_VAR_ALARM_EMAIL.
 # Falta de qualquer uma falha fechada.
+
+# O título do run leva o SHA pedido (texto de exibição, ainda não validado): é por ele que o
+# runbook de rollback acha o SHA do deploy anterior em `gh run list`.
+run-name: Deploy production ${{ inputs.sha }}
+
 on:
   workflow_dispatch:
     inputs:

@@ -73,6 +73,7 @@ Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 Workflow `deploy-production.yml`. Só roda por `workflow_dispatch`, disparado por um humano, com o campo `sha`: o SHA completo de um commit de `main` que já foi publicado em staging. Nada é reconstruído.
 
 - **Concorrência** `deploy-production`, sem cancelar o que está rodando.
+- **Título do run:** `Deploy production <sha>`, com o SHA pedido. É por ele que o runbook de rollback acha o deploy anterior.
 - **Job `check`** (sem Environment e sem credencial AWS). As recusas ficam em `infra/tools/release_gate.py`; `scripts/find-staging-release.sh` consulta a API do GitHub:
   1. o SHA tem 40 hexadecimais minúsculos, o workflow roda em `refs/heads/main` e o commit é ancestral de `origin/main`;
   2. existe um run de `deploy-staging.yml` desse SHA (`push` em `main`) concluído com sucesso, e nele o job `deploy (staging)` e o passo `Smoke test` terminaram com sucesso. Um run verde com o deploy pulado (staging sem configuração) não conta;
