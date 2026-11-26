@@ -182,11 +182,6 @@
   border: var(--border-width) solid var(--control);
 }
 
-.tools {
-  display: flex;
-  gap: var(--space-1);
-}
-
 .empty {
   position: absolute;
   inset-inline: 0;

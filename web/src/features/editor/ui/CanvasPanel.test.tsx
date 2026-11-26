@@ -43,13 +43,6 @@ describe('CanvasPanel', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 
-  it('oferece zoom e ajustar à tela por botões nomeados', async () => {
-    renderCanvas();
-    for (const name of ['Aumentar o zoom', 'Diminuir o zoom', 'Ajustar à tela']) {
-      expect(await screen.findByRole('button', { name })).toBeEnabled();
-    }
-  });
-
   it('com o design vazio, orienta e mantém só o client', async () => {
     designStore.setState(EMPTY_STATE);
     const { container } = render(

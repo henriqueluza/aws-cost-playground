@@ -5,7 +5,7 @@ import type { CanvasCategory } from '../model/canvasModel';
  * Ícones próprios, no estilo do Lucide (traço de 1,5px na grade de 16). O DESIGN.md pede o Lucide;
  * enquanto o pacote não é dependência do web, estes seis fazem o papel (sem ícone oficial da AWS).
  */
-export type IconName = CanvasCategory | 'globe' | 'plus' | 'minus' | 'fit';
+export type IconName = CanvasCategory | 'globe';
 
 const SHAPES: Record<IconName, ReactElement> = {
   compute: (
@@ -42,9 +42,6 @@ const SHAPES: Record<IconName, ReactElement> = {
       <path d="M1.5 8h13M8 1.5c1.8 1.8 2.7 4 2.7 6.5S9.8 12.7 8 14.5C6.2 12.7 5.3 10.5 5.3 8S6.2 3.3 8 1.5Z" />
     </>
   ),
-  plus: <path d="M8 3v10M3 8h10" />,
-  minus: <path d="M3 8h10" />,
-  fit: <path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5" />,
 };
 
 /** Ícone decorativo de 16px; o nome acessível vem do elemento que o contém. */

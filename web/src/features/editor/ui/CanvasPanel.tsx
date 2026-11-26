@@ -3,20 +3,17 @@ import {
   Background,
   BackgroundVariant,
   MarkerType,
-  Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
   type Edge,
 } from '@xyflow/react';
 import { useEffect, useMemo, type ReactElement } from 'react';
-import { IconButton } from '../../../shared/ui';
 import { useCanvasCosts } from '../hooks/useCanvasCosts';
 import { useDesignStore } from '../hooks/useDesignStore';
 import { toCanvasEdges, toCanvasNodes } from '../model/canvasModel';
 import { BlockNode, ClientNode, type BlockFlowNode, type ClientFlowNode } from './BlockNode';
 import styles from './CanvasPanel.module.css';
-import { Icon } from './CategoryIcon';
 
 type AppNode = BlockFlowNode | ClientFlowNode;
 
@@ -76,17 +73,6 @@ function Canvas(): ReactElement {
         aria-label="Diagrama da arquitetura"
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
-        <Panel position="top-right" className={styles.tools}>
-          <IconButton aria-label="Aumentar o zoom" onClick={() => void flow.zoomIn()}>
-            <Icon name="plus" />
-          </IconButton>
-          <IconButton aria-label="Diminuir o zoom" onClick={() => void flow.zoomOut()}>
-            <Icon name="minus" />
-          </IconButton>
-          <IconButton aria-label="Ajustar à tela" onClick={() => void flow.fitView(FIT_OPTIONS)}>
-            <Icon name="fit" />
-          </IconButton>
-        </Panel>
       </ReactFlow>
       {document.blocks.length === 0 && (
         <p className={styles.empty}>Adicione um bloco pela paleta para começar o desenho.</p>
