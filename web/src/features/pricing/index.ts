@@ -11,6 +11,7 @@ export {
 } from './model/catalog';
 export { CatalogError, createCatalogLoader } from './application/loadCatalog';
 export type { CatalogErrorKind, CatalogLoader, ReadPriceFile } from './application/loadCatalog';
+export { httpPriceFiles } from './api/httpPriceFiles';
 export * from './model/blockRegistry';
 export {
   estimate,

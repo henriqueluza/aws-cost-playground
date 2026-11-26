@@ -4,7 +4,7 @@ O catálogo é o conjunto de arquivos JSON de preço que o frontend baixa de `pu
 
 - **Origem:** [ADR-0001](ADR-0001-stack.md). Este documento só detalha o formato e a validação.
 - **Onde mora:** `web/src/features/pricing/model/catalog.ts` (schemas zod `priceFileSchema` e `priceManifestSchema`, `CATALOG_LIMITS` e os tipos `Price`, `PriceTier`, `PriceFile`, `PriceManifest`, `PriceSource` e `PriceCatalog`). Importe pelo `index.ts` da feature. Se este texto e o código divergirem, vale o código.
-- **Fora deste contrato:** o adaptador HTTP da carga, o hook do TanStack Query e o motor de cálculo.
+- **Fora deste contrato:** o hook do TanStack Query e o motor de cálculo.
 
 ## Arquivo de preço
 
@@ -102,18 +102,27 @@ Como o motor interpreta (detalhe em [cost-estimate.md](cost-estimate.md#algoritm
 
 A porta lança `CatalogError` para `network`, `missing` e `too-large`; o carregador lança `invalid` e `integrity`, e converte qualquer outro erro da porta em `network` e a falha do Web Crypto em `integrity`. Toda falha é um `CatalogError`, com mensagem fixa (sem texto do arquivo ou da rede) e `kind`:
 
-| `kind`      | Quando                                                         |
-| ----------- | -------------------------------------------------------------- |
-| `network`   | Falha de rede na leitura (lançado pela porta)                  |
-| `missing`   | Arquivo listado no manifest que não existe (porta)             |
-| `too-large` | Arquivo acima do tamanho máximo aceito (porta)                 |
-| `invalid`   | JSON ou schema inválido, ou `region`/`service` fora do caminho |
-| `integrity` | O `sha256` calculado difere do manifest                        |
+| `kind`      | Quando                                                                                            |
+| ----------- | ------------------------------------------------------------------------------------------------- |
+| `network`   | Falha de rede, tempo limite ou status diferente de 200 (porta)                                    |
+| `missing`   | Arquivo listado no manifest que não existe (porta)                                                |
+| `too-large` | Arquivo acima do tamanho máximo aceito (porta)                                                    |
+| `invalid`   | JSON ou schema inválido, `region`/`service` fora do caminho, ou caminho fora da allowlist (porta) |
+| `integrity` | O `sha256` calculado difere do manifest                                                           |
 
-Ficam para outras Issues: o adaptador HTTP que implementa `ReadPriceFile` (#173) e o hook com TanStack Query (#174).
+### Adaptador HTTP
+
+`httpPriceFiles({ timeoutMs? })`, em `web/src/features/pricing/api/httpPriceFiles.ts`, implementa `ReadPriceFile` com `fetch` (única pasta do `pricing` que o usa).
+
+- **Allowlist de caminho:** só `manifest.json` e `<region>/<service>.json`, com região de `REGIONS` e serviço `[a-z][a-z0-9-]{0,39}`. Qualquer outra forma dá `invalid`, sem requisição.
+- **URL:** base `/prices/` na origem do site (`location.origin`); a URL final é conferida contra essa base.
+- **Requisição:** `mode: 'same-origin'`, `credentials: 'omit'`, `redirect: 'error'`, `cache: 'no-cache'`, `referrerPolicy: 'no-referrer'`, sem cabeçalhos.
+- **Tamanho:** teto `MAX_PRICE_FILE_BYTES` de 512 KiB por arquivo, medido no corpo decodificado durante a leitura (cancela o stream; não usa `Content-Length`). Acima disso, `too-large`.
+- **Tempo limite:** 10 s, corpo incluído.
+- **Erros:** 404 vira `missing`. Status diferente de 200, redirecionamento, falha de rede ou tempo limite viram `network`. O erro não leva `cause` e a mensagem é fixa.
 
 ## Fora do escopo
 
-- Adaptador HTTP da porta `ReadPriceFile` (#173) e hook com TanStack Query (#174).
+- Hook com TanStack Query (#174).
 - Calcular custo com o catálogo: é o motor, em [cost-estimate.md](cost-estimate.md) (`PriceCatalog` é só o que ele recebe).
 - Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest.
