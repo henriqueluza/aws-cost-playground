@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { expectNoAxeViolations } from '../../../test/axe';
 import { designDocumentSchema } from '../../../shared/lib/design';
@@ -29,7 +28,6 @@ function renderCanvas(label?: string) {
 
 afterEach(() => designStore.setState(EMPTY_STATE));
 
-// O d3-drag do React Flow lê `event.view`, que o user-event não preenche: o clique vai por fireEvent.
 describe('CanvasPanel', () => {
   it('desenha o client e os blocos do design, cada um com nome acessível', async () => {
     renderCanvas();
@@ -45,49 +43,18 @@ describe('CanvasPanel', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 
-  it('selecionar o bloco chama a ação da store', async () => {
-    renderCanvas();
-    fireEvent.click(await screen.findByLabelText(/^S3,/));
-    await waitFor(() =>
-      expect(designStore.getState().selection).toEqual({ kind: 'block', id: 'blk_assets' }),
+  it('reage à store: mostra o custo no nó e o bloco que entra', async () => {
+    const { container } = renderCanvas();
+    expect(await screen.findByLabelText(/^S3,/)).toHaveTextContent('—');
+    const icons = [...container.querySelectorAll<SVGElement>('.react-flow__node svg')];
+    expect(icons.map((svg) => svg.dataset.icon).sort()).toEqual(['compute', 'data', 'globe']);
+    expect(screen.getByLabelText(/^Lambda,/)).toHaveTextContent(/Lambda · \S/);
+    const { document } = designStore.getState();
+    const extra = { ...document.blocks[0]!, id: 'blk_extra', label: 'Outra' };
+    act(() =>
+      designStore.setState({ document: { ...document, blocks: [...document.blocks, extra] } }),
     );
-  });
-
-  it('Delete remove o bloco selecionado pela store e leva as arestas dele', async () => {
-    renderCanvas();
-    fireEvent.click(await screen.findByLabelText(/^S3,/));
-    await userEvent.keyboard('{Delete}');
-    await waitFor(() =>
-      expect(designStore.getState().document.blocks.map((b) => b.id)).toEqual(['blk_fn_api']),
-    );
-    expect(designStore.getState().document.edges).toEqual([]);
-  });
-
-  it('o client não é removido nem é selecionável', async () => {
-    renderCanvas();
-    const client = await screen.findByLabelText(/^Internet/);
-    fireEvent.click(client);
-    await userEvent.keyboard('{Delete}');
-    expect(screen.getByLabelText(/^Internet/)).toBeInTheDocument();
-    expect(designStore.getState().selection).toBeNull();
-  });
-
-  it('oferece zoom e ajustar à tela por botões nomeados', async () => {
-    renderCanvas();
-    for (const name of ['Aumentar o zoom', 'Diminuir o zoom', 'Ajustar à tela']) {
-      expect(await screen.findByRole('button', { name })).toBeEnabled();
-    }
-  });
-
-  it('com o design vazio, orienta e mantém só o client', async () => {
-    designStore.setState(EMPTY_STATE);
-    const { container } = render(
-      <QueryClientProvider client={new QueryClient()}>
-        <CanvasPanel />
-      </QueryClientProvider>,
-    );
-    expect(await screen.findByText(/Adicione um bloco pela paleta/)).toBeVisible();
-    expect(container.querySelectorAll('.react-flow__node')).toHaveLength(1);
+    expect(await screen.findByLabelText(/^Lambda, Outra,/)).toBeInTheDocument();
   });
 
   it('não tem violação de acessibilidade', async () => {

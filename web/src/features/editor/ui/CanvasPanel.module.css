@@ -1,10 +1,7 @@
-/* DESIGN.md, "Bloco no canvas", "Arestas e cotas". Só tokens: nenhuma cor ou medida literal. */
-
 .canvas {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 0;
   border-radius: var(--radius-sheet);
   overflow: hidden;
 
@@ -18,10 +15,6 @@
   --xy-handle-background-color: var(--surface);
   --xy-handle-border-color: var(--control);
   --xy-attribution-background-color: transparent;
-}
-
-.canvas :global(.react-flow__edge.selected .react-flow__edge-path) {
-  stroke-width: 2;
 }
 
 .canvas :global(.react-flow__attribution) {
@@ -57,10 +50,6 @@
     0 0 0 calc(var(--focus-offset-node) + 2 * var(--focus-width)) var(--focus);
 }
 
-.canvas :global(.react-flow__node.dragging) > .block {
-  box-shadow: var(--shadow-float);
-}
-
 .block {
   box-sizing: border-box;
   width: var(--node-width);
@@ -73,7 +62,6 @@
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-card);
   font-family: var(--font);
-  cursor: grab;
 }
 
 .head {
@@ -156,6 +144,7 @@
 .value,
 .valueMuted {
   flex: none;
+  font-variant-numeric: tabular-nums;
   font-family: var(--font-mono);
   font-size: var(--fs-body);
   line-height: var(--lh-body);
@@ -182,32 +171,6 @@
   border: var(--border-width) solid var(--control);
 }
 
-.tools {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.empty {
-  position: absolute;
-  inset-inline: 0;
-  bottom: var(--space-6);
-  margin: 0;
-  text-align: center;
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--muted);
-  pointer-events: none;
-}
-
-.refusal {
-  position: absolute;
-  inset-inline: var(--space-4);
-  bottom: var(--space-6);
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
 .hidden {
   position: absolute;
   width: 1px;
@@ -215,4 +178,12 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Alto contraste remove sombras: o foco do bloco selecionado vira contorno duplo. */
+@media (forced-colors: active) {
+  .canvas :global(.react-flow__node.selected:focus-visible) > .block {
+    outline-style: double;
+    outline-width: calc(3 * var(--focus-width));
+  }
 }

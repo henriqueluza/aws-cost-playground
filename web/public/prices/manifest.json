@@ -5,7 +5,7 @@
   "files": [
     {
       "path": "sa-east-1/alb.json",
-      "sha256": "3199085679874ccae96b6e481089f7b1be290044dc672943bd07d0a153c95d2a"
+      "sha256": "735a2a1fb27211dad61fcce9f36049bc74ba26300052186845c57072f09b0481"
     },
     {
       "path": "sa-east-1/cloudfront.json",
@@ -17,7 +17,7 @@
     },
     {
       "path": "sa-east-1/cloudwatch.json",
-      "sha256": "4c865b5006eb67683eb643502dbcf71774eb55e4b89e5f3b12780e6c416dc93c"
+      "sha256": "6738add14831ac987a9621cd93d491c3ad6a51587198db9d138b0ba68f528203"
     },
     {
       "path": "sa-east-1/codepipeline.json",
@@ -26,6 +26,10 @@
     {
       "path": "sa-east-1/cognito.json",
       "sha256": "8530d83ebe2d7594af729cecc3cc8c207604db0111ef091e2d9b30518becb74e"
+    },
+    {
+      "path": "sa-east-1/data-transfer.json",
+      "sha256": "83d76d46f09fde9df349ea48e80d855f3fe7baff23c240dbd74123bcf52d50d4"
     },
     {
       "path": "sa-east-1/dynamodb.json",
@@ -37,7 +41,7 @@
     },
     {
       "path": "sa-east-1/elasticache.json",
-      "sha256": "bf3521874d1a4e1455c77783861b7a486ff73729bb49ac85feb6751de3089103"
+      "sha256": "12b84fef2fad8546bfd551f805ff1aff7a873d61ff1c1ec895145512bf3bb5d3"
     },
     {
       "path": "sa-east-1/lambda.json",
@@ -45,15 +49,15 @@
     },
     {
       "path": "sa-east-1/nat-gateway.json",
-      "sha256": "fa73355740f05ba4529b93656bb8656b34a92678e7117d3bd1cd3ca1544387c6"
+      "sha256": "9458e33e99def7fedbdfb26b2ebe3ed31d6e77cbd59bd3617af3c8955a186098"
     },
     {
       "path": "sa-east-1/rds.json",
-      "sha256": "27f8e5c56c4042b08cf15a9c16b3e27e85fe984672eb8d0806f1c6b89b4b813e"
+      "sha256": "73cbb18738ad10840b1955ad6b396110f3b6417fd623d5503d6c02c50d153eef"
     },
     {
       "path": "sa-east-1/route53.json",
-      "sha256": "e4d1b2f175fab25d9c06622aaa190387df98f2cd2c92b6d81544b9f22c88ab7d"
+      "sha256": "a41957abdc99530e9440d165f0dfa7abcacbeb6331bf7aa2abcc439a1291f1d7"
     },
     {
       "path": "sa-east-1/s3.json",
@@ -69,11 +73,11 @@
     },
     {
       "path": "sa-east-1/waf.json",
-      "sha256": "fbfb49ecb9a43910b79932151ec470c2b109499555e9298751e6aa3c5e7c2846"
+      "sha256": "ce6c08050b14afdead4936fc2e076153e2e25eb9f2e8849ea5cd9dfbe3357a1f"
     },
     {
       "path": "us-east-1/alb.json",
-      "sha256": "f61802200852d44a198f616e606408b77dd54fd9bd80a667d1f2706fc8295955"
+      "sha256": "2560d413e0ab97f3bea7ff1c717eee4761d2e3d7bf2c20c2af6270b9f18764f5"
     },
     {
       "path": "us-east-1/cloudfront.json",
@@ -85,7 +89,7 @@
     },
     {
       "path": "us-east-1/cloudwatch.json",
-      "sha256": "58f7eee1c1d70d9b91306686b26df306374252885fd15c63d8609e792b718f53"
+      "sha256": "eb4cd9d8c9f9bd582cff4449751b7cf8caeabb7795f09fc3084011ef262e01ae"
     },
     {
       "path": "us-east-1/codepipeline.json",
@@ -94,6 +98,10 @@
     {
       "path": "us-east-1/cognito.json",
       "sha256": "1b1565e81e302961734b6ab0ec52f27dfeeab8d837c6dc2daf29ecd9845d2993"
+    },
+    {
+      "path": "us-east-1/data-transfer.json",
+      "sha256": "965fd1833fee6e722d116a8ea3aac1793e06078c64dfe02afe7221ccf8356238"
     },
     {
       "path": "us-east-1/dynamodb.json",
@@ -105,7 +113,7 @@
     },
     {
       "path": "us-east-1/elasticache.json",
-      "sha256": "2de923cfe699f57fc0effbceeec622ee73604eed84a70b2642bc6f014a799994"
+      "sha256": "7cad162b06551c2f0a7401da7e7220e96069f680beaccacd237dcd35af3d7fba"
     },
     {
       "path": "us-east-1/lambda.json",
@@ -113,15 +121,15 @@
     },
     {
       "path": "us-east-1/nat-gateway.json",
-      "sha256": "9a36887fe8fa4e3c827bbda2cf07e9bf64711bda34b01a88d1f216f2443aee48"
+      "sha256": "7cf6ed8924797f59b7b40c3bd376b9ef5b9dfb5d448a44172a4bfb8863552725"
     },
     {
       "path": "us-east-1/rds.json",
-      "sha256": "4efb91bd11e3d7e280e942ff4a962a2a95b4bdb1f636eaa38bec8c64e7b43bb4"
+      "sha256": "0429d4a59312524e1fce366d3a0737f505e3f03859af733aa9c4bd4bb29c3b0b"
     },
     {
       "path": "us-east-1/route53.json",
-      "sha256": "c2f9b5aff70ab83aabf16b24db71550654bff8ec697353e1a49704921b81de20"
+      "sha256": "b55658a79686a5823058c70fae8e8a68740e2c8f2910317f781e3f3d6dbbef01"
     },
     {
       "path": "us-east-1/s3.json",
@@ -137,7 +145,7 @@
     },
     {
       "path": "us-east-1/waf.json",
-      "sha256": "749d911e738d8b280bda17c8263edce2fdc2e2b25863277f8f87ac52c1002a6b"
+      "sha256": "078bc4f4fd2bab668b3855e7d0bb86540efeedcfcc6ae54e7c7bf09f4430938b"
     }
   ]
 }

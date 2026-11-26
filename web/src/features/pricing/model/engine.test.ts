@@ -142,7 +142,7 @@ describe('estimate', () => {
     expect(block).toMatchObject({ status: 'priced', lines: [], blockType: 'aws.iam' });
   });
 
-  it('preserva a ordem do design; as arestas saem com preço zero até a #42', () => {
+  it('preserva a ordem do design nos blocos e nas arestas', () => {
     const kinds = ['logs', 'data', 'runs-on'] as const;
     const ordered = designDocumentSchema.parse({
       ...adrExampleDesign,
@@ -157,7 +157,9 @@ describe('estimate', () => {
     expect(edges.map((e) => [e.edgeId, e.kind])).toEqual(
       kinds.map((kind, i) => [`edg_${i}`, kind]),
     );
-    edges.forEach((edge) => expect(edge).toMatchObject({ status: 'priced', lines: [] }));
+    // S3 → S3: só `data` é par do contrato (sem custo); os custos estão em `edgeCosts.test.ts`.
+    expect(edges.map((edge) => edge.status)).toEqual(['unavailable', 'priced', 'unavailable']);
+    edges.forEach((edge) => expect(edge.lines).toEqual([]));
   });
 
   it('é determinística e pura: repete o resultado e não altera design nem catálogo', () => {

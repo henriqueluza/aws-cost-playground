@@ -2,7 +2,7 @@
 
 Script Python executado no CI que vai gerar o catálogo de preços (`web/public/prices/<region>/<service>.json`) a partir da AWS Price List API. Stack e decisões: `docs/architecture/aws-cost-playground/ADR-0001-stack.md`. Nível de arquitetura: `simple`.
 
-O gerador está completo (Issue #28, partes #195, #202, #196 e #214): cliente da Price List Query API (`GetProducts`, região `us-east-1`, credenciais da cadeia padrão do ambiente: variáveis `AWS_*`, perfil ou role do CI), registro dos 17 serviços, serialização, schema em Python, checagens, geração, gravação e CLI. Os filtros reais de cada serviço entram nas Issues de bloco (#30 a #42); o workflow semanal é a #29.
+O gerador está completo (Issue #28, partes #195, #202, #196 e #214): cliente da Price List Query API (`GetProducts`, região `us-east-1`, credenciais da cadeia padrão do ambiente: variáveis `AWS_*`, perfil ou role do CI), registro dos 18 serviços, serialização, schema em Python, checagens, geração, gravação e CLI. Os filtros reais de cada serviço entram nas Issues de bloco (#30 a #42); o workflow semanal é a #29.
 
 ## Pré-requisitos
 
@@ -63,13 +63,13 @@ Os testes não fazem rede nem precisam de credenciais AWS: simulam o `GetProduct
 - `generate.py` — `generate(specs, fetch, prices_dir, now)` (monta e confere em memória, não grava), `seed(specs, prices_dir)`, `write(prices_dir, files)`, `Result` (`files` e `report`) e `Fetch` (função que atende uma `Query`).
 - `__main__.py` — a CLI (`generate` e `seed`, `--root`).
 - `summary.py` — `pr_body(report)` e `python -m app.summary`: corpo do PR semanal a partir do relatório (seção abaixo).
-- `services/` — registro: um módulo por serviço, cada um exporta `SERVICE = ServiceSpec(...)`; `SERVICES` junta os 17, em ordem de slug.
+- `services/` — registro: um módulo por serviço, cada um exporta `SERVICE = ServiceSpec(...)`; `SERVICES` junta os 18, em ordem de slug.
 
 ## Registro de serviços
 
 O registro fica em `app/services/` (e não em `pricing/services/`, como diz o texto da #28 e das Issues de bloco). Motivo: mypy, cobertura e import-linter já cobrem `app`; fora dele o código ficaria sem essas checagens.
 
-Os 17 módulos já existem e já estão em `SERVICES`. Módulo sem consulta é provisório (não consulta a AWS e não gera preço); o implementado consulta a Price List; o docstring diz o que fica de fora e as constantes do módulo dizem o que é consultado e os SKUs gerados. O nome do módulo é o slug com `_` no lugar de `-` (`nat_gateway.py`, `secrets_manager.py`); `lambda` é `lambda_.py`. O slug é o tipo do bloco sem `aws.` e vira o nome do arquivo do catálogo.
+Os 17 módulos dos blocos já existem e já estão em `SERVICES`; o 18º, `data_transfer.py`, não tem bloco: são os preços dos custos de aresta (#42). Módulo sem consulta é provisório (não consulta a AWS e não gera preço); o implementado consulta a Price List; o docstring diz o que fica de fora e as constantes do módulo dizem o que é consultado e os SKUs gerados. O nome do módulo é o slug com `_` no lugar de `-` (`nat_gateway.py`, `secrets_manager.py`); `lambda` é `lambda_.py`. O slug é o tipo do bloco sem `aws.` e vira o nome do arquivo do catálogo.
 
 A Issue de um bloco edita só o módulo do próprio serviço e cria o teste dele em `tests/test_service_<slug com _>.py`. Não edita `services/__init__.py` nem `tests/test_services.py`: o teste do registro vale para serviço provisório e para serviço implementado.
 
@@ -81,11 +81,14 @@ No módulo do serviço:
 
 Padrão dos serviços implementados (siga nos próximos blocos; referência: `app/services/lambda_.py`):
 
-- **Consultas estreitas:** só `TERM_MATCH`, uma `Query` por produto: `regionCode` (ou `usagetype`, no produto global) mais o atributo que separa o produto (`group`, `queueType`…). Só entra o conjunto fechado de atributos que o módulo conhece.
-- **Franquia do produto global, quando existir:** lida da Price List, não fixada no código. O produto deve ter 1 dimensão, início 0, preço 0 e fim finito (o fim é a franquia); senão, `PricingError`.
+- **Consultas estreitas:** só `TERM_MATCH`, uma `Query` por produto: `regionCode` (ou `usagetype`, no produto global) mais o atributo que separa o produto (`group`, `queueType`…). Só entra o conjunto fechado de atributos que o módulo conhece. No ALB e no NAT Gateway, a consulta leva `regionCode`, `operation` e `usagetype`. O `usagetype` tem prefixo regional, tirado de um mapa fechado no próprio módulo (`""` em us-east-1, `SAE1-` em sa-east-1). Região fora do mapa dá `PricingError`.
+- **Atributo com prefixo de região:** se só o `usagetype` separa o produto e ele leva o prefixo da região (RDS: o `UnusedBox` repete os atributos da instância), o prefixo vem de um mapa fechado com as chaves de `REGIONS` (`USAGETYPE_PREFIX` em `app/services/rds.py`), conferido no teste do serviço.
+- **Franquia do produto global, quando existir:** lida da Price List, não fixada no código. O produto deve ter 1 dimensão, início 0, preço 0 e fim finito (o fim é a franquia); senão, `PricingError`. ALB e NAT Gateway não têm franquia na Price List. A de 12 meses do ALB não está lá e não entra (regra 4 de `docs/scenarios.md`).
 - **Recusa:** produto duplicado, unidade AWS fora do conjunto esperado ou 1ª faixa do produto regional com preço 0 dão `PricingError`. Exceção: SKU com franquia embutida (DynamoDB), em que a AWS põe a franquia como 1ª faixa grátis do próprio produto regional; esse SKU precisa ter exatamente 2 faixas (0 a F com preço 0, F sem fim paga), a 1ª vira `freeTier` (sem pool) e outro formato dá `PricingError`. Com erro, nada é gravado e o arquivo versionado continua.
 - **Testes:** `tests/test_service_<slug com _>.py` lê fixtures reais em `tests/fixtures/<slug>-<região>.jsonl` (formato PriceList, um item por linha, tirado do bulk offer file público da AWS, com a data no docstring do teste). O teste de `generate()` compara com a semente só `sku`, `description`, `unit` e `freeTier.pool`, não as faixas nem a quantidade da franquia: o workflow semanal (#29) atualiza números da AWS sem quebrar teste. Faixas e franquia são conferidas contra as fixtures.
 - **Price List global e franquia fora dela** (ex.: CloudFront, cobrado pela borda e não pela região): serviço sem `regionCode` tem uma fixture só, `tests/fixtures/<slug>.jsonl`. A franquia permanente que a Price List não publica fica numa constante do módulo, com o motivo no docstring, e o `build` recusa qualquer faixa com preço 0, que contaria a franquia duas vezes.
+- **`usagetype` regional com prefixo** (ex.: ElastiCache, em que o `usagetype` separa o nó do Extended Support e do Outposts): o prefixo vem de uma tabela fechada do módulo, com as chaves de `catalog.REGIONS` (`""` em us-east-1, `SAE1-` em sa-east-1); região fora dela dá `PricingError`. A consulta usa `regionCode` + `usagetype` completo + o atributo que separa o produto (`operation`, no ElastiCache).
+- **Geração do mesmo produto:** quando `group` não separa a geração (WAF: WAFv2 e Classic compartilham `group`), a consulta soma `groupDescription` ao `regionCode` e ao `group`; o valor exato vem de um conjunto fechado do módulo, conferido nas fixtures.
 
 ## Serviço provisório e gravação
 

@@ -1,6 +1,6 @@
 import { CLIENT_NODE_ID, type DesignDocument, type EdgeKind } from '../../../shared/lib/design';
 import { toFixed, type Money } from '../../../shared/lib/money';
-import { blockDefinition, edgeKindsFor, type BlockCategory } from '../../pricing';
+import { blockDefinition, type BlockCategory } from '../../pricing';
 import type { Layout, Selection } from './editorState';
 
 /** As cinco categorias do desenho (DESIGN.md, "Categorias dos blocos"). */
@@ -70,15 +70,14 @@ export type CanvasEdge = {
   readonly target: string;
   readonly selected: boolean;
   readonly ariaLabel: string;
+  readonly markerEnd: typeof ARROW;
   readonly data: { readonly kind: EdgeKind };
 };
 
-const CELL = { x: 288, y: 144 };
+const ARROW = { type: 'arrowclosed', width: 16, height: 16 } as const;
+const CELL = { x: 248, y: 144 };
 
-/**
- * Posição de quem não tem entrada no layout: uma coluna por profundidade (o maior caminho desde
- * um bloco sem entrada) e o `client` na última coluna, para o desenho ler da esquerda para a direita.
- */
+/** Posição de quem não tem entrada no layout: coluna = maior caminho desde um bloco sem entrada; o `client` fica na última. */
 export function defaultLayout(doc: DesignDocument): Record<string, { x: number; y: number }> {
   const depth = new Map<string, number>();
   const visiting = new Set<string>();
@@ -185,48 +184,7 @@ export function toCanvasEdges(doc: DesignDocument, selection: Selection): Canvas
     target: edge.target,
     selected: selection?.kind === 'edge' && selection.id === edge.id,
     ariaLabel: `${KIND_LABELS[edge.kind]}: ${nameOf(edge.source)} para ${nameOf(edge.target)}`,
+    markerEnd: ARROW,
     data: { kind: edge.kind },
   }));
-}
-
-export type ConnectionRefusal = 'unknown' | 'same-node' | 'not-allowed' | 'duplicate';
-export type ConnectionCheck =
-  | { readonly ok: true; readonly kind: EdgeKind }
-  | { readonly ok: false; readonly reason: ConnectionRefusal; readonly message: string };
-
-/**
- * Julga uma conexão `source → target` pelo contrato (`edgeKindsFor`) e pelo design. O tipo da
- * aresta é o primeiro que o contrato aceita para o par; a escolha entre tipos é da #46.
- */
-export function checkConnection(
-  doc: DesignDocument,
-  sourceId: string,
-  targetId: string,
-): ConnectionCheck {
-  const typeOf = (id: string) =>
-    id === CLIENT_NODE_ID ? CLIENT_NODE_ID : doc.blocks.find((b) => b.id === id)?.type;
-  const sourceType = sourceId === CLIENT_NODE_ID ? undefined : typeOf(sourceId);
-  const targetType = typeOf(targetId);
-  const refuse = (reason: ConnectionRefusal, message: string): ConnectionCheck => ({
-    ok: false,
-    reason,
-    message,
-  });
-  if (sourceType === undefined || targetType === undefined) {
-    return refuse('unknown', 'Essa conexão não pode partir da internet nem de um bloco ausente.');
-  }
-  if (sourceId === targetId) return refuse('same-node', 'Um bloco não se conecta a ele mesmo.');
-  const kinds = edgeKindsFor(sourceType, targetType);
-  const from = serviceName(sourceType);
-  const to = targetId === CLIENT_NODE_ID ? 'a internet' : serviceName(targetType);
-  const kind = kinds[0];
-  if (kind === undefined) {
-    return refuse(
-      'not-allowed',
-      `${from} não se conecta com ${to}: o contrato não prevê esse par.`,
-    );
-  }
-  const repeated = doc.edges.some((e) => e.source === sourceId && e.target === targetId);
-  if (repeated) return refuse('duplicate', `${from} já está conectado a ${to}.`);
-  return { ok: true, kind };
 }
