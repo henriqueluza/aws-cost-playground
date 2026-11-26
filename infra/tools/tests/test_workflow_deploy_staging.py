@@ -282,6 +282,21 @@ class DeployStepsTest(unittest.TestCase):
         run = run_block(step(job("deploy"), "smoke"))
         self.assertIn("/quota", run)
         self.assertIn("401", run)
+        self.assertRegex(run, r'--fail[^\n]*"\$SITE_URL/"|curl_opts=\([^)]*--fail')
+        self.assertRegex(run, r'jq -S[^\n]*\$RUNNER_TEMP/config\.json')
+
+    def test_config_is_validated_then_published_from_the_generated_file(self) -> None:
+        run = run_block(step(job("deploy"), "config"))
+        for key in ("apiBaseUrl", "cognitoAuthority", "cognitoClientId"):
+            self.assertIn(key, run.split("jq -c", 1)[0])
+        self.assertIn("jq -e", run)
+        self.assertRegex(run, r's3 cp "\$RUNNER_TEMP/config\.json" [^\n]*--content-type application/json')
+        self.assertNotIn("release/site/config.json", run)
+
+    def test_docs_list_the_deploy_ids_in_order(self) -> None:
+        docs = DOCS.read_text(encoding="utf-8")
+        section = docs.split("## Ordem do job `deploy`\n", 1)[1].split("\n## ", 1)[0]
+        self.assertEqual([i for i in re.findall(r"`(\w+)`", section) if i in DEPLOY_IDS], DEPLOY_IDS)
 
 
 GATE_FIELDS = {
