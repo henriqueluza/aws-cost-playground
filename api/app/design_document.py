@@ -27,7 +27,6 @@ from pydantic_core import InitErrorDetails, PydanticCustomError
 Region = Literal["us-east-1", "sa-east-1"]
 EdgeKind = Literal["data", "runs-on", "logs"]
 UsageSource = Literal["llm", "default"]
-REGIONS: tuple[Region, ...] = ("us-east-1", "sa-east-1")
 CLIENT_NODE_ID = "client"
 """Nó fixo, sem preço, que representa a internet. É o destino das arestas de egress."""
 
@@ -55,14 +54,13 @@ _TIME = r"(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]+)?"
 
 
 class ContractModel(BaseModel):
-    """Base dos modelos de contrato: tipos estritos (como o zod), JSON em camelCase, imutável."""
+    """Base dos contratos: tipos estritos (como o zod), JSON só em camelCase, imutável."""
 
     model_config = ConfigDict(
         strict=True,
         extra="ignore",
         frozen=True,
         alias_generator=to_camel,
-        validate_by_name=True,
         validate_by_alias=True,
     )
 
@@ -175,8 +173,10 @@ class DesignDocument(ContractModel):
     schema_version: SchemaVersion
     region: Region
     workload: Workload
-    blocks: Annotated[list[Block], Field(max_length=MAX_BLOCKS)]
-    edges: Annotated[list[Edge], Field(max_length=MAX_EDGES)]
+    # `fail_fast`: para no primeiro item inválido. O veredito é o do zod; só a lista de erros
+    # encurta, para entrada adversarial não gerar dezenas de milhares de erros (T1).
+    blocks: Annotated[list[Block], Field(max_length=MAX_BLOCKS, fail_fast=True)]
+    edges: Annotated[list[Edge], Field(max_length=MAX_EDGES, fail_fast=True)]
     scenarios: Annotated[list[object], Field(max_length=0)]
 
     @model_validator(mode="after")

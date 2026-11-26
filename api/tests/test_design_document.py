@@ -157,3 +157,19 @@ def test_float_integral_conta_como_inteiro(literal: str) -> None:
     esperado["blocks"][0]["usage"]["values"]["avgDurationMs"] = int(float(literal))
     parsed = DesignDocument.model_validate(json.loads(raw))
     assert doc_size_bytes(parsed) == js_size(esperado)
+
+
+def test_entrada_adversarial_nao_multiplica_os_erros() -> None:
+    """`fail_fast` nas listas: só o primeiro bloco e a primeira aresta inválidos geram erros."""
+    bad = {f"k{i}": [1] for i in range(32)}
+    usage = {"source": "default", "values": bad}
+    d = doc(
+        blocks=[
+            {**ADR["blocks"][0], "id": f"blk_{i}", "attributes": bad, "overrides": bad}
+            for i in range(100)
+        ],
+        edges=[{**ADR["edges"][0], "id": f"edg_{i}", "usage": usage} for i in range(400)],
+    )
+    with pytest.raises(ValidationError) as caught:
+        DesignDocument.model_validate(d)
+    assert caught.value.error_count() < 500
