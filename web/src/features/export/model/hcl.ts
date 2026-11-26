@@ -19,7 +19,7 @@ export const COUNT_INDEX = { kind: 'count-index' } as const;
 export type HclRefPart = string | number | typeof COUNT_INDEX;
 
 /** Funções do Terraform que o construtor sabe chamar. Lista fechada: nome de função nunca vem de dado. */
-export const HCL_FUNCTIONS = ['format'] as const;
+export const HCL_FUNCTIONS = ['format', 'base64encode'] as const;
 export type HclFunction = (typeof HCL_FUNCTIONS)[number];
 
 export type HclNode =

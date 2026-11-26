@@ -5,9 +5,11 @@ import { cloudformation } from './cloudformation';
 import { cloudfront } from './cloudfront';
 import { cloudtrail } from './cloudtrail';
 import { cloudwatch } from './cloudwatch';
+import { codepipeline } from './codepipeline';
 import { cognito } from './cognito';
 import { dynamodb } from './dynamodb';
 import { ec2 } from './ec2';
+import { ecs } from './ecs';
 import { elasticache } from './elasticache';
 import { iam } from './iam';
 import { lambda } from './lambda';
@@ -41,10 +43,10 @@ export const BLOCK_GENERATORS: Readonly<Record<BlockType, BlockGenerator>> = {
   'aws.secrets-manager': secretsManager,
   'aws.cloudtrail': cloudtrail,
   'aws.route53': route53,
-  'aws.codepipeline': notSupportedYet,
+  'aws.codepipeline': codepipeline,
   'aws.iam': iam,
   'aws.cloudformation': cloudformation,
-  'aws.ecs': notSupportedYet,
+  'aws.ecs': ecs,
 };
 
 /** Tipos que ainda estão no gerador provisório, na ordem do registro. */
