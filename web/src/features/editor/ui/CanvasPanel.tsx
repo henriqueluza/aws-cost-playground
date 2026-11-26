@@ -28,19 +28,27 @@ import {
   refusalMessage,
   type FlowChange,
 } from '../hooks/canvasHandlers';
+import { announce } from '../hooks/announcer';
 import { designStore } from '../hooks/designStore';
 import { useCanvasCosts } from '../hooks/useCanvasCosts';
 import { useDesignStore } from '../hooks/useDesignStore';
-import { checkConnection, toCanvasEdges, toCanvasNodes } from '../model/canvasModel';
+import {
+  checkConnection,
+  selectionMessage,
+  toCanvasEdges,
+  toCanvasNodes,
+} from '../model/canvasModel';
 import { dropBlock, isBlockDrag } from '../model/palette';
 import { BlockNode, ClientNode, type BlockFlowNode, type ClientFlowNode } from './BlockNode';
 import styles from './CanvasPanel.module.css';
 import { Icon } from './CategoryIcon';
+import { FLOW_ARIA_LABELS } from './flowA11y';
 
 type AppNode = BlockFlowNode | ClientFlowNode;
 
 const NODE_TYPES = { block: BlockNode, client: ClientNode };
-const FIT_OPTIONS = { padding: 0.2, maxZoom: 1 };
+/** `minZoom` do ajuste: abaixo de ~0,7 o texto de 12 px passa a ~8 px e some; sobra o pan. */
+const FIT_OPTIONS = { padding: 0.2, minZoom: 0.7, maxZoom: 1 };
 const GRID: [number, number] = [8, 8];
 
 /** O canvas: nós e arestas saem do design da store; cada gesto vira uma ação dela. */
@@ -59,6 +67,13 @@ function Canvas(): ReactElement {
   const costs = useCanvasCosts(document);
   const flow = useReactFlow();
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [dropping, setDropping] = useState(false);
+
+  // Mudança de seleção (clique, teclado, painel de custo) é dita em voz alta.
+  useEffect(() => {
+    const message = selectionMessage(designStore.getState().document, selection);
+    if (message) announce(message);
+  }, [selection]);
 
   const nodes = useMemo(
     () => toCanvasNodes(document, layout, selection, costs) as unknown as AppNode[],
@@ -78,11 +93,11 @@ function Canvas(): ReactElement {
 
   const onNodesChange = useCallback((changes: FlowChange[]) => {
     const { selection: current, ...actions } = designStore.getState();
-    applyNodeChanges(changes, actions, current, CLIENT_NODE_ID);
+    applyNodeChanges(changes, actions, current, CLIENT_NODE_ID, announce);
   }, []);
   const onEdgesChange = useCallback((changes: FlowChange[]) => {
     const { selection: current, ...actions } = designStore.getState();
-    applyEdgeChanges(changes, actions, current);
+    applyEdgeChanges(changes, actions, current, announce);
   }, []);
 
   const isValidConnection = useCallback(
@@ -114,10 +129,16 @@ function Canvas(): ReactElement {
 
   // Soltar bloco da paleta (contrato da #47): só o tipo viaja; o bloco nasce com o padrão do contrato.
   const onDragOver = useCallback((e: DragEvent) => {
-    if (isBlockDrag(e.dataTransfer)) e.preventDefault();
+    if (!isBlockDrag(e.dataTransfer)) return;
+    e.preventDefault();
+    setDropping(true); // aviso visual de "pode soltar"
+  }, []);
+  const onDragLeave = useCallback((e: DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
   }, []);
   const onDrop = useCallback(
     (e: DragEvent) => {
+      setDropping(false);
       if (!isBlockDrag(e.dataTransfer)) return;
       e.preventDefault();
       const at = flow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
@@ -127,7 +148,7 @@ function Canvas(): ReactElement {
   );
 
   return (
-    <div className={styles.canvas}>
+    <div className={styles.canvas} data-dropping={dropping || undefined}>
       <h2 className={styles.hidden}>Canvas</h2>
       <ReactFlow
         nodes={nodes}
@@ -149,6 +170,8 @@ function Canvas(): ReactElement {
         snapToGrid
         snapGrid={GRID}
         onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        ariaLabelConfig={FLOW_ARIA_LABELS}
         onDrop={onDrop}
         fitView
         fitViewOptions={FIT_OPTIONS}

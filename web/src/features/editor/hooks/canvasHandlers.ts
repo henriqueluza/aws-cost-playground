@@ -11,6 +11,11 @@ export type FlowChange =
   | { type: 'dimensions' | 'add' | 'replace'; id?: string };
 
 type Actions = Pick<DesignActions, 'moveBlock' | 'removeBlock' | 'removeEdge' | 'select'>;
+/** Anuncia uma frase fixa em pt-BR (região `aria-live` do editor). */
+export type Say = (message: string) => void;
+const silent: Say = () => undefined;
+/** Ação recusada (`ok: false`) não conta; mock sem resultado conta como aceita. */
+const accepted = (r: { ok: boolean } | undefined): boolean => r === undefined || r.ok;
 
 /** Traduz `onNodesChange` em ações da store. O `client` nunca é removido. */
 export function applyNodeChanges(
@@ -18,15 +23,18 @@ export function applyNodeChanges(
   actions: Actions,
   selection: Selection,
   clientId: string,
+  say: Say = silent,
 ): void {
+  let removed = false;
   for (const change of changes) {
     if (change.type === 'position' && change.position) {
       actions.moveBlock(change.id, change.position);
     } else if (change.type === 'remove' && change.id !== clientId) {
-      actions.removeBlock(change.id);
+      removed = accepted(actions.removeBlock(change.id)) || removed;
     }
   }
-  applySelection(changes, 'block', actions, selection);
+  applySelection(changes, 'block', actions, selection, say);
+  if (removed) say('Bloco removido'); // por último: vale mais que "Seleção removida"
 }
 
 /** Traduz `onEdgesChange` em ações da store. */
@@ -34,11 +42,14 @@ export function applyEdgeChanges(
   changes: readonly FlowChange[],
   actions: Actions,
   selection: Selection,
+  say: Say = silent,
 ): void {
+  let removed = false;
   for (const change of changes) {
-    if (change.type === 'remove') actions.removeEdge(change.id);
+    if (change.type === 'remove') removed = accepted(actions.removeEdge(change.id)) || removed;
   }
-  applySelection(changes, 'edge', actions, selection);
+  applySelection(changes, 'edge', actions, selection, say);
+  if (removed) say('Conexão removida');
 }
 
 /** A seleção é única: o último `select` ligado vence; desligar o selecionado limpa a seleção. */
@@ -47,6 +58,7 @@ function applySelection(
   kind: 'block' | 'edge',
   actions: Actions,
   selection: Selection,
+  say: Say,
 ): void {
   const picks = changes.filter((c) => c.type === 'select');
   const chosen = picks.findLast((c) => c.selected);
@@ -57,7 +69,10 @@ function applySelection(
     return;
   }
   const dropped = picks.some((c) => selection?.kind === kind && c.id === selection.id);
-  if (dropped) actions.select(null);
+  if (dropped) {
+    actions.select(null);
+    say('Seleção removida');
+  }
 }
 
 type ConnectionEnds = { readonly source: string; readonly target: string };
