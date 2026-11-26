@@ -46,7 +46,9 @@ describe('CanvasPanel', () => {
   it('reage à store: mostra o custo no nó e o bloco que entra', async () => {
     const { container } = renderCanvas();
     expect(await screen.findByLabelText(/^S3,/)).toHaveTextContent('—');
-    expect(container.querySelectorAll('.react-flow__node svg')).toHaveLength(3);
+    const icons = [...container.querySelectorAll<SVGElement>('.react-flow__node svg')];
+    expect(icons.map((svg) => svg.dataset.icon).sort()).toEqual(['compute', 'data', 'globe']);
+    expect(screen.getByLabelText(/^Lambda,/)).toHaveTextContent(/Lambda · \S/);
     const { document } = designStore.getState();
     const extra = { ...document.blocks[0]!, id: 'blk_extra', label: 'Outra' };
     act(() =>

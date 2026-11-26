@@ -54,6 +54,7 @@ export function Icon({ name }: { name: IconName }): ReactElement {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      data-icon={name}
       focusable="false"
     >
       {SHAPES[name]}

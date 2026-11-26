@@ -7,8 +7,8 @@ import { formatUsd, type CostView } from '../model/canvasModel';
 const NONE: ReadonlyMap<string, CostView> = new Map();
 
 /**
- * Custo mensal de cada bloco, já em texto. Sem catálogo (carregando, erro ou design vazio) ou com
- * o bloco sem preço, o bloco não entra no mapa e o nó mostra o traço. O `Decimal` não sai daqui.
+ * Custo mensal de cada bloco, já em texto. Sem catálogo ou sem preço, o bloco não entra no mapa
+ * e o nó mostra o traço. O `Decimal` não sai daqui.
  */
 export function useCanvasCosts(design: DesignDocument): ReadonlyMap<string, CostView> {
   const state = usePriceCatalog(design);

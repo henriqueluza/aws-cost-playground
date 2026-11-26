@@ -144,6 +144,7 @@
 .value,
 .valueMuted {
   flex: none;
+  font-variant-numeric: tabular-nums;
   font-family: var(--font-mono);
   font-size: var(--fs-body);
   line-height: var(--lh-body);

@@ -30,6 +30,7 @@ describe('toCanvasNodes', () => {
       service: 'Lambda',
     });
     expect(lambda?.ariaLabel).toBe('Lambda, API handler, Computação, US$ 5,73 por mês');
+    expect(lambda?.data).toMatchObject({ summary: expect.stringMatching(/^Lambda · \S/) });
     const s3 = nodes[2];
     expect((s3?.data as BlockNodeData).cost).toBe('—');
     expect(s3?.ariaLabel).toContain('custo ainda sem valor');
@@ -97,6 +98,7 @@ describe('toCanvasEdges', () => {
     const [edge] = toCanvasEdges(doc, { kind: 'edge', id: 'edg_1' });
     expect(edge).toMatchObject({ source: 'blk_assets', target: 'client', selected: true });
     expect(edge?.ariaLabel).toBe('Dados: S3 para Internet');
+    expect(edge?.markerEnd).toMatchObject({ type: 'arrowclosed' });
   });
 });
 

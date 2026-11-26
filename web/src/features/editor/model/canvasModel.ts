@@ -70,15 +70,14 @@ export type CanvasEdge = {
   readonly target: string;
   readonly selected: boolean;
   readonly ariaLabel: string;
+  readonly markerEnd: typeof ARROW;
   readonly data: { readonly kind: EdgeKind };
 };
 
+const ARROW = { type: 'arrowclosed', width: 16, height: 16 } as const;
 const CELL = { x: 248, y: 144 };
 
-/**
- * Posição de quem não tem entrada no layout: uma coluna por profundidade (o maior caminho desde
- * um bloco sem entrada) e o `client` na última coluna, para o desenho ler da esquerda para a direita.
- */
+/** Posição de quem não tem entrada no layout: coluna = maior caminho desde um bloco sem entrada; o `client` fica na última. */
 export function defaultLayout(doc: DesignDocument): Record<string, { x: number; y: number }> {
   const depth = new Map<string, number>();
   const visiting = new Set<string>();
@@ -185,6 +184,7 @@ export function toCanvasEdges(doc: DesignDocument, selection: Selection): Canvas
     target: edge.target,
     selected: selection?.kind === 'edge' && selection.id === edge.id,
     ariaLabel: `${KIND_LABELS[edge.kind]}: ${nameOf(edge.source)} para ${nameOf(edge.target)}`,
+    markerEnd: ARROW,
     data: { kind: edge.kind },
   }));
 }

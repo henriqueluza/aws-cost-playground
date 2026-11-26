@@ -15,7 +15,7 @@ export const BlockNode = memo(function BlockNode({ data }: NodeProps<BlockFlowNo
       <Handle type="target" position={Position.Left} className={styles.handle} />
       <div className={styles.head}>
         <span className={styles.tile} title={category ? CATEGORY_LABELS[category] : undefined}>
-          <Icon name={category ?? 'ops'} />
+          {category && <Icon name={category} />}
         </span>
         <span className={styles.name} title={label}>
           {label}
@@ -34,15 +34,17 @@ export const BlockNode = memo(function BlockNode({ data }: NodeProps<BlockFlowNo
 });
 
 /** Nó fixo da internet: destino das arestas de saída, sem preço e sem categoria. */
-export const ClientNode = memo(function ClientNode(): ReactElement {
+export const ClientNode = memo(function ClientNode({
+  data,
+}: NodeProps<ClientFlowNode>): ReactElement {
   return (
-    <div className={`${styles.block} ${styles.client}`}>
+    <div className={`${styles.block}`}>
       <Handle type="target" position={Position.Left} className={styles.handle} />
       <div className={styles.head}>
         <span className={`${styles.tile} ${styles.tileClient}`}>
           <Icon name="globe" />
         </span>
-        <span className={styles.name}>Internet</span>
+        <span className={styles.name}>{data.label}</span>
       </div>
     </div>
   );
