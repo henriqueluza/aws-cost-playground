@@ -118,6 +118,13 @@ def undocumented_actions(policy_tf: str, readme: str) -> list[str]:
     return found or ([] if STATEMENT.search(policy_tf) else ["nenhum statement encontrado"])
 
 
+def missing_imports(tf: str, readme: str) -> list[str]:
+    """Recursos de IAM sem linha na tabela de import do README ("Estado deste diretório")."""
+    rows = "\n".join(line for line in readme.splitlines() if line.startswith("| `aws_"))
+    declared = sorted({f"{kind}.{name}" for kind, name in RESOURCE.findall(tf)})
+    return [address for address in declared if f"`{address}" not in rows] or ([] if declared else ["nenhum recurso"])
+
+
 class BootstrapApplyRolesTest(unittest.TestCase):
     def test_bootstrap_real_nao_tem_violacao(self) -> None:
         tf = "\n".join(path.read_text() for path in sorted(BOOTSTRAP.glob("*.tf")))
@@ -176,3 +183,16 @@ class BootstrapApplyRolesTest(unittest.TestCase):
         # O serviço conta: a mesma ação curta de outro serviço não vale como documentada.
         other = 'Sid = "Table"\n Action = "s3:CreateTable"\n Resource = "x"'
         self.assertEqual(undocumented_actions(other, readme), ["Table: s3:CreateTable fora da tabela do README"])
+
+    def test_todo_recurso_de_iam_tem_linha_de_import_no_readme(self) -> None:
+        tf = "\n".join(path.read_text() for path in sorted(BOOTSTRAP.glob("*.tf")))
+        self.assertEqual(missing_imports(tf, (BOOTSTRAP / "README.md").read_text()), [])
+        row = "| `aws_iam_role.apply[\"<env>\"]` | `acp-ci-apply-<env>` |"
+        expected = [
+            "aws_iam_policy.apply_boundary",
+            "aws_iam_policy.apply_named",
+            "aws_iam_policy_attachment.admin",
+            "aws_iam_role_policy.apply_extra",
+        ]
+        self.assertEqual(missing_imports(HOSTILE, row), expected)
+        self.assertEqual(missing_imports("", row), ["nenhum recurso"])

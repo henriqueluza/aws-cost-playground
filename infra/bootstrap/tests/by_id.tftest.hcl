@@ -59,9 +59,20 @@ run "lista_inteira_de_statements" {
       {
         Sid       = "CreateTagged"
         Effect    = "Allow"
-        Action    = ["acm:RequestCertificate", "cloudfront:CreateDistribution", "cognito-idp:CreateUserPool"]
+        Action    = ["cloudfront:CreateDistribution", "cognito-idp:CreateUserPool"]
         Resource  = "*"
         Condition = { StringEquals = { "aws:RequestTag/environment" = env } }
+      },
+      {
+        Sid      = "CertificateRequest"
+        Effect   = "Allow"
+        Action   = "acm:RequestCertificate"
+        Resource = "*"
+        Condition = {
+          StringEquals              = { "aws:RequestTag/environment" = env }
+          "ForAllValues:StringLike" = { "acm:DomainNames" = { staging = ["staging.example.com", "*.staging.example.com"], production = ["example.com", "api.example.com", "auth.example.com"] }[env] }
+          Null                      = { "acm:DomainNames" = "false" }
+        }
       },
       {
         Sid      = "TagOwn"
@@ -103,10 +114,17 @@ run "lista_inteira_de_statements" {
           "cognito-idp:CreateManagedLoginBranding", "cognito-idp:CreateUserPoolClient", "cognito-idp:CreateUserPoolDomain",
           "cognito-idp:DescribeManagedLoginBranding", "cognito-idp:DescribeManagedLoginBrandingByClient", "cognito-idp:DescribeUserPool",
           "cognito-idp:DescribeUserPoolClient", "cognito-idp:GetUserPoolMfaConfig", "cognito-idp:ListUserPoolClients",
-          "cognito-idp:UpdateManagedLoginBranding", "cognito-idp:UpdateUserPool", "cognito-idp:UpdateUserPoolClient", "cognito-idp:UpdateUserPoolDomain",
+          "cognito-idp:UpdateManagedLoginBranding", "cognito-idp:UpdateUserPoolClient", "cognito-idp:UpdateUserPoolDomain",
         ]
         Resource  = "arn:aws:cognito-idp:us-east-1:123456789012:userpool/*"
         Condition = { StringEquals = { "aws:ResourceTag/environment" = env } }
+      },
+      {
+        Sid       = "UserPoolUpdate"
+        Effect    = "Allow"
+        Action    = "cognito-idp:UpdateUserPool"
+        Resource  = "arn:aws:cognito-idp:us-east-1:123456789012:userpool/*"
+        Condition = { StringEquals = { "aws:ResourceTag/environment" = env }, Null = { "aws:TagKeys" = "true" } }
       },
       { Sid = "UserPoolDomainRead", Effect = "Allow", Action = "cognito-idp:DescribeUserPoolDomain", Resource = "*" },
       {
@@ -141,6 +159,11 @@ run "lista_inteira_de_statements" {
               "route53:ChangeResourceRecordSetsActions"     = ["CREATE", "UPSERT"]
               "route53:ChangeResourceRecordSetsRecordTypes" = ["A", "CNAME"]
             }
+            Null = {
+              "route53:ChangeResourceRecordSetsActions"               = "false"
+              "route53:ChangeResourceRecordSetsNormalizedRecordNames" = "false"
+              "route53:ChangeResourceRecordSetsRecordTypes"           = "false"
+            }
             "ForAllValues:StringLike" = {
               "route53:ChangeResourceRecordSetsNormalizedRecordNames" = { staging = ["staging.example.com", "*.staging.example.com"], production = ["example.com", "api.example.com", "auth.example.com", "_*.example.com"] }[env]
             }
@@ -149,7 +172,7 @@ run "lista_inteira_de_statements" {
         )
       },
     ]])
-    error_message = "A política dá exatamente estes 12 Allow, com o ambiente na tag ou no nome do registro. Ação, recurso ou condição a mais ou a menos quebra o assert."
+    error_message = "A política dá exatamente estes 14 Allow, com o ambiente na tag ou no nome do registro. Ação, recurso ou condição a mais ou a menos quebra o assert."
   }
 }
 
@@ -201,11 +224,11 @@ run "forma_e_escopo_por_ambiente" {
             contains(["EdgePolicies", "UserPoolDomainRead", "ZoneRead", "ZoneList", "Records"], s.Sid),
           ]),
           can(s.Condition) || alltrue([for action in flatten([s.Action]) : can(regex(":(Get|List|Describe)", action)) || (s.Sid == "EdgePolicies" && can(regex("^cloudfront:Create(CachePolicy|OriginAccessControl|ResponseHeadersPolicy)$", action)))]),
-          s.Resource != "*" || contains(["CreateTagged", "EdgePolicies", "UserPoolDomainRead", "ZoneList"], s.Sid),
+          s.Resource != "*" || contains(["CreateTagged", "CertificateRequest", "EdgePolicies", "UserPoolDomainRead", "ZoneList"], s.Sid),
         ]
       ]
     ]))
-    error_message = "Toda escrita exige a tag environment do próprio ambiente (no recurso ou no pedido). Sem condição só há leitura e criação de política ou OAC do CloudFront; Resource \"*\" só nos quatro Sids conhecidos; nada cita o outro ambiente."
+    error_message = "Toda escrita exige a tag environment do próprio ambiente (no recurso ou no pedido). Sem condição só há leitura e criação de política ou OAC do CloudFront; Resource \"*\" só nos cinco Sids conhecidos; nada cita o outro ambiente."
   }
 
   assert {
@@ -216,11 +239,12 @@ run "forma_e_escopo_por_ambiente" {
             alltrue([for word in ["Delete", "Remove", "Untag", "Admin", "ListUsers", "Import", "Password", "SignUp", "Auth", "apigateway:DELETE", "apigateway:PUT", "iam:"] : !strcontains(action, word)]),
             !can(regex("^cognito-idp:.*User", action)) || can(regex("^cognito-idp:[A-Za-z]*UserPool", action)),
             !can(regex("Tag(Resource|sToCertificate)$", action)) || (s.Sid == "TagOwn" && s.Condition.StringEquals["aws:RequestTag/environment"] == env && s.Condition.StringEqualsIfExists["aws:ResourceTag/environment"] == env),
+            action != "cognito-idp:UpdateUserPool" || (s.Action == action && s.Condition.StringEquals["aws:ResourceTag/environment"] == env && s.Condition.Null["aws:TagKeys"] == "true"),
           ]
         ]
       ]
     ]))
-    error_message = "Nenhuma exclusão, nenhuma ação de usuário do Cognito, nenhum DELETE ou PUT do API Gateway, nada de IAM; etiquetar só no Sid TagOwn, com o ambiente no pedido e no recurso, e nunca tirar etiqueta."
+    error_message = "Nenhuma exclusão, nenhuma ação de usuário do Cognito, nenhum DELETE ou PUT do API Gateway, nada de IAM; etiquetar só no Sid TagOwn, com o ambiente no pedido e no recurso, nunca tirar etiqueta, e UpdateUserPool só sem tags no pedido."
   }
 
   # Nada do que o papel já tem negado (Deny sem condição em qualquer recurso) pode voltar por um Allow.
@@ -270,15 +294,45 @@ run "registros_dns_por_ambiente" {
 
   assert {
     condition = alltrue(flatten([
+      for env, probes in {
+        staging    = { allowed = ["staging.example.com", "api.staging.example.com", "*.staging.example.com"], denied = ["example.com", "api.example.com", "auth.example.com", "*.example.com"] }
+        production = { allowed = ["example.com", "api.example.com", "auth.example.com"], denied = ["staging.example.com", "api.staging.example.com", "*.example.com", "www.example.com"] }
+        } : [
+        for s in jsondecode(aws_iam_policy.apply_id[env].policy).Statement : [
+          for expected, names in probes : [
+            for name in names :
+            anytrue([for p in s.Condition["ForAllValues:StringLike"]["acm:DomainNames"] : can(regex("^${replace(replace(p, ".", "\\."), "*", ".*")}$", name))]) == (expected == "allowed")
+          ]
+        ] if s.Sid == "CertificateRequest"
+      ]
+    ]))
+    error_message = "Cada papel só pede certificado para os nomes do próprio ambiente: staging não obtém certificado de um nome de produção (nem o curinga da zona), e vice-versa."
+  }
+
+  assert {
+    condition = alltrue(flatten([
       for env in ["staging", "production"] : [
         for s in jsondecode(aws_iam_policy.apply_id[env].policy).Statement : [
           s.Resource == "arn:aws:route53:::hostedzone/Z0000000EXAMPLE",
           s.Condition["ForAllValues:StringEquals"] == { "route53:ChangeResourceRecordSetsActions" = ["CREATE", "UPSERT"], "route53:ChangeResourceRecordSetsRecordTypes" = ["A", "CNAME"] },
-          length(s.Condition) == (env == "staging" ? 2 : 3),
+          length(s.Condition) == (env == "staging" ? 3 : 4) && alltrue([for v in values(s.Condition.Null) : v == "false"]) && length(s.Condition.Null) == 3,
         ] if contains(flatten([s.Action]), "route53:ChangeResourceRecordSets")
       ]
     ]))
-    error_message = "ChangeResourceRecordSets vale só na zona do produto, só para criar ou sobrescrever registros A e CNAME (sem DELETE), sempre com a condição de nome."
+    error_message = "ChangeResourceRecordSets vale só na zona do produto, só para criar ou sobrescrever registros A e CNAME (sem DELETE), sempre com a condição de nome e com as três chaves presentes no pedido (Null)."
+  }
+}
+
+run "dominio_mais_longo_cabe_no_limite" {
+  command = apply
+
+  variables {
+    zone_name = "um-dominio-de-exemplo-com-o-tamanho-maximo-aceito-pela.variavel"
+  }
+
+  assert {
+    condition     = length(var.zone_name) == 63 && length(aws_iam_policy.apply_id["staging"].policy) <= 6144 && length(aws_iam_policy.apply_id["production"].policy) <= 6144
+    error_message = "Com o domínio mais longo que a variável aceita (63 caracteres), a política por ID continua dentro dos 6144 caracteres."
   }
 }
 

@@ -7,9 +7,10 @@ variable "zone_name" {
   type        = string
 
   # A chave de condição do Route 53 compara nomes normalizados: minúsculas e sem ponto final.
+  # O domínio aparece nove vezes na política de produção: o teto de tamanho a mantém em 6.144.
   validation {
-    condition     = can(regex("^[a-z0-9-]+(\\.[a-z0-9-]+)+$", var.zone_name))
-    error_message = "Informe o domínio em minúsculas, sem ponto final e sem curinga (por exemplo, exemplo.com)."
+    condition     = can(regex("^[a-z0-9-]+(\\.[a-z0-9-]+)+$", var.zone_name)) && length(var.zone_name) <= 63
+    error_message = "Informe o domínio em minúsculas, sem ponto final e sem curinga, com até 63 caracteres (por exemplo, exemplo.com)."
   }
 }
 
@@ -26,10 +27,18 @@ locals {
   # Mesmos nomes de `infra/envs/<ambiente>/main.tf` e do módulo `dns`: staging vive inteiro sob
   # `staging.<domínio>`; produção usa o domínio, `api.`, `auth.` e os CNAMEs de validação do ACM.
   staging_record_names = ["staging.${var.zone_name}", "*.staging.${var.zone_name}"]
+  production_names     = [var.zone_name, "api.${var.zone_name}", "auth.${var.zone_name}"]
   record_names = {
     staging    = local.staging_record_names
-    production = [var.zone_name, "api.${var.zone_name}", "auth.${var.zone_name}", "_*.${var.zone_name}"]
+    production = concat(local.production_names, ["_*.${var.zone_name}"])
   }
+
+  # Certificados só para os nomes do próprio ambiente: o ACM reaproveita o CNAME de validação,
+  # e um certificado de staging para um nome de produção validaria sozinho.
+  certificate_names = { staging = local.staging_record_names, production = local.production_names }
+
+  # `ForAllValues` é verdadeiro com a chave ausente: `Null` exige que o pedido a traga.
+  record_keys = [for key in ["Actions", "NormalizedRecordNames", "RecordTypes"] : "route53:ChangeResourceRecordSets${key}"]
 
   # ARN montado por nome, como `local.apply_named_arn`.
   apply_id_arn = { for env in keys(local.environments) : env => "${local.iam_arn}:policy/acp-ci-apply-id-${env}" }
@@ -62,9 +71,20 @@ resource "aws_iam_policy" "apply_id" {
         # Criar exige a tag do próprio ambiente no pedido: o recurso já nasce delimitado.
         Sid       = "CreateTagged"
         Effect    = "Allow"
-        Action    = ["acm:RequestCertificate", "cloudfront:CreateDistribution", "cognito-idp:CreateUserPool"]
+        Action    = ["cloudfront:CreateDistribution", "cognito-idp:CreateUserPool"]
         Resource  = "*"
         Condition = { StringEquals = { "aws:RequestTag/environment" = each.key } }
+      },
+      {
+        Sid      = "CertificateRequest"
+        Effect   = "Allow"
+        Action   = "acm:RequestCertificate"
+        Resource = "*"
+        Condition = {
+          StringEquals              = { "aws:RequestTag/environment" = each.key }
+          "ForAllValues:StringLike" = { "acm:DomainNames" = local.certificate_names[each.key] }
+          Null                      = { "acm:DomainNames" = "false" }
+        }
       },
       {
         # Etiquetar nunca troca `environment`: o pedido leva o próprio ambiente, e um recurso que
@@ -114,10 +134,22 @@ resource "aws_iam_policy" "apply_id" {
           "cognito-idp:CreateManagedLoginBranding", "cognito-idp:CreateUserPoolClient", "cognito-idp:CreateUserPoolDomain",
           "cognito-idp:DescribeManagedLoginBranding", "cognito-idp:DescribeManagedLoginBrandingByClient", "cognito-idp:DescribeUserPool",
           "cognito-idp:DescribeUserPoolClient", "cognito-idp:GetUserPoolMfaConfig", "cognito-idp:ListUserPoolClients",
-          "cognito-idp:UpdateManagedLoginBranding", "cognito-idp:UpdateUserPool", "cognito-idp:UpdateUserPoolClient", "cognito-idp:UpdateUserPoolDomain",
+          "cognito-idp:UpdateManagedLoginBranding", "cognito-idp:UpdateUserPoolClient", "cognito-idp:UpdateUserPoolDomain",
         ]
         Resource  = "arn:aws:cognito-idp:${local.region}:${local.account_id}:userpool/*"
         Condition = { StringEquals = { "aws:ResourceTag/environment" = each.key } }
+      },
+      {
+        # `UpdateUserPool` aceita tags no pedido e trocaria `environment` sem passar por `TagOwn`.
+        # O provider não as envia nessa chamada: pedido com qualquer tag é recusado.
+        Sid      = "UserPoolUpdate"
+        Effect   = "Allow"
+        Action   = "cognito-idp:UpdateUserPool"
+        Resource = "arn:aws:cognito-idp:${local.region}:${local.account_id}:userpool/*"
+        Condition = {
+          StringEquals = { "aws:ResourceTag/environment" = each.key }
+          Null         = { "aws:TagKeys" = "true" }
+        }
       },
       {
         # A ação não aceita recurso. Só lê a configuração de um domínio pelo nome.
@@ -169,6 +201,7 @@ resource "aws_iam_policy" "apply_id" {
               "route53:ChangeResourceRecordSetsRecordTypes" = ["A", "CNAME"]
             }
             "ForAllValues:StringLike" = { "route53:ChangeResourceRecordSetsNormalizedRecordNames" = local.record_names[each.key] }
+            Null                      = { for key in local.record_keys : key => "false" }
           },
           {
             for operator, names in { "ForAllValues:StringNotLike" = local.staging_record_names } :
