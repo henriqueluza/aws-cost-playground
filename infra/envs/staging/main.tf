@@ -25,10 +25,12 @@ module "dns" {
 module "site" {
   source = "../../modules/site"
 
-  name_prefix         = local.name_prefix
+  name_prefix = local.name_prefix
+  # Nome global no S3: se já estiver ocupado, o primeiro apply falha e o nome muda por PR antes dele.
   bucket_name         = "${local.name_prefix}-site-aws-cost-playground"
   aliases             = [module.dns.domain_names.site]
   acm_certificate_arn = module.dns.certificate_arns["site"]
+  # API, login gerenciado e o endpoint do pool (descoberta OIDC do issuer, região única do ADR).
   connect_src_origins = [
     "https://${module.dns.domain_names.api}",
     "https://${module.dns.domain_names.auth}",

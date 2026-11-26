@@ -18,7 +18,11 @@ ENVS = {
         "point_in_time_recovery_enabled": "false",
     },
 }
-KEYS = {"llm_enabled", "default_throttle", "estimates_throttle"}
+SHARED = {
+    "llm_enabled": "false",
+    "default_throttle": "{ rate_limit = 10, burst_limit = 20 }",
+    "estimates_throttle": "{ rate_limit = 1, burst_limit = 5 }",
+}
 AUTHOR_VARS = ["zone_name", "alarm_email", "package_bucket", "package_key"]
 MODULES = {f"../../modules/{m}" for m in "alarms auth database dns functions http-api site".split()}
 OUTPUTS = {"site_bucket_name", "site_distribution_id", "function_names", "site_config"}
@@ -47,8 +51,7 @@ class EnvsTest(unittest.TestCase):
         for env, expected in ENVS.items():
             text = read(env, "terraform.tfvars")
             pairs = dict(re.findall(r"^(\w+)\s*=\s*(.+?)\s*$", text, re.M))
-            self.assertEqual(set(pairs), set(expected) | KEYS)
-            self.assertEqual({k: pairs[k].strip('"') for k in expected}, expected)
+            self.assertEqual({k: v.strip('"') for k, v in pairs.items()}, expected | SHARED)
 
     def test_tfvars_has_no_secret_or_author_data(self) -> None:
         for env in ENVS:
@@ -73,6 +76,15 @@ class EnvsTest(unittest.TestCase):
             code = code.replace('var.environment == "production"', "")
             self.assertIsNone(re.search(r'"(staging|production)"', code))
 
+    def test_main_wires_auth_domain_and_callback_route(self) -> None:
+        router = (ROOT / "web/src/app/router.tsx").read_text(encoding="utf-8")
+        self.assertIn("auth/callback", router)
+        for env in ENVS:
+            text = read(env, "main.tf")
+            self.assertRegex(text, r"domain_name\s*=\s*module\.dns\.auth_domain")
+            self.assertNotIn("module.auth.domain_name", text)
+            self.assertIn("${local.site_origin}/auth/callback", text)
+
     def test_outputs_and_site_config_follow_the_runtime_schema(self) -> None:
         keys = schema_keys()
         self.assertEqual(keys, {"apiBaseUrl", "cognitoAuthority", "cognitoClientId"})
@@ -85,6 +97,7 @@ class EnvsTest(unittest.TestCase):
             self.assertEqual(set(re.findall(r"^\s*(\w+)\s*=", config.group(1), re.M)), keys)
 
     def test_shared_files_are_identical_across_envs(self) -> None:
+        """Com um ambiente só passa trivialmente; vale quando a #168 acrescentar `production`."""
         first = next(iter(ENVS))
         for env in ENVS:
             for name in ("main.tf", "variables.tf", "outputs.tf"):

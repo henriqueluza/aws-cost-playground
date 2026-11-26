@@ -7,8 +7,8 @@ Terraform da AWS (us-east-1, 100% serverless). Decisões em `docs/architecture/a
 | Pasta | Conteúdo |
 |---|---|
 | `modules/` | Módulos reutilizáveis, cada um com README próprio (hoje: `alarms`, `auth`, `database`, `dns`, `functions`, `http-api` e `site`, o bucket privado + CloudFront da SPA) |
-| `envs/staging` | Raiz do ambiente `staging` |
-| `envs/production` | Raiz do ambiente `production` |
+| `envs/staging` | Raiz do ambiente `staging`: compõe os sete módulos (`main.tf`, `variables.tf` e `outputs.tf` genéricos; valores em `terraform.tfvars`) |
+| `envs/production` | Raiz do ambiente `production`: por ora só backend e versões; recebe os mesmos arquivos na #168 |
 | `tools/` | `plan_guard.py` e seus testes |
 | `bootstrap/` | Buckets de estado, provedor OIDC e papéis de CI, com README próprio; só o autor aplica. Agentes não tocam sem Issue que autorize |
 
@@ -22,6 +22,48 @@ terraform -chdir=infra/envs/<env> init -backend=false && terraform -chdir=infra/
 ```
 
 Módulo com testes (`tests/*.tftest.hcl`, provider simulado, sem credenciais): `terraform -chdir=infra/modules/<m> init -backend=false && terraform -chdir=infra/modules/<m> validate && terraform -chdir=infra/modules/<m> test`. O lockfile do módulo não é versionado, e o CI só roda `validate` nos ambientes.
+
+O ambiente também tem teste de composição com provider simulado (o CI ainda não roda `terraform test`, #117):
+
+```bash
+terraform -chdir=infra/envs/staging init -backend=false && terraform -chdir=infra/envs/staging test
+python3 -m unittest discover -s infra/tools/tests   # tfvars sem segredo e arquivos iguais entre ambientes
+```
+
+## Variáveis dos ambientes
+
+Nenhuma variável tem default: sem o valor, o `plan` falha fechado.
+
+| Variável | Origem |
+|---|---|
+| `environment`, `self_signup_enabled`, `point_in_time_recovery_enabled`, `llm_enabled`, `default_throttle`, `estimates_throttle` | `terraform.tfvars` do ambiente (versionado, sem segredo) |
+| `zone_name` | `TF_VAR_zone_name` do GitHub Environment: domínio da zona do Route 53 |
+| `alarm_email` | `TF_VAR_alarm_email` do GitHub Environment (sensível) |
+| `package_bucket` | `TF_VAR_package_bucket`: bucket de artefatos com o zip das funções. Ainda não existe em nenhum módulo; quem cria é decisão pendente (#22) |
+| `package_key` | `TF_VAR_package_key`: montada pelo pipeline com o SHA |
+
+Atenção: o job `plan` do `terraform.yml` hoje não passa `TF_VAR_*`. Quando `AWS_PLAN_ROLE_ARN` for cadastrada, o plano falhará até o workflow passar essas variáveis (mudança de workflow, só com autorização do autor: #171).
+
+## Saídas para o deploy
+
+| Saída | Uso |
+|---|---|
+| `site_bucket_name` | Destino do bundle do site e do `/config.json` |
+| `site_distribution_id` | Distribuição CloudFront a invalidar |
+| `function_names` | Funções Lambda a atualizar |
+| `site_config` | Conteúdo do `/config.json` |
+
+```bash
+terraform output -json site_config > config.json
+```
+
+Chaves: `apiBaseUrl`, `cognitoAuthority`, `cognitoClientId`, iguais ao schema de `web/src/shared/config/runtimeConfig.ts`.
+
+## Primeiro apply (feito pelo autor)
+
+- O zip das funções precisa existir no bucket de artefatos antes.
+- A validação do ACM e o domínio do Cognito podem levar até ~1 h; se falhar por tempo, rode o plan de novo.
+- Nunca `import` nem `state`.
 
 ## Backend
 
