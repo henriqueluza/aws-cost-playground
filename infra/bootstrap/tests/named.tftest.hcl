@@ -33,8 +33,10 @@ run "identidade_e_anexo" {
   assert {
     condition = alltrue([
       for env in ["staging", "production"] :
-      startswith(aws_iam_policy.apply_named[env].name, "acp-ci-") && jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement[2].Action == "iam:*"
-      && contains(jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement[2].Resource, "arn:aws:iam::123456789012:policy/acp-ci-*")
+      startswith(aws_iam_policy.apply_named[env].name, "acp-ci-") && one([
+        for s in jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement :
+        s.Effect == "Deny" && s.Action == "iam:*" && contains(s.Resource, "arn:aws:iam::123456789012:policy/acp-ci-*") if s.Sid == "DenyCiIdentity"
+      ])
     ])
     error_message = "O papel apply não altera nem apaga a própria política: o nome dela casa com policy/acp-ci-*, negado em DenyCiIdentity."
   }
