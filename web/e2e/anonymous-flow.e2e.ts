@@ -42,6 +42,8 @@ test('fluxo anônimo: template, edição, baixar e abrir, sem tocar a API', asyn
     expect(await readTotal(page)).not.toBe(ZERO_TOTAL);
     await expectNoSeriousA11yViolations(page, 'editor inicial');
   });
+  await expect(blocks).not.toHaveCount(0);
+  await expect(edges).not.toHaveCount(0);
   const templateBlocks = await blocks.count();
   const templateEdges = await edges.count();
 
@@ -116,6 +118,7 @@ test('fluxo anônimo: template, edição, baixar e abrir, sem tocar a API', asyn
     await page.getByRole('button', { name: 'Abrir arquivo' }).click();
     await (await chooser).setFiles(file);
     await expect(totalLine(page)).toContainText(editedTotal);
+    expect(await readTotal(page)).toBe(editedTotal);
     await expect(blocks).toHaveCount(templateBlocks + 1);
     await expect(edges).toHaveCount(templateEdges + 1);
   });

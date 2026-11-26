@@ -64,6 +64,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Web — e2e no build (vite preview)
         id: e2e
+        timeout-minutes: 5
         working-directory: web
         run: npx playwright test
       - name: Web — relatório e traces do e2e (só em falha)
