@@ -12,3 +12,4 @@ export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { ToastProvider, useToast } from './Toast';
 export type { ToastApi, ToastProviderProps } from './Toast';
 export { Dialog, type DialogProps } from './Dialog';
+export { LegalLinks } from './LegalLinks';

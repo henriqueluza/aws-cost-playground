@@ -1,0 +1,21 @@
+/* DESIGN.md, "Links": --accent com sublinhado permanente de 1px que engrossa no hover.
+   Alvo de 44px de altura nas páginas de texto (DESIGN.md, "Larguras"). */
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-5);
+}
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.link:hover {
+  text-decoration-thickness: 2px;
+}

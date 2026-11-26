@@ -1,7 +1,6 @@
+import { privacyPolicy } from '../model/privacy';
+import { LegalPage } from './LegalPage';
+
 export function PrivacyPage() {
-  return (
-    <main>
-      <h1>Política de privacidade</h1>
-    </main>
-  );
+  return <LegalPage doc={privacyPolicy} />;
 }

@@ -1,0 +1,124 @@
+/* DESIGN.md: moldura --ground, folha --surface (borda 1px, cantos 16px, sem sombra), texto "Read"
+   (16/26, até 68ch), margens de 16px a partir de 320px e alvos de 44px. */
+.frame {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--ground);
+  color: var(--text);
+}
+.top,
+.bottom {
+  display: flex;
+  align-items: center;
+  min-height: var(--topbar-height);
+  padding: 0 var(--space-4);
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+}
+.brand,
+.toc a,
+.article a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.brand:hover,
+.toc a:hover,
+.article a:hover {
+  text-decoration-thickness: 2px;
+}
+.toc a,
+.article a {
+  color: var(--accent);
+}
+.toc a {
+  display: inline-block;
+  min-height: 44px;
+  padding: var(--space-2) 0;
+}
+.sheet {
+  flex: 1;
+  margin: 0 var(--space-4);
+  padding: var(--space-5) var(--space-4);
+  background-color: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sheet);
+}
+.article {
+  max-width: var(--measure-read);
+  margin: 0 auto;
+  font-size: var(--fs-read);
+  line-height: var(--lh-read);
+  overflow-wrap: anywhere;
+}
+.title {
+  margin: 0;
+  font-size: var(--fs-read-title);
+  line-height: var(--lh-read-title);
+  font-weight: var(--fw-semibold);
+}
+.lead {
+  margin: var(--space-2) 0 var(--space-5);
+  color: var(--muted);
+}
+.toc {
+  margin: var(--space-5) 0 var(--space-6);
+}
+.toc ol {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+.tocTitle,
+.section h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-semibold);
+  scroll-margin-top: var(--space-5);
+}
+/* proximidade: 12px dentro da seção, 32px entre seções */
+.section {
+  margin-top: var(--space-6);
+}
+.section p,
+.section ul,
+.section dl {
+  margin: 0 0 var(--space-3);
+}
+.section ul {
+  padding-left: var(--space-5);
+}
+.section li + li,
+.defs div + div {
+  margin-top: var(--space-2);
+}
+.defs dt {
+  font-weight: var(--fw-semibold);
+}
+.defs dd {
+  margin: 0;
+}
+/* marcador a preencher: paleta de aviso com borda, para não depender só da cor */
+.marker {
+  padding: 0 var(--space-1);
+  background-color: var(--pill-warning-bg);
+  color: var(--pill-warning-ink);
+  border: var(--border-width) solid var(--pill-warning-border);
+  border-radius: var(--radius-chip);
+}
+@media (min-width: 640px) {
+  .top,
+  .bottom {
+    padding: 0 var(--space-5);
+  }
+  .sheet {
+    margin: 0 var(--space-5);
+    padding: var(--space-7) var(--space-5);
+  }
+}
