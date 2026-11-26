@@ -4,6 +4,7 @@ import { AuthActions, AuthCallbackPage, RequireAuth, SignInButton } from '../fea
 import { ComparePage } from '../features/compare';
 import { DesignsPage, SaveControls } from '../features/designs';
 import { EditorPage, keepDesignForLogin } from '../features/editor';
+import { WorkloadPanel } from '../features/workload';
 import { PrivacyPage, TermsPage } from '../features/legal';
 
 /** O app compõe a barra do editor: salvar (designs) e a conta (auth); o editor não conhece nenhum dos dois. */
@@ -16,6 +17,7 @@ function EditorRoute() {
           <AuthActions beforeSignIn={keepDesignForLogin} />
         </>
       }
+      workload={<WorkloadPanel />}
     />
   );
 }
