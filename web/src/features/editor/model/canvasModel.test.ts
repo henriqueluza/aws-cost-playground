@@ -7,6 +7,7 @@ import {
   canvasCategory,
   defaultLayout,
   formatUsd,
+  selectionMessage,
   toCanvasEdges,
   toCanvasNodes,
   type BlockNodeData,
@@ -147,5 +148,25 @@ describe('checkConnection', () => {
     const edge = { ...doc.edges[0]!, id: 'edg_9', source: 'blk_a', target: 'blk_b' };
     const result = checkConnection({ ...d, edges: [edge] }, 'blk_a', 'blk_b');
     expect(result).toMatchObject({ ok: false, reason: 'duplicate' });
+  });
+});
+
+describe('selectionMessage', () => {
+  const d = doc;
+  it('diz o serviço do contrato, nunca o rótulo do usuário', () => {
+    const evil = {
+      ...d,
+      blocks: [{ ...d.blocks[0]!, label: '<img src=x onerror=alert(1)>' }, d.blocks[1]!],
+    };
+    expect(selectionMessage(evil, { kind: 'block', id: d.blocks[0]!.id })).toBe(
+      'Lambda selecionado',
+    );
+  });
+  it('aresta: origem e destino pelo nome do serviço; sem seleção ou id inexistente: null', () => {
+    expect(selectionMessage(d, { kind: 'edge', id: 'edg_1' })).toBe(
+      'Conexão selecionada: S3 para Internet',
+    );
+    expect(selectionMessage(d, null)).toBeNull();
+    expect(selectionMessage(d, { kind: 'block', id: 'nada' })).toBeNull();
   });
 });

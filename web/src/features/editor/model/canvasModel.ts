@@ -173,6 +173,25 @@ export function toCanvasNodes(
   return [client, ...blocks];
 }
 
+/**
+ * Frase que anuncia a seleção, só com nomes do contrato (nunca o texto livre do usuário):
+ * "EC2 selecionado", "Dados, de S3 para Internet, selecionada". `null` quando não há o que dizer.
+ */
+export function selectionMessage(doc: DesignDocument, selection: Selection): string | null {
+  if (selection === null) return null;
+  if (selection.kind === 'block') {
+    const block = doc.blocks.find((b) => b.id === selection.id);
+    return block ? `${serviceName(block.type)} selecionado` : null;
+  }
+  const edge = doc.edges.find((e) => e.id === selection.id);
+  if (!edge) return null;
+  const nameOf = (id: string) =>
+    id === CLIENT_NODE_ID
+      ? 'Internet'
+      : serviceName(doc.blocks.find((b) => b.id === id)?.type ?? '');
+  return `Conexão selecionada: ${nameOf(edge.source)} para ${nameOf(edge.target)}`;
+}
+
 /** Arestas do canvas derivadas do design e da seleção. Função pura. */
 export function toCanvasEdges(doc: DesignDocument, selection: Selection): CanvasEdge[] {
   const typeOf = new Map(doc.blocks.map((block) => [block.id, block.type]));
