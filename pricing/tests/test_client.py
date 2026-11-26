@@ -114,6 +114,15 @@ def test_duplicate_sku_fails() -> None:
             fetch_products(client, QUERY)
 
 
+def test_malformed_item_names_the_service_without_aws_text() -> None:
+    with stubbed() as (client, stubber):
+        stubber.add_response("get_products", {"PriceList": ["VAZOU não é JSON"]})
+        with pytest.raises(PricingError) as err:
+            fetch_products(client, QUERY)
+    assert "AmazonEC2" in str(err.value)
+    assert "VAZOU" not in str(err.value)
+
+
 def test_duplicate_sku_across_pages_fails() -> None:
     with stubbed() as (client, stubber):
         stubber.add_response("get_products", {"PriceList": [item("A")], "NextToken": "t"})

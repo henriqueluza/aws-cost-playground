@@ -53,6 +53,13 @@ def test_decimal_text_rejects(raw: object) -> None:
         decimal_text(raw)
 
 
+@pytest.mark.parametrize("raw", ["VAZOU", "0.0000000000001"])
+def test_decimal_text_error_does_not_echo_input(raw: str) -> None:
+    with pytest.raises(PricingError) as err:
+        decimal_text(raw)
+    assert raw not in str(err.value)
+
+
 def test_region_filter() -> None:
     assert region_filter("sa-east-1") == Filter("regionCode", "sa-east-1", "TERM_MATCH")
 

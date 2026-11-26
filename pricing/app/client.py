@@ -10,7 +10,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from app.model import PricingError, Product, Query
 from app.products import parse_product
 
-_CODIGO_ERRO = re.compile(r"[A-Za-z0-9.]{1,64}")
+_ERROR_CODE = re.compile(r"[A-Za-z0-9.]{1,64}")
 
 
 class PricingClient(Protocol):
@@ -46,13 +46,17 @@ def fetch_products(client: PricingClient, query: Query, *, max_pages: int = 50) 
             if not isinstance(items, list):
                 raise PricingError(f"PriceList inválida em {query.service_code}")
             for item in items:
-                product = parse_product(item)
+                try:
+                    product = parse_product(item)
+                except PricingError as exc:
+                    # Mensagens do parse são fixas (no máximo o SKU validado).
+                    raise PricingError(f"{query.service_code}: {exc}") from None
                 if product.sku in products:
                     raise PricingError(f"SKU repetido em {query.service_code}: {product.sku}")
                 products[product.sku] = product
     except ClientError as err:
         code = err.response.get("Error", {}).get("Code")
-        if isinstance(code, str) and _CODIGO_ERRO.fullmatch(code):
+        if isinstance(code, str) and _ERROR_CODE.fullmatch(code):
             raise PricingError(f"{base}: {code}") from None
         raise PricingError(base) from None
     except BotoCoreError:
