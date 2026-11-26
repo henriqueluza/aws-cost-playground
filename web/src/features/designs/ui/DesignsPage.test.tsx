@@ -40,7 +40,14 @@ describe('DesignsPage', () => {
     expect(within(rows[0]!).getByText('2 blocos')).toBeInTheDocument();
     expect(within(rows[0]!).getByText('us-east-1')).toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
-    expect(screen.getByText('2 de 50')).toBeInTheDocument();
+    expect(screen.getByText('2 de 50 designs')).toBeInTheDocument();
+    expect(rows[0]!.querySelector('time')).toHaveAttribute(
+      'datetime',
+      (await api.designs.list())[0]!.updatedAt,
+    );
+    expect(rows[0]!.querySelector('time')!.textContent).toMatch(
+      /^\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}$/,
+    );
     await expectNoAxeViolations(container);
   });
 

@@ -38,7 +38,6 @@
 }
 
 .back,
-.empty a,
 .sheet a {
   color: var(--accent);
   text-decoration: underline;
@@ -52,6 +51,13 @@
 
 .sheet a:hover {
   text-decoration-thickness: 2px;
+}
+
+/* Só em tela estreita rola na horizontal; acima disso o contêiner não rola e o cabeçalho segue fixo na página. */
+@media (max-width: 720px) {
+  .scroll {
+    overflow-x: auto;
+  }
 }
 
 .table {
@@ -112,7 +118,7 @@
 
 .skeletonRow {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: 3fr 1.4fr 1.2fr 1.6fr;
   align-items: center;
   gap: var(--space-4);
   height: var(--row-table);

@@ -21,6 +21,7 @@ function LoadingRows() {
           <span className={styles.bar} />
           <span className={styles.bar} />
           <span className={styles.bar} />
+          <span className={styles.bar} />
         </div>
       ))}
     </div>
@@ -29,43 +30,43 @@ function LoadingRows() {
 
 function DesignsTable(props: { designs: DesignSummary[]; onOpen: (d: DesignSummary) => void }) {
   return (
-    <table className={styles.table}>
-      <caption className={styles.srOnly}>
-        Seus designs salvos, do mais recente ao mais antigo
-      </caption>
-      <thead>
-        <tr>
-          <th scope="col">Nome</th>
-          <th scope="col">Região</th>
-          <th scope="col" className={styles.num}>
-            Blocos
-          </th>
-          <th scope="col">Atualizado em</th>
-          <th scope="col">
-            <span className={styles.srOnly}>Ações</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {props.designs.map((d) => (
-          <tr key={d.id}>
-            <th scope="row" className={styles.name} title={d.name}>
-              {d.name}
+    <div className={styles.scroll}>
+      <table className={styles.table}>
+        <caption className={styles.srOnly}>Seus designs salvos</caption>
+        <thead>
+          <tr>
+            <th scope="col">Nome</th>
+            <th scope="col">Região</th>
+            <th scope="col" className={styles.num}>
+              Blocos
             </th>
-            <td className={styles.mono}>{d.region}</td>
-            <td className={styles.num}>{blockCountLabel(d.blockCount)}</td>
-            <td className={styles.mono}>
-              <time dateTime={d.updatedAt}>{formatUpdatedAt(d.updatedAt)}</time>
-            </td>
-            <td className={styles.open}>
-              <Button onClick={() => props.onOpen(d)} aria-label={`Abrir ${d.name}`}>
-                Abrir
-              </Button>
-            </td>
+            <th scope="col">Atualizado em</th>
+            <th scope="col">
+              <span className={styles.srOnly}>Ações</span>
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {props.designs.map((d) => (
+            <tr key={d.id}>
+              <th scope="row" className={styles.name} title={d.name}>
+                {d.name}
+              </th>
+              <td className={styles.mono}>{d.region}</td>
+              <td className={styles.num}>{blockCountLabel(d.blockCount)}</td>
+              <td className={styles.mono}>
+                <time dateTime={d.updatedAt}>{formatUpdatedAt(d.updatedAt)}</time>
+              </td>
+              <td className={styles.open}>
+                <Button onClick={() => props.onOpen(d)} aria-label={`Abrir ${d.name}`}>
+                  Abrir
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -130,7 +131,7 @@ export function DesignsPage({ signInAction }: { signInAction?: ReactNode }) {
           <h1 className={styles.title}>Meus designs</h1>
           {list.data !== undefined && list.data.length > 0 && (
             <span className={styles.count}>
-              {list.data.length} de {DESIGN_LIMIT}
+              {list.data.length} de {DESIGN_LIMIT} designs
             </span>
           )}
           <Link to="/" className={styles.back}>
