@@ -1,8 +1,9 @@
 import { Link } from 'react-router';
-import { PricingPanel } from '../../pricing';
+import { PricingPanel, usePriceCatalog } from '../../pricing';
 import { WorkloadPanel } from '../../workload';
+import { useDesignStore } from '../hooks/useDesignStore';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import type { CatalogStamp } from '../model/estimateNotice';
+import { catalogStamp } from '../model/estimateNotice';
 import { ActionBar } from './ActionBar';
 import { CanvasPanel } from './CanvasPanel';
 import styles from './EditorPage.module.css';
@@ -10,10 +11,6 @@ import { EstimateNotice } from './EstimateNotice';
 import { InspectorPanel } from './InspectorPanel';
 import { PalettePanel } from './PalettePanel';
 import { RailTabs } from './RailTabs';
-
-// Fica em `unavailable` até a store do design (parte 1 de #12) entrar; quem ligar a store
-// passa o estado de `usePriceCatalog` (pricing), mapeando idle/error para unavailable.
-const CATALOG_STAMP: CatalogStamp = { status: 'unavailable' };
 
 const RAIL_TABS = [
   { id: 'cost', label: 'Custo', panel: <PricingPanel /> },
@@ -23,6 +20,7 @@ const RAIL_TABS = [
 
 export function EditorPage() {
   const wide = useMediaQuery('(min-width: 1024px)', true);
+  const stamp = catalogStamp(usePriceCatalog(useDesignStore((s) => s.document)));
 
   if (!wide) {
     return (
@@ -30,7 +28,7 @@ export function EditorPage() {
         <h1>Editor</h1>
         <p>A edição precisa de uma tela com pelo menos 1024 px de largura.</p>
         <Link to="/designs">Meus designs</Link>
-        <EstimateNotice stamp={CATALOG_STAMP} />
+        <EstimateNotice stamp={stamp} />
       </main>
     );
   }
@@ -49,7 +47,7 @@ export function EditorPage() {
       </main>
       <aside aria-label="Painéis" className={styles.rail}>
         <RailTabs label="Painéis do design" tabs={RAIL_TABS} />
-        <EstimateNotice stamp={CATALOG_STAMP} />
+        <EstimateNotice stamp={stamp} />
       </aside>
     </div>
   );

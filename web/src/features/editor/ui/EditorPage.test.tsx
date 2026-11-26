@@ -1,12 +1,21 @@
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations } from '../../../test/axe';
+import { catalogOf } from '../../../test/catalogFixtures';
+import { adrExampleDesign } from '../../../test/designFixtures';
+import { catalogServices, priceCatalogKey } from '../../pricing';
+import { designStore } from '../application/designStore';
+import { EMPTY_STATE } from '../model/editorState';
 import { EditorPage } from './EditorPage';
 import { EstimateNotice } from './EstimateNotice';
 
-const NOTICE = 'Estimativa on-demand, não é cotação oficial · data dos preços indisponível';
+const NOTICE =
+  'Estimativa on-demand, não é cotação oficial · a data dos preços aparece com o primeiro bloco';
+const READY_NOTICE =
+  'Estimativa on-demand, não é cotação oficial · preços de 2026-11-23 · valores de exemplo';
 
 const WIDE_QUERY = '(min-width: 1024px)';
 
@@ -38,15 +47,26 @@ function stubWidth(initial: boolean | null) {
   };
 }
 
-function renderPage(matches: boolean | null) {
+function renderPage(matches: boolean | null, client?: QueryClient) {
   const media = stubWidth(matches);
+  const queryClient = client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter([{ path: '/', Component: EditorPage }], {
     initialEntries: ['/'],
   });
-  return { ...render(<RouterProvider router={router} />), media };
+  return {
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    ),
+    media,
+  };
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  designStore.setState(EMPTY_STATE);
+});
 
 describe('EstimateNotice', () => {
   it('é uma nota com a data e a origem', () => {
@@ -160,5 +180,27 @@ describe('EditorPage e a largura em runtime', () => {
     media.set(true);
     expect(screen.getByRole('tablist', { name: 'Painéis do design' })).toBeInTheDocument();
     expect(screen.getByRole('banner')).toBeInTheDocument();
+  });
+});
+
+describe.each([
+  ['largo', true],
+  ['estreito', false],
+] as const)('EditorPage com catálogo pronto (%s)', (_nome, matches) => {
+  it('mostra a data e a origem do catálogo sem buscar nada', () => {
+    const fetchSpy = vi.fn(() => Promise.reject(new Error('nenhuma chamada de rede esperada')));
+    vi.stubGlobal('fetch', fetchSpy);
+    expect(designStore.getState().loadDesign(adrExampleDesign).ok).toBe(true);
+    const { document } = designStore.getState();
+    const services = catalogServices(document);
+    expect(services.length).toBeGreaterThan(0);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(
+      priceCatalogKey(document.region, services),
+      catalogOf(Object.fromEntries(services.map((service) => [service, []]))),
+    );
+    renderPage(matches, client);
+    expect(screen.getByRole('note')).toHaveTextContent(READY_NOTICE);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

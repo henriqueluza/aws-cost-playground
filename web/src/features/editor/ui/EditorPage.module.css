@@ -54,6 +54,13 @@
   font-weight: var(--fw-semibold);
 }
 
+/* O título da paleta alinha com o rótulo das abas da coluna direita (mesma linha de 32px). */
+.palette .panelTitle {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-height);
+}
+
 .hidden {
   position: absolute;
   width: 1px;
@@ -68,6 +75,7 @@
   font-size: var(--fs-small);
   line-height: var(--lh-small);
   color: var(--muted);
+  text-wrap: pretty;
 }
 
 .narrow {
@@ -81,7 +89,9 @@
 
 /* DESIGN.md "Links": --accent com sublinhado permanente de 1px, 2px no hover. */
 .narrow a {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-min);
   margin-bottom: var(--space-3);
   color: var(--accent);
   text-decoration: underline;
