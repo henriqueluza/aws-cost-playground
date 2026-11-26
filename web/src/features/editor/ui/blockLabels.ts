@@ -29,7 +29,7 @@ const RAW_OPTION_KEYS: ReadonlySet<string> = new Set([
 const OPTION_LABELS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   queueType: { standard: 'Padrão', fifo: 'FIFO' },
   capacityMode: { 'on-demand': 'Sob demanda', provisioned: 'Provisionada' },
-  az: { a: 'Zona a', b: 'Zona b', c: 'Zona c' },
+  az: { a: 'Zona A', b: 'Zona B', c: 'Zona C' },
   engine: { postgres: 'PostgreSQL', mysql: 'MySQL', redis: 'Redis', memcached: 'Memcached' },
   deployment: { 'single-az': 'Uma zona', 'multi-az': 'Várias zonas' },
   tier: { lite: 'Lite', essentials: 'Essentials', plus: 'Plus' },

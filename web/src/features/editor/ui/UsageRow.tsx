@@ -10,7 +10,7 @@ export function UsageRow({ field }: { field: UsageField }) {
     <div className={styles.item} data-origin={field.origin}>
       <dt className={styles.term}>{label}</dt>
       <dd className={styles.value}>
-        {formatRangeNumber(field.value)}{' '}
+        <span>{formatRangeNumber(field.value)}</span>
         <span className={styles.unit}>{unitLabel(field.unit) ?? field.unit}</span>
       </dd>
       <dd className={styles.meta}>

@@ -50,11 +50,11 @@ describe('InspectorPanel', () => {
     expect(screen.getByLabelText('Memória')).toHaveValue('512');
     expect(screen.getByLabelText('Arquitetura')).toHaveValue('arm64');
     expect(screen.getByText('Requisições por mês').nextElementSibling).toHaveTextContent(
-      '3.000.000 requisições',
+      /3\.000\.000.*requisições/,
     );
     // origem: LLM, padrão e alterado à mão, cada uma em texto
     expect(screen.getByText(/estimado pela LLM/)).toBeInTheDocument();
-    expect(screen.getByText('Duração média').nextElementSibling).toHaveTextContent('80 ms');
+    expect(screen.getByText('Duração média').nextElementSibling).toHaveTextContent(/80.*ms/);
     expect(screen.getByText(/alterado à mão/)).toBeInTheDocument();
   });
 
@@ -62,7 +62,7 @@ describe('InspectorPanel', () => {
     select('blk_assets');
     render(<InspectorPanel />);
     expect(screen.getAllByText(/padrão/)).toHaveLength(3);
-    expect(screen.getByText('Armazenamento').nextElementSibling).toHaveTextContent('50 GB');
+    expect(screen.getByText('Armazenamento').nextElementSibling).toHaveTextContent(/50.*GB/);
   });
 
   it('atributo é seleção do conjunto fechado e grava o tipo do contrato', async () => {
