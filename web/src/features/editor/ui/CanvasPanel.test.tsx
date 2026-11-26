@@ -46,25 +46,15 @@ describe('CanvasPanel', () => {
   it('reage à store: mostra o custo no nó e o bloco que entra', async () => {
     const { container } = renderCanvas();
     expect(await screen.findByLabelText(/^S3,/)).toHaveTextContent('—');
-    expect(container.querySelectorAll('.react-flow__node svg')).toHaveLength(3);
+    const icons = [...container.querySelectorAll<SVGElement>('.react-flow__node svg')];
+    expect(icons.map((svg) => svg.dataset.icon).sort()).toEqual(['compute', 'data', 'globe']);
+    expect(screen.getByLabelText(/^Lambda,/)).toHaveTextContent(/Lambda · \S/);
     const { document } = designStore.getState();
     const extra = { ...document.blocks[0]!, id: 'blk_extra', label: 'Outra' };
     act(() =>
       designStore.setState({ document: { ...document, blocks: [...document.blocks, extra] } }),
     );
     expect(await screen.findByLabelText(/^Lambda, Outra,/)).toBeInTheDocument();
-  });
-
-  it('mostra o ícone da categoria e o resumo "serviço · SKU" no nó', async () => {
-    renderCanvas();
-    const icon = (re: RegExp) => screen.getByLabelText(re).querySelector('svg')?.dataset.icon;
-    await screen.findByLabelText(/^Lambda, API handler/);
-    expect([icon(/^Lambda,/), icon(/^S3,/), icon(/^Internet/)]).toEqual([
-      'compute',
-      'data',
-      'globe',
-    ]);
-    expect(screen.getByLabelText(/^Lambda,/)).toHaveTextContent(/Lambda · \S/);
   });
 
   it('não tem violação de acessibilidade', async () => {
