@@ -12,7 +12,7 @@ from uuid import uuid4
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 ALLOWED_FIELDS: frozenset[str] = frozenset(
-    {"method", "route", "status", "duration_ms", "error_type", "stack"}
+    {"method", "route", "status", "duration_ms", "error_type", "stack", "stage", "deleted_items"}
     | {"scope", "count", "limit", "sub"}  # eventos de quota (`app.quota`)
 )
 UNMATCHED_ROUTE = "<unmatched>"

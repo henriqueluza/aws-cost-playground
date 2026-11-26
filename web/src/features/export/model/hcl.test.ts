@@ -146,6 +146,11 @@ describe('renderHcl', () => {
   });
 
   const evil = 'x" {}\nresource "aws_iam_user" "y';
+  it('escreve chamada de função da lista fechada, com cada argumento escapado', () => {
+    const value = hcl.call('format', [hcl.string('%s${a}'), hcl.ref('var', 'aws_region')]);
+    expect(renderHcl([hcl.attr('zona', value)])).toBe('zona = format("%s$${a}", var.aws_region)\n');
+  });
+
   it.each([
     ['nome de atributo', () => hcl.attr(evil, hcl.bool(true))],
     ['nome de atributo com hífen', () => hcl.attr('a-b', hcl.bool(true))],
@@ -161,6 +166,11 @@ describe('renderHcl', () => {
     ['índice negativo', () => hcl.attr('a', hcl.ref('a', -1))],
     ['índice fracionário', () => hcl.attr('a', hcl.ref('a', 1.5))],
     ['número não finito', () => hcl.attr('a', hcl.number(NaN))],
+    [
+      'função fora da lista',
+      () => hcl.attr('a', hcl.call('file' as never, [hcl.string('/etc/passwd')])),
+    ],
+    ['argumento de função inválido', () => hcl.attr('a', hcl.call('format', [hcl.ref('a b')]))],
     ['valor de tipo desconhecido', () => hcl.attr('a', { kind: 'raw', value: 'x' } as never)],
     ['número dentro de lista', () => hcl.attr('a', hcl.list([hcl.number(Infinity)]))],
   ])('recusa %s em vez de escrever texto cru', (_name, node) => {

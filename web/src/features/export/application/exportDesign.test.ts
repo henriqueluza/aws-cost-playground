@@ -212,6 +212,26 @@ describe('exportDesign', () => {
       );
     });
 
+    it('entrega a cada gerador as arestas do design inteiro, por id do bloco', () => {
+      const seen: (readonly string[])[] = [];
+      const spy = createExporter({
+        ...BLOCK_GENERATORS,
+        'aws.s3': ({ block, links, designLinks }) => {
+          expect(designLinks.get(block.id)).toBe(links);
+          seen.push([...designLinks.keys()]);
+          return { exported: true, nodes: [] };
+        },
+      });
+      const edges = [
+        { ...adrExampleDesign.edges[0], id: 'edg_1', source: 'blk_0', target: 'blk_1' },
+      ];
+      expect(spy({ ...withLabels('a', 'b'), edges }).ok).toBe(true);
+      expect(seen).toEqual([
+        ['blk_0', 'blk_1'],
+        ['blk_0', 'blk_1'],
+      ]);
+    });
+
     it('gerador que lança não gera arquivo nem repassa a exceção', () => {
       const broken = createExporter({
         ...BLOCK_GENERATORS,
