@@ -4,6 +4,7 @@ import { designStore, hasUnsavedChanges, useDesignStore } from '../../editor';
 import { designNameSchema } from '../../../shared/lib/api';
 import { Button, Dialog, Notice, TextField } from '../../../shared/ui';
 import { savedDesignStore, useSavedDesign } from '../hooks/savedDesignStore';
+import { errorKind } from '../application/saveDesign';
 import { useOpenDesign, useSaveDesign } from '../hooks/useDesigns';
 import { copyName, designErrorMessage, isRetryable } from '../model/designMessages';
 import { SAVE_STATUS_LABEL, saveStatus, type SaveStatus } from '../model/saveState';
@@ -174,12 +175,14 @@ export function SaveControls({ signInAction }: { signInAction?: ReactNode } = {}
           {error === 'version-conflict' && saved !== null && (
             <>
               <Button
-                onClick={() => {
-                  savedDesignStore.getState().clearError();
-                  reload.mutate(saved.id);
-                }}
+                onClick={() =>
+                  reload.mutate(saved.id, {
+                    onSuccess: () => savedDesignStore.getState().clearError(),
+                    onError: (e) => savedDesignStore.getState().fail(errorKind(e)),
+                  })
+                }
               >
-                Recarregar versão salva
+                Recarregar versão salva (descarta suas alterações)
               </Button>
               <Button
                 variant="primary"

@@ -200,7 +200,7 @@ describe('SaveControls', () => {
 
     it('avisa e oferece recarregar ou salvar como cópia, sem sobrescrever', async () => {
       const { api, id } = await conflict();
-      expect(screen.getByRole('button', { name: 'Recarregar versão salva' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Recarregar versão salva/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Salvar como cópia' })).toBeInTheDocument();
       expect((await api.designs.get(id)).doc.region).toBe(doc.region);
     });
@@ -217,7 +217,7 @@ describe('SaveControls', () => {
 
     it('recarrega a versão salva e descarta a edição local', async () => {
       const { user, id } = await conflict();
-      await user.click(screen.getByRole('button', { name: 'Recarregar versão salva' }));
+      await user.click(screen.getByRole('button', { name: /Recarregar versão salva/ }));
       await waitFor(() => expect(savedDesignStore.getState().saved?.version).toBe(2));
       expect(savedDesignStore.getState().saved).toMatchObject({ id, name: 'Outro lugar' });
       expect(designStore.getState().document.region).toBe(doc.region);

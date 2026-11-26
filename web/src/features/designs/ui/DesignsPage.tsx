@@ -67,29 +67,31 @@ function DesignsTable(props: {
               <td className={styles.mono}>
                 <time dateTime={d.updatedAt}>{formatUpdatedAt(d.updatedAt)}</time>
               </td>
-              <td className={styles.open}>
-                <Button onClick={() => props.onOpen(d)} aria-label={`Abrir ${d.name}`}>
-                  Abrir
-                </Button>
-                <Button
-                  onClick={() => props.onAction('rename', d)}
-                  aria-label={`Renomear ${d.name}`}
-                >
-                  Renomear
-                </Button>
-                <Button
-                  onClick={() => props.onAction('duplicate', d)}
-                  aria-label={`Duplicar ${d.name}`}
-                >
-                  Duplicar
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => props.onAction('delete', d)}
-                  aria-label={`Apagar ${d.name}`}
-                >
-                  Apagar
-                </Button>
+              <td className={styles.openCell}>
+                <div className={styles.open}>
+                  <Button onClick={() => props.onOpen(d)} aria-label={`Abrir ${d.name}`}>
+                    Abrir
+                  </Button>
+                  <Button
+                    onClick={() => props.onAction('rename', d)}
+                    aria-label={`Renomear ${d.name}`}
+                  >
+                    Renomear
+                  </Button>
+                  <Button
+                    onClick={() => props.onAction('duplicate', d)}
+                    aria-label={`Duplicar ${d.name}`}
+                  >
+                    Duplicar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => props.onAction('delete', d)}
+                    aria-label={`Apagar ${d.name}`}
+                  >
+                    Apagar
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}
