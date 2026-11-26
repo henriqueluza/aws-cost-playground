@@ -105,28 +105,3 @@
   font-size: var(--fs-small);
   line-height: var(--lh-small);
 }
-
-/* Pontas da aresta: "De" e "Para", com o nome do serviço e o rótulo do usuário (texto). */
-.ends {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin: 0;
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-}
-.end {
-  display: flex;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.end dt {
-  flex: none;
-  width: var(--space-6);
-  color: var(--muted);
-}
-.end dd {
-  margin: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}

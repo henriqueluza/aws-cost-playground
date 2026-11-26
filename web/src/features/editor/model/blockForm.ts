@@ -1,10 +1,5 @@
-import type {
-  AttributeDefinition,
-  BlockDefinition,
-  EdgeKindDefinition,
-  UsageKeyDefinition,
-} from '../../pricing';
-import { DESIGN_LIMITS, type Block, type Edge } from '../../../shared/lib/design';
+import type { AttributeDefinition, BlockDefinition, UsageKeyDefinition } from '../../pricing';
+import { DESIGN_LIMITS, type Block } from '../../../shared/lib/design';
 
 /** Valor de um atributo do SKU: o tipo das opções do contrato. */
 export type AttributeValue = string | number;
@@ -53,10 +48,7 @@ function attributeField(def: AttributeDefinition, block: Block): AttributeField 
   };
 }
 
-/** O que o campo de uso lê de um bloco ou de uma aresta. */
-type Priced = Pick<Block, 'usage' | 'overrides'>;
-
-function usageField(def: UsageKeyDefinition, block: Priced): UsageField {
+function usageField(def: UsageKeyDefinition, block: Block): UsageField {
   const base = { key: def.key, unit: def.unit, min: def.min, max: def.max, integer: def.integer };
   if (Object.hasOwn(block.overrides, def.key)) {
     return { ...base, value: block.overrides[def.key] ?? def.default, origin: 'manual' };
@@ -77,11 +69,6 @@ export function buildBlockForm(def: BlockDefinition, block: Block): BlockForm {
     attributes: def.attributes.map((attribute) => attributeField(attribute, block)),
     usage: def.usage.map((key) => usageField(key, block)),
   };
-}
-
-/** Campos de uso da aresta, do contrato do tipo dela (`edges.json`): o mesmo formato do bloco. */
-export function buildEdgeForm(def: EdgeKindDefinition, edge: Pick<Edge, 'usage' | 'overrides'>) {
-  return { usage: def.usage.map((key) => usageField(key, edge)) };
 }
 
 /**
