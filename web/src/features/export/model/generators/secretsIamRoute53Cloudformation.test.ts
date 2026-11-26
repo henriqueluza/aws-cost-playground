@@ -160,10 +160,13 @@ describe('export do design com os blocos de nível B e C', () => {
   const text = mainTf(levelBcDesign);
 
   it('exporta todos os blocos e não tem literal sensível no arquivo inteiro', () => {
-    expect(text).toMatch(/^# Blocos exportados: 7 de 7\.$/m);
+    expect(text).toMatch(/^# Blocos exportados: (\d+) de \1\.$/m);
     expect(text).not.toMatch(SENSITIVE_LITERAL);
     expect(text).not.toMatch(/arn:aws|AKIA[0-9A-Z]{16}|-----BEGIN/);
-    expect(allowedWildcards(kitGenerate(levelBcDesign))).toEqual([]);
+    // O único curinga permitido é o nome do objeto no bucket de logs da trilha.
+    expect(allowedWildcards(kitGenerate(levelBcDesign))).toEqual([
+      'format("%s/AWSLogs/%s/*", aws_s3_bucket.auditoria__logs.arn, data.aws_caller_identity.auditoria.account_id)',
+    ]);
   });
 
   it('é determinístico e não depende da ordem do documento', () => {

@@ -13,6 +13,9 @@ export const levelBcDesign = design(
     { id: 'papel', type: 'aws.iam', label: 'Papel da aplicação' },
     { id: 'stack', type: 'aws.cloudformation', label: 'Stack' },
     { id: 'logs', type: 'aws.cloudwatch', label: 'Logs' },
+    { id: 'firewall', type: 'aws.waf', label: 'Firewall' },
+    { id: 'login', type: 'aws.cognito', label: 'Login', attributes: { tier: 'plus' } },
+    { id: 'auditoria', type: 'aws.cloudtrail', label: 'Auditoria' },
   ],
   [
     ['dns', 'lb'],
@@ -20,5 +23,8 @@ export const levelBcDesign = design(
     ['web', 'cofre'],
     ['papel', 'logs', 'logs'],
     ['stack', 'logs', 'logs'],
+    ['firewall', 'lb'],
+    ['web', 'login'],
+    ['auditoria', 'logs', 'logs'],
   ],
 );

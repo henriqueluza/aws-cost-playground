@@ -13,8 +13,6 @@ describe('registro dos geradores', () => {
    * (#65, #66, #67) tira o tipo daqui; a lista fica vazia quando os 20 estiverem prontos.
    */
   it('lista os blocos que ainda estão no gerador provisório', () => {
-    expect([...PROVISIONAL_BLOCK_TYPES].sort()).toEqual(
-      ['aws.cloudtrail', 'aws.codepipeline', 'aws.cognito', 'aws.ecs', 'aws.waf'].sort(),
-    );
+    expect([...PROVISIONAL_BLOCK_TYPES].sort()).toEqual(['aws.codepipeline', 'aws.ecs'].sort());
   });
 });
