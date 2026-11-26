@@ -178,3 +178,11 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Alto contraste remove sombras: o foco do bloco selecionado vira contorno duplo. */
+@media (forced-colors: active) {
+  .canvas :global(.react-flow__node.selected:focus-visible) > .block {
+    outline-style: double;
+    outline-width: calc(3 * var(--focus-width));
+  }
+}
