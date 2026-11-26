@@ -47,6 +47,10 @@ export type DesignActions = {
   setOverride(target: ElementRef, key: string, value: number | null): Result<void>;
   select(selection: Selection): Result<void>;
   setRegion(region: Region): Result<void>;
+  /** Descrição da carga; digitação em sequência é um passo só (como as setas do canvas). */
+  setDescription(description: string): Result<void>;
+  /** Documento com o `usage` novo vindo da estimativa, gravado como UM passo desfazível. */
+  applyEstimate(next: DesignDocument): Result<void>;
   loadDesign(raw: unknown): Result<void>;
   replaceDocument(doc: DesignDocument): Result<void>;
   /** Troca o design inteiro pelo template inicial (PRD F5); o confirmar antes é de quem chama. */
@@ -105,12 +109,13 @@ export function createDesignStore(
       value: T,
       kind: StepKind,
       extra: (s: EditorState, doc: DesignDocument) => Partial<DesignStoreState> = () => ({}),
+      group?: Grouping,
     ): Result<T> => {
       if (!r.ok) return r;
       set((s) => ({
         document: r.value,
         ...extra(s, r.value),
-        history: record(s.history, s, kind),
+        history: record(s.history, s, kind, group),
       }));
       return ok(value);
     };
@@ -183,6 +188,13 @@ export function createDesignStore(
         return ok(undefined);
       },
       setRegion: (region) => apply(act.setRegion(doc(), region), undefined, 'set-region'),
+      setDescription: (text) => {
+        const r = act.setDescription(doc(), text);
+        if (r.ok && text === doc().workload.description) return ok(undefined);
+        const group = { key: 'description', now: clock(), windowMs: NUDGE_WINDOW_MS };
+        return apply(r, undefined, 'set-description', () => ({}), group);
+      },
+      applyEstimate: (next) => apply(act.parseDesign(next), undefined, 'apply-estimate', prune),
       loadDesign: (raw) =>
         apply(act.parseDesign(raw), undefined, 'replace-design', (_, loaded) => ({
           selection: null,
