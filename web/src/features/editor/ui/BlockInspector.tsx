@@ -12,7 +12,7 @@ import {
 import { attributeLabel, optionLabel } from './blockLabels';
 import { labelErrorMessage } from './inspectorMessages';
 import styles from './InspectorPanel.module.css';
-import { UsageRow } from './UsageRow';
+import { UsageItem } from './UsageItem';
 
 type Props = { block: Block; definition: BlockDefinition };
 
@@ -66,6 +66,8 @@ function AttributeSelect({ block, field }: { block: Block; field: AttributeField
 
 /** Formulário do bloco selecionado, gerado do contrato por `buildBlockForm`. */
 export function BlockInspector({ block, definition }: Props) {
+  const setOverride = useDesignStore((s) => s.setOverride);
+  const target = { kind: 'block', id: block.id } as const;
   const form = buildBlockForm(definition, block);
   return (
     <div className={styles.inspector}>
@@ -88,11 +90,15 @@ export function BlockInspector({ block, definition }: Props) {
           <h3 id={`${block.id}-uso`} className={styles.section}>
             Uso mensal
           </h3>
-          <dl className={styles.list}>
-            {form.usage.map((field) => (
-              <UsageRow key={field.key} field={field} />
-            ))}
-          </dl>
+          {form.usage.map((field) => (
+            <UsageItem
+              key={field.key}
+              field={field}
+              estimated={block.usage.source === 'llm'}
+              onChange={(key, value) => setOverride(target, key, value)}
+              onReset={(key) => setOverride(target, key, null)}
+            />
+          ))}
         </section>
       ) : (
         <p className={styles.note}>Este bloco não tem custo próprio nem valores de uso.</p>
