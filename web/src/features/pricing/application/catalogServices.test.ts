@@ -48,10 +48,12 @@ describe('catalogServices', () => {
     expect(catalogServices({ blocks })).toEqual(['s3']);
   });
 
-  it('cobre os 20 blocos do contrato, um serviço em slug por tipo', () => {
+  it('cobre os 17 blocos com cobrança do contrato, um serviço em slug por tipo', () => {
     const blocks = BLOCKS.map(({ type }, i) => block(type, `blk_${i}`));
     const services = catalogServices({ blocks });
-    expect(services).toHaveLength(20);
+    expect(services).toHaveLength(17);
+    // Os três de custo zero (nível C) não têm arquivo de preço.
+    for (const service of ['iam', 'cloudformation', 'ecs']) expect(services).not.toContain(service);
     for (const service of services) expect(service).toMatch(/^[a-z][a-z0-9-]{0,39}$/);
   });
 
@@ -62,6 +64,15 @@ describe('catalogServices', () => {
   it('bloco com atributo fora das opções pede só o serviço do tipo', () => {
     const invalid = block('aws.lambda', 'blk_1', { attributes: { memoryMb: 7 } });
     expect(catalogServices({ blocks: [invalid] }, pricedBy(ebs))).toEqual(['lambda']);
+  });
+
+  it('bloco de custo zero não pede serviço, nem o que a função dele declarasse', () => {
+    const zeroCost = pricedBy(
+      Object.assign(ebs, { zeroCost: { kind: 'no-direct-cost' } as const }),
+    );
+    expect(catalogServices({ blocks: [lambda] }, zeroCost)).toEqual([]);
+    const blocks = [block('aws.iam', 'blk_1'), block('aws.cloudformation', 'blk_2'), s3];
+    expect(catalogServices({ blocks: [...blocks, block('aws.ecs', 'blk_3')] })).toEqual(['s3']);
   });
 
   it('não altera o design', () => {

@@ -41,7 +41,7 @@ export interface BlockCost extends ItemCost {
   readonly blockId: string;
   /** `Block.type` do design (ex.: `aws.lambda`). */
   readonly blockType: string;
-  /** Por que o bloco sai com zero: só em bloco `priced` de nível C; ausente nos demais. */
+  /** Por que o bloco sai com zero: só em bloco `priced` de custo zero (nível C); ausente nos demais. */
   readonly note?: CostNote;
 }
 
@@ -61,7 +61,7 @@ export interface CostEstimate {
   readonly blocks: readonly BlockCost[];
   /** Um item por aresta, na ordem de `design.edges`. */
   readonly edges: readonly EdgeCost[];
-  /** Problemas que não impedem o cálculo, na ordem de `design.blocks`; vazio se não há. */
+  /** Problemas do design que não impedem o cálculo nem dependem do catálogo, na ordem de `design.blocks`. */
   readonly warnings: readonly CostWarning[];
 }
 
@@ -94,8 +94,9 @@ function itemCost(lines: readonly CostLine[] | undefined): ItemCost {
  * entrada ao contrato (`blockPriceInput`), chama a função de preço e aplica as regras do
  * catálogo (`createRater`). Sai `unavailable` o bloco de tipo sem contrato, com atributo fora
  * das opções ou com cobrança sem preço no catálogo, e todo bloco se o catálogo é de outra região.
- * Bloco `priced` de nível C leva a `note` do custo zero; ECS sem `runs-on` gera aviso, não erro
- * (`zeroCostReport`). As arestas saem `priced` com zero até a #42.
+ * Bloco de custo zero (função de preço criada por `zeroCostPricer`) sai `priced` com zero, sem
+ * linhas e com a `note` do motivo; ECS sem `runs-on` gera aviso, não erro (`zeroCostReport`).
+ * As arestas saem `priced` com zero até a #42.
  */
 export function createEstimator(blocks: BlockPricing) {
   return (design: DesignDocument, catalog: PriceCatalog): CostEstimate => {
@@ -113,16 +114,15 @@ export function createEstimator(blocks: BlockPricing) {
       );
     };
 
-    const zeroCost = zeroCostReport(design, blocks.definition);
+    const { notes, warnings } = zeroCostReport(design, blocks.pricer);
     const blockCosts = design.blocks.map((block): BlockCost => {
       const cost = itemCost(linesOf(block));
-      const note = cost.status === 'priced' ? zeroCost.notes.get(block.id) : undefined;
+      const note = cost.status === 'priced' ? notes.get(block.id) : undefined;
       return { ...cost, blockId: block.id, blockType: block.type, ...(note && { note }) };
     });
     const edges = design.edges.map((e) => ({ ...zeroCost, edgeId: e.id, kind: e.kind }));
     const fixed = sum(blockCosts.map((block) => block.fixed));
     const variable = sum(blockCosts.map((block) => block.variable));
-    const { warnings } = zeroCost;
     return { total: add(fixed, variable), fixed, variable, blocks: blockCosts, edges, warnings };
   };
 }
