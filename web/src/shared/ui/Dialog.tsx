@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './Dialog.module.css';
@@ -45,8 +45,6 @@ export function Dialog({ open, ...surface }: DialogProps): ReactElement | null {
 function DialogSurface({ onClose, title, children }: Omit<DialogProps, 'open'>): ReactElement {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  // Durante o `onClose` a feature pode levar o foco para fora antes de fechar: a guarda não age.
-  const closingRef = useRef(false);
   // No render: o `autoFocus` de um filho roda antes de qualquer effect desta superfície.
   const [trigger] = useState<Focusable | null>(() => {
     const active = document.activeElement;
@@ -60,21 +58,30 @@ function DialogSurface({ onClose, title, children }: Omit<DialogProps, 'open'>):
     const focusFirst = () => (tabbables(dialog)[0] ?? dialog).focus();
     // Ignora o `autoFocus` dos filhos: dev e StrictMode se comportam igual.
     focusFirst();
-    // Um diálogo por vez: duas guardas disputariam o foco em loop.
-    const guard = (event: FocusEvent) => {
-      const inside = event.target instanceof Node && dialog.contains(event.target);
-      if (!inside && !closingRef.current) focusFirst();
-    };
+    // Adiada: se a feature levou o foco para fora ao fechar, o diálogo já saiu do DOM e o foco
+    // fica onde ela pôs. Um diálogo por vez: duas guardas disputariam o foco em loop.
+    const guard = () =>
+      setTimeout(() => {
+        if (dialog.isConnected && !dialog.contains(document.activeElement)) focusFirst();
+      });
     document.addEventListener('focusin', guard);
+    // Antes de o React tirar o portal do DOM. Não rouba o foco que a feature moveu.
     return () => {
-      // Roda antes de o React tirar o portal do DOM.
       document.removeEventListener('focusin', guard);
       const active = document.activeElement;
       const ownsFocus = active === null || active === document.body || dialog.contains(active);
-      // Não rouba o foco que a feature moveu; disparador removido fica sem foco.
       if (ownsFocus && trigger?.isConnected) trigger.focus();
     };
   }, [trigger]);
+
+  // Controle com foco removido ou desabilitado: o foco cai no `body` e o Esc só chega ao `document`.
+  useEffect(() => {
+    const escapeFromBody = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape' && event.target === document.body) onClose();
+    };
+    document.addEventListener('keydown', escapeFromBody);
+    return () => document.removeEventListener('keydown', escapeFromBody);
+  }, [onClose]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     // Sempre: o nativo chegaria ao `document`, onde o React Flow apaga o bloco no Backspace.
@@ -87,12 +94,7 @@ function DialogSurface({ onClose, title, children }: Omit<DialogProps, 'open'>):
       event.preventDefault();
       target.focus();
     } else if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
-      closingRef.current = true; // o Esc do IME (composição) não fecha
-      try {
-        onClose();
-      } finally {
-        closingRef.current = false;
-      }
+      onClose(); // o Esc que encerra a composição do IME não fecha
     }
   }
 

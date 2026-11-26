@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -14,7 +14,7 @@ const expectClosed = () => {
   expect(screen.queryByRole('dialog')).toBeNull();
   expect(document.body.childElementCount).toBe(1); // só o container do render: sem scrim
 };
-// Pedido de fechar feito pelo Dialog (Esc). "Cancelar" fecha direto, sem passar por ele.
+// Pedidos de fechar: o Esc (pelo Dialog) e o "Salvar". "Cancelar" fecha direto, sem passar aqui.
 const onClose = vi.fn();
 afterEach(() => onClose.mockReset());
 
@@ -34,7 +34,9 @@ function Page({ content }: { content?: ReactNode }) {
           <>
             <TextField label="Nome" />
             <Button onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button variant="primary">Salvar</Button>
+            <Button variant="primary" onClick={requestClose}>
+              Salvar
+            </Button>
           </>
         )}
       </Dialog>
@@ -81,13 +83,14 @@ describe('Dialog', () => {
     expect(save).toHaveFocus();
   });
 
-  it('sem controles, o foco fica no próprio diálogo com Tab e Shift+Tab; Esc fecha', async () => {
+  it('sem controles, o foco fica no próprio diálogo; perdido no body, Esc ainda fecha', async () => {
     const { user, trigger, dialog } = await open(<p>Nada a fazer aqui.</p>);
     expect(dialog).toHaveFocus();
     await user.tab();
     expect(dialog).toHaveFocus();
     await user.tab({ shift: true });
     expect(dialog).toHaveFocus();
+    dialog.blur(); // como um controle focado que sai da página: o foco cai no body
     await user.keyboard('{Escape}');
     expectClosed();
     expect(trigger).toHaveFocus();
@@ -98,7 +101,7 @@ describe('Dialog', () => {
     for (const outside of [before, after]) {
       button('Salvar').focus();
       outside.focus();
-      expect(field()).toHaveFocus();
+      await waitFor(() => expect(field()).toHaveFocus());
     }
   });
 
@@ -123,19 +126,24 @@ describe('Dialog', () => {
     expect(trigger).toHaveFocus();
   });
 
-  it('não rouba o foco que o onClose da feature levou para fora antes de fechar', async () => {
-    const { user, after } = await open();
-    onClose.mockImplementation(() => after.focus());
-    await user.keyboard('{Escape}');
-    expectClosed();
-    expect(after).toHaveFocus();
-  });
+  it.each(['{Escape}', '{Tab}{Tab}{Enter}'])(
+    '%s: não rouba o foco que a feature moveu',
+    async (keys) => {
+      const { user, after } = await open();
+      onClose.mockImplementation(() => after.focus()); // a feature leva o foco para fora e fecha
+      await user.keyboard(keys); // Esc, ou Enter no "Salvar"
+      expectClosed();
+      expect(after).toHaveFocus();
+    },
+  );
 
   it('Esc chama onClose uma vez e nenhuma tecla do diálogo chega ao document', async () => {
     const onDocumentKey = vi.fn();
     document.addEventListener('keydown', onDocumentKey);
     onTestFinished(() => document.removeEventListener('keydown', onDocumentKey));
     const { user } = await open();
+    fireEvent.keyDown(field(), { key: 'Escape', isComposing: true }); // o IME encerra a composição
+    expect(onClose).not.toHaveBeenCalled();
     await user.keyboard('a{Backspace}{Delete}{Tab}{Shift>}{Tab}{/Shift}{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onDocumentKey).not.toHaveBeenCalled();
@@ -146,11 +154,10 @@ describe('Dialog', () => {
   it('Esc já tratado por um filho (preventDefault) não chama onClose', async () => {
     const swallowEscape = (event: KeyboardEvent) =>
       event.key === 'Escape' && event.preventDefault();
-    const { user, dialog } = await open(<TextField label="Busca" onKeyDown={swallowEscape} />);
+    const { user } = await open(<TextField label="Busca" onKeyDown={swallowEscape} />);
     expect(field('Busca')).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();
-    expect(dialog).toBeInTheDocument(); // e o diálogo segue aberto
   });
 
   it('o scrim não fecha nem tira o foco do diálogo', async () => {
@@ -160,7 +167,6 @@ describe('Dialog', () => {
     expect(fireEvent.mouseDown(field())).toBe(true); // dentro do diálogo, o clique segue normal
     await user.click(scrim);
     expect(onClose).not.toHaveBeenCalled();
-    expect(dialog).toBeInTheDocument();
     expect(field()).toHaveFocus();
   });
 });
