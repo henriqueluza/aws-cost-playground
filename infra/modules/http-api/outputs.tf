@@ -7,3 +7,11 @@ output "access_log_group_name" {
   description = "Nome do log group do log de acesso, para conferir a retenção (runbook de guardrails, passo 6)."
   value       = aws_cloudwatch_log_group.access.name
 }
+
+output "domain_alias" {
+  description = "Alvo do registro de alias da API, no formato de `api_alias` do módulo `dns`. Depende só do domínio."
+  value = {
+    name    = aws_apigatewayv2_domain_name.this.domain_name_configuration[0].target_domain_name
+    zone_id = aws_apigatewayv2_domain_name.this.domain_name_configuration[0].hosted_zone_id
+  }
+}

@@ -50,6 +50,26 @@ variable "cors_allowed_origins" {
   }
 }
 
+variable "domain_name" {
+  description = "Domínio próprio da API (ex.: `api.staging.exemplo.com`): saída `domain_names.api` do módulo `dns`."
+  type        = string
+
+  validation {
+    condition     = can(regex("^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$", var.domain_name))
+    error_message = "domain_name: um domínio, em minúsculas, sem esquema, porta nem curinga."
+  }
+}
+
+variable "acm_certificate_arn" {
+  description = "ARN do certificado ACM em us-east-1 que cobre `domain_name`: saída `certificate_arns[\"api\"]` do módulo `dns`."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]+$", var.acm_certificate_arn))
+    error_message = "acm_certificate_arn: certificado ACM em us-east-1, a região da API (domínio regional exige a mesma região)."
+  }
+}
+
 variable "routes" {
   description = "Rotas da API. A chave é o route key exato (`POST /estimates`); `throttle` troca o limite só daquela rota. `/estimates` e `/quota` vão para o `llm-proxy`, o resto para a `api`."
   type = map(object({
