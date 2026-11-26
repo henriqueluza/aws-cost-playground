@@ -32,7 +32,7 @@ export type DesignActions = {
   setOverride(target: ElementRef, key: string, value: number | null): Result<void>;
   select(selection: Selection): Result<void>;
   setRegion(region: Region): Result<void>;
-  loadDesign(raw: unknown, layout?: Layout): Result<void>;
+  loadDesign(raw: unknown): Result<void>;
   replaceDocument(doc: DesignDocument): Result<void>;
 };
 export type DesignStoreState = EditorState & DesignActions;
@@ -59,6 +59,7 @@ const pickLayout = (doc: DesignDocument, layout: Layout): Layout =>
     ),
   );
 
+/** `initial` é confiado (só código do app e testes o passam); o que vem de fora entra por `loadDesign`. */
 export function createDesignStore(
   initial: EditorState = EMPTY_STATE,
   ids: IdSource = randomIds,
@@ -119,11 +120,8 @@ export function createDesignStore(
         return ok(undefined);
       },
       setRegion: (region) => apply(act.setRegion(doc(), region), undefined),
-      loadDesign: (raw, layout = {}) =>
-        apply(act.parseDesign(raw), undefined, (_, d) => ({
-          selection: null,
-          layout: pickLayout(d, layout),
-        })),
+      loadDesign: (raw) =>
+        apply(act.parseDesign(raw), undefined, () => ({ selection: null, layout: {} })),
       replaceDocument: (next) => apply(act.parseDesign(next), undefined, prune),
     };
   });

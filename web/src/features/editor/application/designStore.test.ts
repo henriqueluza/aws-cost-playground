@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { designDocumentSchema } from '../../../shared/lib/design';
 import { adrExampleDesign } from '../../../test/designFixtures';
-import type { EditorState, NewBlock } from '../model/editorState';
+import type { EditorState, NewBlock, NewEdge } from '../model/editorState';
 import { createDesignStore, randomIds, type IdSource } from './designStore';
 
 const doc = designDocumentSchema.parse(adrExampleDesign);
@@ -65,16 +65,21 @@ describe('designStore: caminho feliz das 12 ações', () => {
     expect(s.getState().document.blocks.map((b) => b.id)).toEqual(['blk_assets']);
   });
 
-  it('loadDesign filtra o layout e zera a seleção', () => {
+  it('loadDesign troca o documento e zera layout e seleção', () => {
     const s = setup({ ...initial, selection: block });
-    const raw = { ...adrExampleDesign };
-    const bad = { blk_fn_api: { x: 1, y: 1 }, fantasma: { x: 2, y: 2 }, client: { x: 3, y: 3 } };
-    const r = s.getState().loadDesign(raw, { ...bad, blk_assets: { x: Infinity, y: 0 } });
-    expect(r.ok).toBe(true);
-    expect(s.getState().layout).toEqual({ blk_fn_api: { x: 1, y: 1 }, client: { x: 3, y: 3 } });
-    expect(s.getState().selection).toBeNull();
-    s.getState().loadDesign(raw);
+    expect(s.getState().loadDesign({ ...adrExampleDesign, region: 'sa-east-1' }).ok).toBe(true);
+    expect(s.getState().document.region).toBe('sa-east-1');
     expect(s.getState().layout).toEqual({});
+    expect(s.getState().selection).toBeNull();
+  });
+
+  it('addBlock e connect descartam chave fora do contrato', () => {
+    const s = setup();
+    s.getState().addBlock({ ...newBlock, chaveIntrusa: 1 } as NewBlock, { x: 0, y: 0 });
+    const edge = { source: 'blk_fn_api', target: 'blk_assets', kind: 'data', chaveIntrusa: 1 };
+    s.getState().connect(edge as NewEdge);
+    expect(s.getState().document.blocks.at(-1)).not.toHaveProperty('chaveIntrusa');
+    expect(s.getState().document.edges.at(-1)).not.toHaveProperty('chaveIntrusa');
   });
 });
 

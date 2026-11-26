@@ -53,14 +53,3 @@ export const EMPTY_DESIGN: DesignDocument = {
 };
 
 export const EMPTY_STATE: EditorState = { document: EMPTY_DESIGN, layout: {}, selection: null };
-
-/** Data e origem do catálogo de preços para o aviso de estimativa (PRD F16). */
-export type CatalogStamp =
-  | { readonly status: 'loading' }
-  | { readonly status: 'unavailable' }
-  | {
-      readonly status: 'ready';
-      readonly source: 'seed' | 'price-list';
-      /** ISO 8601 em UTC, como no `manifest.json`. */
-      readonly generatedAt: string;
-    };

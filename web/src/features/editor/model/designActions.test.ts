@@ -6,6 +6,7 @@ import {
   type Block,
   type DesignDocument,
   type Edge,
+  type Usage,
 } from '../../../shared/lib/design';
 import type { ActionErrorCode, ElementRef, Result } from './editorState';
 import {
@@ -20,10 +21,11 @@ import {
   setUsage,
 } from './designActions';
 
-const doc: DesignDocument = adrExampleDesign;
-const [lambda, s3] = adrExampleDesign.blocks;
-const [edge1] = adrExampleDesign.edges;
-const full = designWithBlocks(DESIGN_LIMITS.maxBlocks) as DesignDocument;
+const doc: DesignDocument = designDocumentSchema.parse(adrExampleDesign);
+const lambda = doc.blocks[0]!;
+const s3 = doc.blocks[1]!;
+const edge1 = doc.edges[0]!;
+const full = designDocumentSchema.parse(designWithBlocks(DESIGN_LIMITS.maxBlocks));
 const newEdge: Edge = { ...edge1, id: 'edg_2', source: 'blk_fn_api', target: 'blk_assets' };
 const usage = { source: 'default', values: { requestsPerMonth: 7 } } as const;
 const blockRef: ElementRef = { kind: 'block', id: 'blk_fn_api' };
@@ -128,12 +130,12 @@ describe('removeEdge', () => {
 describe('setUsage', () => {
   it('troca o usage do bloco sem tocar nos overrides', () => {
     const [block] = accepted(setUsage(doc, blockRef, usage)).blocks;
-    expect(block.usage).toEqual(usage);
-    expect(block.overrides).toEqual({ avgDurationMs: 80 });
+    expect(block?.usage).toEqual(usage);
+    expect(block?.overrides).toEqual({ avgDurationMs: 80 });
   });
 
   it('troca o usage da aresta', () => {
-    expect(accepted(setUsage(doc, edgeRef, usage)).edges[0].usage).toEqual(usage);
+    expect(accepted(setUsage(doc, edgeRef, usage)).edges[0]?.usage).toEqual(usage);
   });
 
   it.each<[ElementRef, ActionErrorCode]>([
@@ -147,17 +149,17 @@ describe('setUsage', () => {
 describe('setOverride', () => {
   it('define a chave no bloco e na aresta', () => {
     const set = accepted(setOverride(doc, blockRef, 'requestsPerMonth', 5));
-    expect(set.blocks[0].overrides).toEqual({ avgDurationMs: 80, requestsPerMonth: 5 });
-    expect(accepted(setOverride(doc, edgeRef, 'gbPerMonth', 9)).edges[0].overrides).toEqual({
+    expect(set.blocks[0]?.overrides).toEqual({ avgDurationMs: 80, requestsPerMonth: 5 });
+    expect(accepted(setOverride(doc, edgeRef, 'gbPerMonth', 9)).edges[0]?.overrides).toEqual({
       gbPerMonth: 9,
     });
   });
 
   it('null remove a chave; remover chave ausente é ok', () => {
-    expect(accepted(setOverride(doc, blockRef, 'avgDurationMs', null)).blocks[0].overrides).toEqual(
-      {},
-    );
-    expect(accepted(setOverride(doc, blockRef, 'storageGb', null)).blocks[0].overrides).toEqual({
+    expect(
+      accepted(setOverride(doc, blockRef, 'avgDurationMs', null)).blocks[0]?.overrides,
+    ).toEqual({});
+    expect(accepted(setOverride(doc, blockRef, 'storageGb', null)).blocks[0]?.overrides).toEqual({
       avgDurationMs: 80,
     });
   });
@@ -194,10 +196,25 @@ describe('parseDesign', () => {
   });
 });
 
+describe('o documento aceito é o do schema', () => {
+  // JSON.parse cria `__proto__` como chave própria, como faria um JSON vindo de fora.
+  const attributes = JSON.parse('{"__proto__": 1, "memoryMb": 256}') as Block['attributes'];
+  it.each<[string, () => Result<DesignDocument>]>([
+    ['addBlock', () => addBlock(doc, { ...s3, id: 'blk_novo', chaveIntrusa: 1 } as Block)],
+    ['editBlock', () => editBlock(doc, 'blk_fn_api', { attributes })],
+    ['connect', () => connect(doc, { ...newEdge, chaveIntrusa: 1 } as Edge)],
+    ['setUsage', () => setUsage(doc, blockRef, { ...usage, chaveIntrusa: 1 } as Usage)],
+  ])('%s descarta chave fora do contrato', (_, run) => {
+    const json = JSON.stringify(accepted(run()));
+    expect(json).not.toContain('chaveIntrusa');
+    expect(json).not.toContain('__proto__');
+  });
+});
+
 describe('imutabilidade', () => {
   it('não lança nem altera um documento congelado em profundidade', () => {
-    const frozen = deepFreeze(structuredClone(adrExampleDesign)) as DesignDocument;
-    const before = structuredClone(adrExampleDesign);
+    const frozen = deepFreeze(structuredClone(doc));
+    const before = structuredClone(doc);
     const run = [
       () => addBlock(frozen, { ...s3, id: 'blk_novo' }),
       () => editBlock(frozen, 'blk_fn_api', { label: 'N', attributes: {} }),

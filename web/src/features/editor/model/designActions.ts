@@ -17,11 +17,14 @@ type Priced = { readonly usage: Usage; readonly overrides: Overrides };
 const ok = <T>(value: T): Result<T> => ({ ok: true, value });
 const fail = (code: ActionErrorCode): Result<never> => ({ ok: false, error: { code } });
 
-/** Rede final de toda ação: o schema julga o candidato, e em sucesso volta o candidato, não o `data`. */
-function commit(candidate: DesignDocument): Result<DesignDocument> {
-  return designDocumentSchema.safeParse(candidate).success
-    ? ok(candidate)
-    : fail('invalid-document');
+/**
+ * Rede final de toda ação: o schema julga o candidato e volta o `data` dele. O zod descarta chave
+ * fora do contrato (e `__proto__` nos records) em vez de recusar; com o `data`, ela não fica no
+ * estado nem chega ao JSON exportado.
+ */
+function commit(candidate: unknown): Result<DesignDocument> {
+  const parsed = designDocumentSchema.safeParse(candidate);
+  return parsed.success ? ok(parsed.data) : fail('invalid-document');
 }
 
 const hasId = (items: readonly WithId[], id: string) => items.some((item) => item.id === id);
@@ -107,7 +110,7 @@ export function setOverride(
   key: string,
   value: number | null,
 ): Result<DesignDocument> {
-  // O zod descarta `__proto__` dos records em vez de recusar; a chave viraria própria no candidato.
+  // Chave do `Object.prototype` é recusada aqui, em vez de sumir em silêncio no `commit`.
   if (Object.hasOwn(Object.prototype, key)) return fail('invalid-document');
   return updatePriced(doc, target, ({ overrides }) => ({
     overrides:
@@ -123,6 +126,5 @@ export function setRegion(doc: DesignDocument, region: Region): Result<DesignDoc
 
 /** Documento de fora (arquivo, API). A mensagem do zod nunca sai daqui. */
 export function parseDesign(raw: unknown): Result<DesignDocument> {
-  const parsed = designDocumentSchema.safeParse(raw);
-  return parsed.success ? ok(parsed.data) : fail('invalid-document');
+  return commit(raw);
 }
