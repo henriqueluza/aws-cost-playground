@@ -12,7 +12,7 @@ from fastapi import Depends, HTTPException, Request
 
 _CLAIM_PATH = ("requestContext", "authorizer", "jwt", "claims", "sub")
 # `sub` do Cognito é UUID; recusar `#` protege a chave `USER#<sub>` do DynamoDB.
-_SUB_PATTERN = re.compile(r"[A-Za-z0-9-]{1,128}")
+SUB_PATTERN = re.compile(r"[A-Za-z0-9-]{1,128}")
 
 
 def current_user_id(request: Request) -> str:
@@ -20,7 +20,7 @@ def current_user_id(request: Request) -> str:
     node: Any = request.scope.get("aws.event")
     for key in _CLAIM_PATH:
         node = node.get(key) if isinstance(node, dict) else None
-    if isinstance(node, str) and _SUB_PATTERN.fullmatch(node):
+    if isinstance(node, str) and SUB_PATTERN.fullmatch(node):
         return node
     raise HTTPException(
         status_code=401,

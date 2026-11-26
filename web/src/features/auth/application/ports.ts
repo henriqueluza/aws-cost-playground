@@ -33,6 +33,24 @@ export interface IdentityProvider {
   endSession(session: Session | null): Promise<string>;
 }
 
+/** Tentativa de login em andamento: o que atravessa o redirecionamento. Não tem token. */
+export type LoginAttempt = {
+  readonly state: string;
+  readonly verifier: string;
+  readonly nonce: string;
+  /** Destino pedido; ainda não confiável (passa por `safeReturnTo` na volta). */
+  readonly returnTo: string;
+  readonly createdAt: number;
+};
+
+/** Guarda a tentativa na aba. Nenhum método lança. */
+export interface LoginAttemptStore {
+  /** `false` se não conseguiu guardar (armazenamento bloqueado). */
+  save(attempt: LoginAttempt): boolean;
+  /** De uso único: devolve e apaga. `null` se não há tentativa ou ela é ilegível. */
+  take(): LoginAttempt | null;
+}
+
 /** Porta de onde a sessão fica guardada (hoje, só memória). Nenhum método lança. */
 export interface SessionStore {
   /** Valor ausente, ilegível ou fora do schema devolve `null` e apaga o que estava guardado. */
