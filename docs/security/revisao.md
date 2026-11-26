@@ -1,10 +1,10 @@
 # Revisão de segurança antes da produção
 
-Primeira rodada da Issue #73. Auditoria do repositório inteiro contra o threat model do ADR (`docs/architecture/aws-cost-playground/ADR-0001-stack.md`, seção "Segurança", ameaças T1 a T6).
+Issue #73, em duas rodadas. A primeira (#73) fez a auditoria do repositório inteiro contra o threat model do ADR (`docs/architecture/aws-cost-playground/ADR-0001-stack.md`, seção "Segurança", ameaças T1 a T6).
 
 - **Data:** 26/11/2026. **Commit auditado:** `4f2a233` (`main` no início da revisão). Durante a revisão `main` avançou até `86442c2`; esse delta não foi auditado (ver "Fora desta rodada"), mas os testes novos rodam verdes sobre ele.
 - **Resultado:** nenhum achado crítico. Um achado **alto**, no CI (agente revisor de PR, #364). Um médio, doze baixos e três informativos, cada um com Issue ou corrigido neste PR. Nenhum segredo no repositório nem no histórico. Nenhuma dependência com vulnerabilidade conhecida.
-- **Não é a revisão final:** o código que ainda não está em `main` fica para a segunda rodada (#375). Ver "Fora desta rodada".
+- **Segunda rodada (#375), 26/11/2026, sobre `6801232`:** auditou o delta `4f2a233..6801232`, que inclui a API e a tela de alterar, duplicar e apagar designs, as rotas de designs no API Gateway, os designs salvos na comparação e o `export-validate.yml`. Não há achado crítico nem alto. Há um médio (DSN-1, que amplia a #277) e um informativo (INP-1, #381). As cinco conferências foram refeitas no estado final. Ver "Segunda rodada: o delta".
 
 O repositório é público. O achado alto está descrito aqui em termos gerais; o caminho de exploração foi entregue ao autor fora do repositório.
 
@@ -140,7 +140,7 @@ O hash do manifest protege contra deploy parcial e corrupção. Não protege con
 | Pergunta | Resposta |
 |---|---|
 | Identidade só do `sub`? | Sim. Tabela T3. |
-| Autorização por dono em toda operação de design? | Sim nas que existiam no commit auditado (criar, ler, listar). As demais: #375. |
+| Autorização por dono em toda operação de design? | Sim, em criar, ler e listar (primeira rodada) e em atualizar, renomear, duplicar e apagar (segunda rodada, "T1 a T6 no código novo"). |
 | Toda entrada validada? | Sim. Pydantic em todo corpo, com limites; o documento é validado em profundidade. zod no arquivo aberto, no `/config.json`, em toda resposta da API (`web/src/shared/lib/http/httpApi.ts:49-110`) e nos arquivos de preço. Os modelos descartam chave desconhecida em vez de recusar (`extra="ignore"`, `z.object`), por decisão registrada de leitura tolerante; a chave extra não chega ao item nem à LLM. |
 | Algum texto livre da LLM é exibido? | Não. Tabela T2. |
 | Gasto da LLM | Quota antes da chamada, `max_tokens` fixo, timeout, sem nova tentativa, interruptor desligado por padrão. Tabela T1. |
@@ -228,7 +228,7 @@ Cada um passou por `fp-check`. Severidade é a final, depois da verificação.
 | FP-10 | Rotas de designs ausentes no API Gateway | Falha fechada (404), não vulnerabilidade; é a #252 |
 | FP-11 | Limite de taxa global, não por usuário | Conhecido e registrado (`docs/handoff/5.md`); o custo segue contido pelas quotas |
 
-## Testes que este PR acrescenta
+## Testes que a primeira rodada acrescentou
 
 | Arquivo | O que trava |
 |---|---|
@@ -239,19 +239,136 @@ Cada um passou por `fp-check`. Severidade é a final, depois da verificação.
 
 Limite conhecido: `infra/tools/tests` só roda no CI quando o PR toca `infra/**` ou um dos workflows listados em `paths` de `.github/workflows/terraform.yml`. Um PR que só mexa em outro workflow não dispara `test_workflows_all.py`. A #365 pede que o job rode para qualquer arquivo de `.github/workflows/`. Pela mesma razão, as conferências de segredos no histórico inteiro e de dependências são evidência pontual desta revisão: o CI não roda `npm audit` nem `pip-audit` (a #365 recebeu esse pedido em comentário).
 
+## Segunda rodada: o delta (#375)
+
+Commit auditado: `6801232` (`main` no início da rodada). Escopo: `git diff 4f2a233..6801232` nos diretórios `api/`, `web/src/`, `infra/` e `.github/workflows/`. Por PR:
+
+| PR | Assunto |
+|---|---|
+| #376 (#54) | API de designs |
+| #377 (#57) | Tela de designs |
+| #378 (#252) | Rotas de designs no API Gateway |
+| #362 (#351) | Designs salvos na comparação |
+| #359 | `export-validate.yml` e `infra/tools/export_validate_report.py` |
+| #379 | Testes da primeira rodada |
+
+Mesmo método da primeira rodada:
+
+| Etapa | Como |
+|---|---|
+| Revisão manual | Skills `security-review`, `owasp-security` e `differential-review` |
+| Revisor independente | Leu o delta sem as conclusões da revisão manual |
+| Padrões inseguros | Skill `insecure-defaults`: dois workflows, um em `api/app/designs` e outro em `.github/workflows/export-validate.yml`, cada um com 6 varreduras de categoria. Resultado nos dois: `no-candidates` |
+| Análise estática | Semgrep 1.182.0 nos 43 arquivos de código do delta, com os mesmos conjuntos de regras. Um achado, FP-12 |
+| Falsos positivos | Cada candidato passou por um verificador `fp-check` encarregado de refutar |
+
+### T1 a T6 no código novo
+
+**T1. Abuso de custo.**
+
+**Veredito: a LLM segue mitigada (nenhuma rota nova chega a ela). O DynamoDB das rotas de designs não tem teto de custo além da taxa do stage: DSN-1, que amplia a #277.**
+
+| Mitigação | Onde | Teste |
+|---|---|---|
+| Designs e conta nunca vão para o `llm-proxy`, a única função que lê a chave e grava a quota | `infra/modules/http-api/main.tf:5-7`, `infra/envs/*/main.tf:86-97` | `infra/tools/tests/test_security_review.py::ApiEdge::test_rotas_do_gateway_sao_as_revistas_e_cada_uma_vai_para_a_funcao_esperada` (novo); `http_api.tftest.hcl` (`estimates_e_quota_vao_para_o_llm_proxy`) |
+| Limite de 50 designs também em `duplicate`, por usuário | `api/app/designs/service.py:75-108,127-130` | `api/tests/test_designs_changes.py::test_duplicar_respeita_o_limite_de_50`, `::test_duplicar_abaixo_do_limite_chega_a_50_e_para`, `::test_limite_de_um_usuario_nao_conta_designs_de_outro` |
+| `doc` até 350.000 bytes e corpo até 1 MiB também no `PATCH` | `api/app/designs/schemas.py:36,48`, `api/app/routing.py:28-30` | `test_designs_changes.py::test_atualizar_doc_no_teto_grava_e_acima_e_413` |
+| Atualizar é uma só escrita condicional, sem leitura antes | `api/app/designs/repository.py:134-167` | `test_designs_changes.py::test_atualizar_e_uma_escrita_condicional_sem_ler_antes` |
+| Limite de taxa nas rotas novas | Só o padrão do stage (10 rps, burst 20), sem limite próprio | **Sem mitigação própria.** Ver DSN-1 |
+
+**T2. Prompt injection.**
+
+**Veredito: não se aplica ao delta.** Nenhuma rota nova chama a LLM, e o prompt, o schema de saída e a revalidação não mudaram. O teste novo de rotas fixa que designs não chegam ao `llm-proxy`.
+
+**T3. Acesso ao design de outro usuário.**
+
+**Veredito: mitigada.**
+
+| Mitigação | Onde | Teste |
+|---|---|---|
+| Toda chave das rotas novas sai do `sub` e do id do caminho, revalidados em `_pk` e `_key` | `api/app/designs/repository.py:52-62` | `test_designs_changes.py::test_rotas_novas_usam_so_a_particao_do_sub` |
+| `designId` como ULID no caminho das rotas novas | `api/app/designs/router.py:38` | `api/tests/test_routes.py::test_design_id_fora_do_formato_ulid_responde_422` |
+| Atualizar design alheio responde 404, igual a inexistente, com qualquer versão: sem oráculo de existência pelo 409 | `repository.py:146,154,164` (a chave é da partição de quem pede) | `test_designs_changes.py::test_atualizar_design_de_outro_usuario_e_404_sem_gravar_nem_criar` (versões erradas acrescentadas neste PR) |
+| `attribute_exists(PK)`: o `UpdateItem` nunca cria item | `repository.py:154` | mesmo teste (nada nasce na partição de B) |
+| Nomes de atributo vêm do serviço como `#aN`; chave e `version` não se alteram pelo corpo | `repository.py:144-149`, `api/app/designs/schemas.py:44-54` | `test_designs_changes.py::test_repositorio_recusa_atualizar_chave_ou_versao`, `::test_atualizar_sem_expected_version_e_422_sem_gravar` |
+| Duplicar design alheio responde 404 antes do limite | `service.py:127-130` | `test_designs_changes.py::test_duplicar_design_de_outro_usuario_e_404_sem_criar` |
+| Apagar é idempotente (sempre 204) e não alcança outra partição | `service.py:133-135`, `repository.py:170-174` | `test_designs_changes.py::test_apagar_e_idempotente`, `::test_apagar_design_de_outro_usuario_nao_o_remove` |
+| Erros com status e detalhe fixos; o item de `ALL_OLD` no 409 não chega à resposta | `router.py:22-34`, `api/app/designs/errors.py` | `test_designs_changes.py::test_versao_desatualizada_e_409_sem_gravar` (corpo igual a `CONFLICT`) |
+| Papel da `api`: entra só `UpdateItem`, e as partições continuam limitadas a `USER#*` | `infra/modules/functions/iam.tf:49-54` | `functions.tftest.hcl` (`papeis_de_menor_privilegio`) |
+| As seis rotas de designs com authorizer JWT, para a função `api`; nenhuma rota fora da lista revista | `infra/envs/*/main.tf:86-97`, `infra/modules/http-api/main.tf:62-70` | `test_security_review.py::ApiEdge::test_rotas_do_gateway_sao_as_revistas_e_cada_uma_vai_para_a_funcao_esperada` e `::test_extrator_de_rotas_ve_rota_nova_e_destino_trocado` (novos); `infra/envs/*/tests/composition.tftest.hcl` (`rotas_de_designs_atras_do_jwt_e_patch_no_cors`) |
+| No site, só ULID vira segmento de caminho; o id nunca é concatenado | `web/src/shared/lib/http/httpApi.ts:37-42,87` | `web/src/shared/lib/http/httpApi.test.ts` "o id vai como segmento do transporte, nunca concatenado, com o 409 de cada rota" |
+| Comparação: "salvo" só com sessão; ao sair da conta, deixa de valer | `web/src/features/compare/hooks/useSideDocument.ts:19-34` | `web/src/features/compare/ui/ComparePage.test.tsx` "o anônimo não vê a opção de salvos e não chama a API", "ao sair da conta, a origem \"salvo\" deixa de valer: nada de salvo na tela" |
+
+**T4. XSS.**
+
+**Veredito: mitigada.**
+
+| Mitigação | Onde | Teste |
+|---|---|---|
+| Documento salvo, vindo do servidor, passa por zod antes do cálculo da comparação | `web/src/features/designs/hooks/useSavedDesigns.ts:26-49` | `ComparePage.test.tsx` "documento inválido vindo do servidor é recusado antes de calcular" |
+| Nome do design só como texto na lista, no seletor da comparação e na tabela | `web/src/features/designs/ui/DesignsPage.tsx`, `web/src/features/compare/ui/SourcePicker.tsx`, `CompareTable.tsx` | `web/src/features/designs/ui/DesignsPage.test.tsx` "lista nome, região, blocos e data na ordem da API, só como texto"; `ComparePage.test.tsx` "escolhe dois designs salvos, com a região de cada um e o nome só como texto"; `CompareTable.test.tsx` "tipo desconhecido e rótulo com HTML saem só como texto" |
+| Arquivo aberto na comparação passa pela mesma validação de "Abrir arquivo" | `SourcePicker.tsx` (`readDesignFile`) | `ComparePage.test.tsx` "arquivo inválido: mesma validação de abrir design, texto próprio e nada comparado", "rótulos do arquivo entram só como texto, nunca como HTML" |
+| Nenhum sorvedouro de HTML ou de código em `web/src` | — | `web/src/security.test.ts` (verde no estado final, sem mudança de lista) |
+
+**T5. Vazamento de chave ou de credencial de CI.**
+
+**Veredito: mitigada no delta.** `export-validate.yml` cumpre as regras da casa:
+- Gatilho só `pull_request` e `permissions: contents: read`.
+- Actions por SHA e `persist-credentials: false`.
+- `npm ci --ignore-scripts`.
+- Nenhuma expressão em `run:`.
+- Falha fechada se houver variável `AWS_*` no ambiente, imprimindo só os nomes.
+- Sem segredo, backend ou plano.
+
+O `export_validate_report.py` só lê JSON e falha fechado. Provas:
+- `infra/tools/tests/test_workflow_export_validate.py`.
+- `infra/tools/tests/test_workflows_all.py`, cuja lista de workflows já inclui o novo.
+
+O log das rotas novas segue a allowlist (`api/tests/test_routes.py::test_log_da_rota_nao_traz_dado_do_usuario`).
+
+**T6. Adulteração dos preços.**
+
+**Veredito: sem mudança.** O delta não toca `pricing/`, o catálogo nem `loadCatalog.ts`. TST-1 (#81) e CI-4 (#368) continuam como na primeira rodada.
+
+### As cinco conferências, no estado final
+
+| Conferência | Resultado |
+|---|---|
+| **Segredos no histórico inteiro** | Limpo. `gitleaks git --redact --log-opts="--all"` (8.30.1): 833 commits, 1 achado, o mesmo FP-1. `gitleaks dir` no estado atual: 0 achados |
+| **CSP efetiva** | Sem mudança desde a primeira rodada: o delta não toca `infra/modules/site` nem o `connect-src` dos ambientes. `test_security_review.py::ContentSecurityPolicy` está verde. A prova com o app rodando segue na #374 |
+| **CORS sem `*`** | Uma origem, a do site, por ambiente, sem credenciais. Os métodos derivam das rotas: `GET`, `POST`, `PATCH`, `DELETE`. `ANY` e `OPTIONS` são recusados (`http_api.tftest.hcl`: `rota_any_e_rejeitada`, `rota_options_e_rejeitada`). A FastAPI continua sem CORS (`api/tests/test_main.py`) |
+| **IAM sem `*` em ação e recurso** | O delta só acrescenta `dynamodb:UpdateItem`, na tabela, com `LeadingKeys` `USER#*`. Os invariantes `test_curinga_em_acao_so_aparece_em_negacao` e `test_nenhum_recurso_curinga_inteiro_nos_modulos` estão verdes |
+| **Dependências sem alta ou crítica** | Nenhuma vulnerabilidade de qualquer severidade. `npm audit`, com e sem dev, em 360 pacotes de `web/`. `pip-audit` 2.10.1 nos dois `uv.lock` (62 pacotes em `api/`, 28 em `pricing/`). O delta não muda manifest nem lockfile |
+
+### Achados da segunda rodada
+
+| Id | Sev. | Achado | Onde | `fp-check` | Issue |
+|---|---|---|---|---|---|
+| DSN-1 | Média | **Custo de escrita nas rotas de designs, que vão a `main` sem a decisão da #277.** O DynamoDB cobra o `UpdateItem` pelo maior tamanho do item, inclusive na escrita condicional recusada. Assim, cada `PATCH` num design de cerca de 350 KB custa cerca de 342 WRU, seja para trocar o `doc`, só renomear ou receber o 409. Não há limite de quantidade, e a única barreira é a taxa do stage. Pior caso de um usuário com conta (cadastro aberto em produção): cerca de US$ 2,25/h num item quente (teto de 1.000 WRU/s da partição) e até cerca de US$ 7,70/h nos 50 itens. A leitura da #277 soma cerca de US$ 1,35/h. O teto de US$ 20/mês estoura em poucas horas. Abaixo do limite da partição, não há 503 nem alarme, e o Budget não corta a função `api` | `api/app/designs/service.py:114-124`, `repository.py:134-167`, `infra/envs/*/main.tf:86-97`, `infra/envs/*/terraform.tfvars` (`default_throttle`) | Verdadeiro na escrita. A amplificação de leitura por `duplicate` e a taxa sem dono são a #277 e FP-11 | #277 (`needs-human`, comentário com os números) |
+| INP-1 | Info | `expectedVersion` sem teto: a partir de 10^38 - 1, o boto3 levanta `decimal.Rounded` e a resposta é 500 genérico. Não há eco nem escrita. Único efeito: ruído no alarme de 5xx | `api/app/designs/schemas.py:45` | Verdadeiro, reproduzido | #381 |
+| FP-12 | — | Semgrep `non-literal-import` em `api/tests/test_main.py:26` | — | Falso positivo: o `import_module` recebe nomes de uma lista literal do `parametrize` | — |
+
+Premissas do DSN-1:
+- Preço on-demand de us-east-1 do fixture de `pricing/`: US$ 0,625 por milhão de WRU e US$ 0,125 por milhão de RRU.
+- Limites de throughput por partição do DynamoDB.
+- A divisão da partição por SK (split for heat) e o limite por rota do `default_route_settings` só se confirmam no staging (ver "O que só o primeiro staging confirma", "API Gateway").
+
+**A #277 não bloqueia mais nada sozinha.** A primeira rodada a registrou como bloqueio da #252, mas a #252 entrou em `main` (`86442c2`). O próximo `apply` de produção publica as rotas sem a decisão. Das opções da #277, só o limite de taxa por rota cobre leitura, escrita e saída de dados; separar o `doc` não resolve o `PATCH` com `doc`. Nada disso foi corrigido aqui: limite de taxa e configuração de custo são decisão e trabalho do autor.
+
+### Testes que a segunda rodada acrescenta
+
+| Arquivo | O que trava |
+|---|---|
+| `infra/tools/tests/test_security_review.py` | As rotas do gateway nos dois ambientes são exatamente as revistas, sem repetição, e cada uma vai para a função esperada, calculada pela mesma expressão do módulo. Um teste de controle prova que o extrator vê rota nova e destino trocado |
+| `api/tests/test_designs_changes.py` | `PATCH` em design alheio com versão errada também responde 404, nunca 409 |
+
 ## Fora desta rodada
 
-Código que não está em `main` no commit auditado. Fica para a #375, que fecha a #73.
+Tudo o que ficou de fora da primeira rodada foi auditado na segunda, salvo o item abaixo, que segue com Issue própria.
 
 | Item | Issue | Estado |
 |---|---|---|
-| API de atualizar, renomear, duplicar e apagar designs (501 no commit auditado) | #54 | Entrou em `main` durante a revisão (PR #376, `0c8715f`). Não auditada aqui |
-| Tela dessas operações | #57 | Entrou em `main` durante a revisão (PR #377). Não auditada aqui |
-| Rotas de designs no API Gateway | #252 | Entrou em `main` durante a revisão (`86442c2`). Não auditada aqui; os invariantes de `test_security_review.py` passam sobre ela |
-| Custo de leitura da partição de designs no pior caso (achado médio já registrado; decisão do autor) | #277 | `needs-human` |
-| Designs salvos na comparação | #351 | Entrou em `main` durante a revisão (PR #362). Não auditada aqui |
-| Workflow `export-validate.yml` | #359 | Entrou em `main` durante a revisão. Passa nos invariantes de `test_workflows_all.py`; não auditado além disso |
-| Tudo o mais que entrou em `main` depois de `4f2a233` | — | `git diff 4f2a233..origin/main` |
+| Custo do DynamoDB nas rotas de designs (leitura e, desde a segunda rodada, escrita: DSN-1) | #277 | `needs-human`: decisão do autor antes do `apply` de produção |
 
 ## O que só o primeiro staging confirma
 
@@ -311,7 +428,7 @@ Nenhuma foi tomada nesta revisão. O risco de cada opção:
 | #284 | Janela do token depois da exclusão; `sub` no log de acesso | (a) Aceitar com a mitigação do cliente: a janela continua aberta para quem guardou o token, e API-1 continua valendo. (b) Marcador de conta excluída nas rotas de escrita: fecha a janela e API-1; custa uma leitura por requisição. (c) Reduzir a validade do token: encurta, não fecha. Log: manter o `sub` por 7 dias como pseudônimo, ou tirar o campo e perder a correlação por usuário |
 | #338 | Escritas do `apply` que não se delimitam por ambiente | Aceitar: o papel de staging alcança política de logs, distribuição, cabeçalhos (CSP) e tags da API de produção. Recusar: esses itens viram tarefa manual e o primeiro deploy para no stage da API e no domínio do Cognito |
 | #327 | Fixar o arquivo do workflow no trust do `prices` | Fixar: fecha o uso por outro workflow em `main`; valor errado tranca o workflow até reaplicar o bootstrap. Manter: qualquer job em `main` sem environment assume o papel, cujo alcance é só leitura de preço público. A mesma pergunta vale para os `apply` (#367), com alcance de escrita |
-| #277 | Custo de leitura da partição de designs | Bloqueia a publicação das rotas (#252). Fora desta rodada |
+| #277 | Custo de leitura e escrita da partição de designs (DSN-1) | As rotas já estão em `main` (#252). Decidir antes do `apply` de produção. Só o limite de taxa por rota cobre leitura, escrita e saída; separar o `doc` não resolve o `PATCH` com `doc` |
 | #364 | Agente revisor (CI-1) | Enquanto aberto: a label de aprovação e outras labels de autorização dependem de o revisor não ser induzido. Mitigação imediata, do autor: a automação de merge conferir quem aplicou a label |
 | #366 | Formato do `sub` | Sem corrigir antes do bootstrap, o primeiro deploy falha (fechado) |
 | #367, #368, #369 | Environment de produção, code owner, papel `plan`; preços na revisão seletiva; quota na exclusão | Nas Issues |
@@ -326,3 +443,9 @@ Risco aceito, apenas citado: cadastro aberto em produção com o remetente padr�
 - **A automação de merge e de despacho** não está no repositório: o que ela confere (ator da label, caminhos da revisão seletiva, data da regra de sprint) não foi verificado.
 - **`terraform validate` do export gerado:** teste opcional, desligado por padrão.
 - Regras Pro do Semgrep, CodeQL e `osv-scanner` não foram usados.
+
+Na segunda rodada (#375):
+- `tflint` e `trivy` continuam fora da máquina.
+- `terraform test` não rodou de novo, porque o PR não altera `.tf`.
+- O `insecure-defaults` rodou como workflow nos dois escopos do delta, e o Semgrep nos 43 arquivos.
+- Os números de DSN-1 vêm de preço e limite documentados, não de medição numa conta.
