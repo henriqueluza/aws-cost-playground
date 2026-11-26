@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { designDocumentSchema } from '../../../shared/lib/design';
 import { adrExampleDesign } from '../../../test/designFixtures';
+import { saveDesignDraft } from '../model/designDraft';
 import { designStore } from './designStore';
 import { keepDesignForLogin, useRestoreDesignDraft } from './designDraftSync';
 
@@ -40,6 +41,15 @@ describe('design em edição e o login', () => {
       .loadDesign({ ...DOC, blocks: [], edges: [], workload: { description: '' } });
     keepDesignForLogin();
     expect(sessionStorage.length).toBe(0);
+  });
+
+  it('o template inicial intocado não é guardado e dá lugar ao rascunho', () => {
+    designStore.getState().newDesign();
+    keepDesignForLogin();
+    expect(sessionStorage.length).toBe(0);
+    saveDesignDraft(DOC);
+    render(<Probe />);
+    expect(designStore.getState().document).toEqual(DOC);
   });
 
   it('nunca troca o que a pessoa já tem na tela por um rascunho (e o rascunho some)', () => {

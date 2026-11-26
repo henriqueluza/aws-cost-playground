@@ -58,6 +58,7 @@ export const USAGE_LABELS: Readonly<Record<string, string>> = {
   logsIngestedGbPerMonth: 'Logs ingeridos por mês',
   logsStoredGb: 'Logs armazenados',
   customMetrics: 'Métricas personalizadas',
+  gbPerMonth: 'Volume de dados por mês',
   alarms: 'Alarmes',
   webAcls: 'ACLs web',
   rules: 'Regras',

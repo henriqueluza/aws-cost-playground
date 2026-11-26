@@ -146,6 +146,11 @@ describe('renderHcl', () => {
   });
 
   const evil = 'x" {}\nresource "aws_iam_user" "y';
+  it('escreve o índice da instância da vez num recurso com count', () => {
+    const value = hcl.ref('aws_instance', 'web', hcl.countIndex, 'id');
+    expect(renderHcl([hcl.attr('alvo', value)])).toBe('alvo = aws_instance.web[count.index].id\n');
+  });
+
   it('escreve chamada de função da lista fechada, com cada argumento escapado', () => {
     const value = hcl.call('format', [hcl.string('%s${a}'), hcl.ref('var', 'aws_region')]);
     expect(renderHcl([hcl.attr('zona', value)])).toBe('zona = format("%s$${a}", var.aws_region)\n');
@@ -165,6 +170,8 @@ describe('renderHcl', () => {
     ['referência que começa por índice', () => hcl.attr('a', hcl.ref(0, 'x'))],
     ['índice negativo', () => hcl.attr('a', hcl.ref('a', -1))],
     ['índice fracionário', () => hcl.attr('a', hcl.ref('a', 1.5))],
+    ['índice de objeto desconhecido', () => hcl.attr('a', hcl.ref('a', { kind: 'x' } as never))],
+    ['índice nulo', () => hcl.attr('a', hcl.ref('a', null as never))],
     ['número não finito', () => hcl.attr('a', hcl.number(NaN))],
     [
       'função fora da lista',

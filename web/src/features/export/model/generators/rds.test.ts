@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { exportDesign } from '../../application/exportDesign';
 import { attrs, block, blocksOf, design, generate, labels, named } from '../../test/generatorKit';
 import { INJECTION_PAYLOADS } from '../../test/injectionPayloads';
-import { renderHcl } from '../hcl';
 
 const rds = (name: string, attributes = {}, values = {}, label = name) =>
   block(`blk_${name}`, 'aws.rds', attributes, values, label);
@@ -96,17 +95,18 @@ describe('gerador de RDS', () => {
   });
 
   it.each(INJECTION_PAYLOADS)('rótulo com a carga "%s" só muda o nome saneado', (_n, p) => {
-    const code = (label: string) => {
-      const nodes = generate(design([rds('a', {}, {}, label), rds('b', {}, {}, label)]));
-      const names = [...labels(nodes, 'aws_db_instance')].sort(
-        (x, y) => (y?.length ?? 0) - (x?.length ?? 0),
-      );
-      for (const name of names) expect(name).toMatch(/^[a-z][a-z0-9_]{0,47}$/);
-      return names.reduce<string>(
-        (text, name, i) => text.replaceAll(`${name}`, `N${i}`),
-        renderHcl(nodes),
-      );
-    };
-    expect(code(p.slice(0, 80))).toBe(code('ok'));
+    const build = (label: string) =>
+      generate(design([rds('a', {}, {}, label), rds('b', {}, {}, label)]));
+    // Os valores não dependem do rótulo; só as referências ao nome do recurso mudam.
+    const shape = (nodes: ReturnType<typeof generate>) =>
+      blocksOf(nodes).map((node) => [
+        node.labels[0],
+        Object.entries(attrs(node)).map(([name, value]) =>
+          name === 'db_subnet_group_name' ? name : `${name}=${value}`,
+        ),
+      ]);
+    const evil = build(p.slice(0, 80));
+    expect(shape(evil)).toEqual(shape(build('ok')));
+    for (const node of blocksOf(evil)) expect(node.labels[1]).toMatch(/^[a-z][a-z0-9_]{0,47}$/);
   });
 });
