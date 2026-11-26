@@ -1,4 +1,5 @@
 export { ComparePage } from './ui/ComparePage';
+export { CompareTable, SummaryStrip } from './ui/CompareTable';
 export {
   compareEstimates,
   contextDifferences,
