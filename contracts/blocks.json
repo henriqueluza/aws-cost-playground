@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "blocks": [
+    {
+      "type": "aws.lambda", "name": "Lambda", "category": "compute", "level": "A",
+      "attributes": [
+        {"key": "architecture", "options": ["x86_64", "arm64"], "default": "arm64"},
+        {"key": "memoryMb", "options": [128, 256, 512, 1024, 2048, 4096, 8192, 10240], "default": 512}
+      ],
+      "usage": [
+        {"key": "requestsPerMonth", "unit": "requests", "default": 1000000, "min": 0, "max": 100000000000, "integer": true},
+        {"key": "avgDurationMs", "unit": "ms", "default": 120, "min": 1, "max": 900000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.s3", "name": "S3", "category": "storage", "level": "A",
+      "attributes": [
+        {"key": "storageClass", "options": ["STANDARD", "STANDARD_IA"], "default": "STANDARD"}
+      ],
+      "usage": [
+        {"key": "storageGb", "unit": "GB", "default": 50, "min": 0, "max": 10000000, "integer": false},
+        {"key": "putRequestsPerMonth", "unit": "requests", "default": 100000, "min": 0, "max": 100000000000, "integer": true},
+        {"key": "getRequestsPerMonth", "unit": "requests", "default": 1000000, "min": 0, "max": 100000000000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.sqs", "name": "SQS", "category": "integration", "level": "A",
+      "attributes": [
+        {"key": "queueType", "options": ["standard", "fifo"], "default": "standard"}
+      ],
+      "usage": [
+        {"key": "requestsPerMonth", "unit": "requests", "default": 1000000, "min": 0, "max": 100000000000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.dynamodb", "name": "DynamoDB", "category": "database", "level": "A",
+      "attributes": [
+        {"key": "capacityMode", "options": ["on-demand", "provisioned"], "default": "on-demand"}
+      ],
+      "usage": [
+        {"key": "readRequestsPerMonth", "unit": "requests", "default": 1000000, "min": 0, "max": 100000000000, "integer": true},
+        {"key": "writeRequestsPerMonth", "unit": "requests", "default": 500000, "min": 0, "max": 100000000000, "integer": true},
+        {"key": "storageGb", "unit": "GB", "default": 5, "min": 0, "max": 1000000, "integer": false},
+        {"key": "provisionedReadUnits", "unit": "RCU", "default": 5, "min": 0, "max": 100000, "integer": true},
+        {"key": "provisionedWriteUnits", "unit": "WCU", "default": 5, "min": 0, "max": 100000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.ec2", "name": "EC2", "category": "compute", "level": "A",
+      "attributes": [
+        {"key": "instanceType", "options": ["t3.micro", "t3.small", "t3.medium", "t3.large", "t4g.micro", "t4g.small", "t4g.medium", "m5.large", "m5.xlarge", "c5.large", "r5.large"], "default": "t3.small"},
+        {"key": "az", "options": ["a", "b", "c"]}
+      ],
+      "usage": [
+        {"key": "instanceCount", "unit": "instances", "default": 1, "min": 1, "max": 1000, "integer": true},
+        {"key": "hoursPerMonth", "unit": "hours", "default": 730, "min": 0, "max": 744, "integer": false},
+        {"key": "rootVolumeGb", "unit": "GB", "default": 30, "min": 8, "max": 16384, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.rds", "name": "RDS", "category": "database", "level": "A",
+      "attributes": [
+        {"key": "engine", "options": ["postgres", "mysql"], "default": "postgres"},
+        {"key": "instanceClass", "options": ["db.t3.micro", "db.t3.small", "db.t3.medium", "db.t4g.micro", "db.t4g.small", "db.t4g.medium", "db.m5.large", "db.r5.large"], "default": "db.t3.micro"},
+        {"key": "deployment", "options": ["single-az", "multi-az"], "default": "single-az"},
+        {"key": "az", "options": ["a", "b", "c"]}
+      ],
+      "usage": [
+        {"key": "storageGb", "unit": "GB", "default": 20, "min": 20, "max": 65536, "integer": true},
+        {"key": "backupStorageGb", "unit": "GB", "default": 20, "min": 0, "max": 1000000, "integer": false}
+      ]
+    },
+    {
+      "type": "aws.elasticache", "name": "ElastiCache", "category": "database", "level": "A",
+      "attributes": [
+        {"key": "engine", "options": ["redis", "memcached"], "default": "redis"},
+        {"key": "nodeType", "options": ["cache.t3.micro", "cache.t3.small", "cache.t3.medium", "cache.t4g.micro", "cache.t4g.small", "cache.t4g.medium", "cache.m5.large", "cache.r5.large"], "default": "cache.t3.micro"},
+        {"key": "az", "options": ["a", "b", "c"]}
+      ],
+      "usage": [
+        {"key": "nodeCount", "unit": "nodes", "default": 1, "min": 1, "max": 500, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.cloudfront", "name": "CloudFront", "category": "networking", "level": "A",
+      "attributes": [],
+      "usage": [
+        {"key": "requestsPerMonth", "unit": "requests", "default": 1000000, "min": 0, "max": 100000000000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.alb", "name": "ALB", "category": "networking", "level": "A",
+      "attributes": [],
+      "usage": [
+        {"key": "newConnectionsPerSecond", "unit": "connections/s", "default": 10, "min": 0, "max": 1000000, "integer": false},
+        {"key": "activeConnectionsPerMinute", "unit": "connections/min", "default": 1000, "min": 0, "max": 100000000, "integer": false},
+        {"key": "processedGbPerMonth", "unit": "GB", "default": 100, "min": 0, "max": 100000000, "integer": false},
+        {"key": "ruleEvaluationsPerSecond", "unit": "evaluations/s", "default": 0, "min": 0, "max": 10000000, "integer": false}
+      ]
+    },
+    {
+      "type": "aws.cloudwatch", "name": "CloudWatch", "category": "management", "level": "A",
+      "attributes": [],
+      "usage": [
+        {"key": "logsIngestedGbPerMonth", "unit": "GB", "default": 5, "min": 0, "max": 10000000, "integer": false},
+        {"key": "logsStoredGb", "unit": "GB", "default": 5, "min": 0, "max": 100000000, "integer": false},
+        {"key": "customMetrics", "unit": "metrics", "default": 10, "min": 0, "max": 1000000, "integer": true},
+        {"key": "alarms", "unit": "alarms", "default": 10, "min": 0, "max": 100000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.nat-gateway", "name": "NAT Gateway", "category": "networking", "level": "A",
+      "attributes": [],
+      "usage": [
+        {"key": "processedGbPerMonth", "unit": "GB", "default": 100, "min": 0, "max": 100000000, "integer": false}
+      ]
+    }
+  ]
+}
