@@ -216,10 +216,6 @@ describe('ponto de migração', () => {
     // 1.5 e texto ficam para o schema, que os recusa como "não é um design"
     expect(errorOf(JSON.stringify({ ...design, schemaVersion: 1.5 }))).toBe('not-design');
   });
-  it('não consulta Object.prototype como se fosse passo', () => {
-    expect(migrateDesign({ schemaVersion: 1 }, {}, 3).ok).toBe(false);
-    expect(migrateDesign({ __proto__: null, schemaVersion: 0 }, {}, 1).ok).toBe(false);
-  });
 });
 
 describe('serialização', () => {

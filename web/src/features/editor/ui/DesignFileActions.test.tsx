@@ -152,14 +152,11 @@ describe('Abrir arquivo', () => {
 
   it('rótulo com marcação aparece como texto, sem virar elemento', async () => {
     const label = '<img src=x onerror=alert(1)>';
-    await (async () => {
-      renderBar();
-      await upload(
-        json(JSON.stringify({ ...adr, blocks: [{ ...adr.blocks[0], label }], edges: [] })),
-      );
-      await waitFor(() => expect(designStore.getState().document.blocks[0]?.label).toBe(label));
-      expect(document.querySelector('img')).toBeNull();
-    })();
+    const doc = { ...adr, blocks: [{ ...adr.blocks[0], label }], edges: [] };
+    renderBar();
+    await upload(json(JSON.stringify(doc)));
+    await waitFor(() => expect(designStore.getState().document.blocks[0]?.label).toBe(label));
+    expect(document.querySelector('img')).toBeNull();
   });
 });
 
