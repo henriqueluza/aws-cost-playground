@@ -199,15 +199,6 @@
   pointer-events: none;
 }
 
-.refusal {
-  position: absolute;
-  inset-inline: var(--space-4);
-  bottom: var(--space-6);
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
 .hidden {
   position: absolute;
   width: 1px;

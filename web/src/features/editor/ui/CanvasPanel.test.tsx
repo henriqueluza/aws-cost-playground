@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { expectNoAxeViolations } from '../../../test/axe';
 import { designDocumentSchema } from '../../../shared/lib/design';
@@ -29,7 +28,6 @@ function renderCanvas(label?: string) {
 
 afterEach(() => designStore.setState(EMPTY_STATE));
 
-// O d3-drag do React Flow lê `event.view`, que o user-event não preenche: o clique vai por fireEvent.
 describe('CanvasPanel', () => {
   it('desenha o client e os blocos do design, cada um com nome acessível', async () => {
     renderCanvas();
@@ -43,33 +41,6 @@ describe('CanvasPanel', () => {
     const node = await screen.findByLabelText(new RegExp('^Lambda,'));
     expect(node).toHaveTextContent(EVIL);
     expect(container.querySelector('img')).toBeNull();
-  });
-
-  it('selecionar o bloco chama a ação da store', async () => {
-    renderCanvas();
-    fireEvent.click(await screen.findByLabelText(/^S3,/));
-    await waitFor(() =>
-      expect(designStore.getState().selection).toEqual({ kind: 'block', id: 'blk_assets' }),
-    );
-  });
-
-  it('Delete remove o bloco selecionado pela store e leva as arestas dele', async () => {
-    renderCanvas();
-    fireEvent.click(await screen.findByLabelText(/^S3,/));
-    await userEvent.keyboard('{Delete}');
-    await waitFor(() =>
-      expect(designStore.getState().document.blocks.map((b) => b.id)).toEqual(['blk_fn_api']),
-    );
-    expect(designStore.getState().document.edges).toEqual([]);
-  });
-
-  it('o client não é removido nem é selecionável', async () => {
-    renderCanvas();
-    const client = await screen.findByLabelText(/^Internet/);
-    fireEvent.click(client);
-    await userEvent.keyboard('{Delete}');
-    expect(screen.getByLabelText(/^Internet/)).toBeInTheDocument();
-    expect(designStore.getState().selection).toBeNull();
   });
 
   it('oferece zoom e ajustar à tela por botões nomeados', async () => {

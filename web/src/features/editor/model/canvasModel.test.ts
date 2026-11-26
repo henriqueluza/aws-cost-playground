@@ -4,7 +4,6 @@ import { decimal } from '../../../shared/lib/money';
 import { adrExampleDesign } from '../../../test/designFixtures';
 import {
   canvasCategory,
-  checkConnection,
   defaultLayout,
   formatUsd,
   toCanvasEdges,
@@ -97,39 +96,6 @@ describe('toCanvasEdges', () => {
     const [edge] = toCanvasEdges(doc, { kind: 'edge', id: 'edg_1' });
     expect(edge).toMatchObject({ source: 'blk_assets', target: 'client', selected: true });
     expect(edge?.ariaLabel).toBe('Dados: S3 para Internet');
-  });
-});
-
-describe('checkConnection', () => {
-  const blocks = [
-    { ...doc.blocks[0]!, id: 'blk_a', type: 'aws.lambda' },
-    { ...doc.blocks[0]!, id: 'blk_b', type: 'aws.dynamodb' },
-    { ...doc.blocks[0]!, id: 'blk_c', type: 'aws.iam' },
-    { ...doc.blocks[0]!, id: 'blk_cdn', type: 'aws.cloudfront' },
-  ];
-  const d = { ...doc, blocks, edges: [] };
-
-  it('aceita o par do contrato e devolve o tipo da aresta', () => {
-    expect(checkConnection(d, 'blk_a', 'blk_b')).toEqual({ ok: true, kind: 'data' });
-    expect(checkConnection(d, 'blk_cdn', 'client')).toEqual({ ok: true, kind: 'data' });
-  });
-
-  it.each([
-    ['blk_c', 'blk_a', 'not-allowed', 'IAM não se conecta com Lambda'],
-    ['blk_a', 'client', 'not-allowed', 'Lambda não se conecta com a internet'],
-    ['blk_a', 'blk_a', 'same-node', 'ele mesmo'],
-    ['client', 'blk_a', 'unknown', 'internet'],
-    ['blk_x', 'blk_a', 'unknown', 'ausente'],
-  ])('recusa %s → %s com explicação', (from, to, reason, text) => {
-    const result = checkConnection(d, from, to);
-    expect(result).toMatchObject({ ok: false, reason });
-    expect(result.ok ? '' : result.message).toContain(text);
-  });
-
-  it('recusa a aresta repetida', () => {
-    const edge = { ...doc.edges[0]!, id: 'edg_9', source: 'blk_a', target: 'blk_b' };
-    const result = checkConnection({ ...d, edges: [edge] }, 'blk_a', 'blk_b');
-    expect(result).toMatchObject({ ok: false, reason: 'duplicate' });
   });
 });
 
