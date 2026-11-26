@@ -1,7 +1,6 @@
+import { termsOfUse } from '../model/terms';
+import { LegalPage } from './LegalPage';
+
 export function TermsPage() {
-  return (
-    <main>
-      <h1>Termos de uso</h1>
-    </main>
-  );
+  return <LegalPage doc={termsOfUse} />;
 }
