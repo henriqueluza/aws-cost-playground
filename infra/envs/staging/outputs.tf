@@ -15,6 +15,11 @@ output "function_names" {
   value       = module.functions.function_names
 }
 
+output "site_url" {
+  description = "Origem do site (https://<host>, sem barra final), para o smoke test do deploy."
+  value       = local.site_origin
+}
+
 output "site_config" {
   description = "Conteúdo do /config.json do site: terraform output -json site_config > config.json."
   value = {

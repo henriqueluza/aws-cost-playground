@@ -9,7 +9,7 @@
     },
     {
       "path": "sa-east-1/cloudfront.json",
-      "sha256": "2d51e500e6984f397836b9803814114e478c569c3c4fef668c7dd9f51b1eecca"
+      "sha256": "a3a913d53ecad078431d0b00816a07b9b4235077851b52c75025d921bd045007"
     },
     {
       "path": "sa-east-1/cloudtrail.json",
@@ -33,7 +33,7 @@
     },
     {
       "path": "sa-east-1/ec2.json",
-      "sha256": "d648eef1570784362451e7f38f49eae73a2aa6de2440616b6759daf306807b6d"
+      "sha256": "e44ebd6f4962fa8e446a9babdc7071b78637ac8e4299ba405ab6408c22490e11"
     },
     {
       "path": "sa-east-1/elasticache.json",
@@ -57,7 +57,7 @@
     },
     {
       "path": "sa-east-1/s3.json",
-      "sha256": "e8f48658804ef517cf6be3e3f4c94d27d1f883db637866c5f8671c4272ab8412"
+      "sha256": "231e8d0fcd6295c11f7945fb6e73d90d6fe54475a49aae06bd42e999bf90b606"
     },
     {
       "path": "sa-east-1/secrets-manager.json",
@@ -77,7 +77,7 @@
     },
     {
       "path": "us-east-1/cloudfront.json",
-      "sha256": "7c15a1d741334778f0df14809a360e2f1113cd716527969c44e717e43ed87812"
+      "sha256": "d46187f127c6f0a6fd938e2ee325702ccffb65f1f75073e894125d61fa67f0f3"
     },
     {
       "path": "us-east-1/cloudtrail.json",
@@ -101,7 +101,7 @@
     },
     {
       "path": "us-east-1/ec2.json",
-      "sha256": "9645151e3bbbacb1a1f639466e2358d0e9dcefb7feb61e7e63c92e81d745137b"
+      "sha256": "a2fda58b16a48a74f1a2f36cf2dbd59a780837127aaa4360e5c30074d0c68624"
     },
     {
       "path": "us-east-1/elasticache.json",
@@ -125,7 +125,7 @@
     },
     {
       "path": "us-east-1/s3.json",
-      "sha256": "7d2879f0837f85b17b5ccac5d53c8e662a7867eecb3c0588d04897926ac95c1e"
+      "sha256": "f16f42166b9dd5b4729f719e911a9bb6703fb92a4f0802e714ae4729683d435d"
     },
     {
       "path": "us-east-1/secrets-manager.json",
