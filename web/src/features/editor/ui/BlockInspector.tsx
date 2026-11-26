@@ -27,14 +27,12 @@ function LabelField({ block }: { block: Block }) {
       label="Nome do bloco"
       value={text}
       autoComplete="off"
-      error={problem ? labelErrorMessage(problem, text.length) : undefined}
+      error={problem ? labelErrorMessage(problem) : undefined}
       onChange={(e) => {
         setDraft(e.target.value);
         if (validateLabel(e.target.value) === null) editBlock(block.id, { label: e.target.value });
       }}
-      onBlur={() => {
-        if (problem === null) setDraft(null);
-      }}
+      onBlur={() => setDraft(null)} // a store é a verdade: o texto inválido não fica no campo
     />
   );
 }

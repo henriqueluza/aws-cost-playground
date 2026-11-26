@@ -17,11 +17,11 @@ export function usageErrorMessage(error: UsageInputError, field: UsageField): st
   return `${REASONS[error]} Faixa permitida: ${range}${field.integer ? ', número inteiro' : ''}.`;
 }
 
-/** Frase de erro do rótulo do bloco. */
-export function labelErrorMessage(error: LabelError, length: number): string {
+/** Frase de erro do rótulo do bloco; fixa, para o leitor de tela não repeti-la a cada tecla. */
+export function labelErrorMessage(error: LabelError): string {
   return error === 'control'
     ? 'O nome não pode ter caracteres de controle nem quebra de linha.'
-    : `Use até ${DESIGN_LIMITS.maxLabelLength} caracteres (tem ${length}).`;
+    : `Use até ${DESIGN_LIMITS.maxLabelLength} caracteres.`;
 }
 
 export const ORIGIN_TEXT = {
