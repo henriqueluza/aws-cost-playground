@@ -13,8 +13,9 @@ O que precisa existir antes de qualquer ambiente: os buckets de estado, o proved
 | Provedor OIDC | `token.actions.githubusercontent.com` | Audiência `sts.amazonaws.com`; `prevent_destroy` |
 | Papel `plan` | `acp-ci-plan` | Somente leitura; usado pelo job `plan` do `terraform.yml` |
 | Papéis `apply` | `acp-ci-apply-staging` e `acp-ci-apply-production` | Um por ambiente, sessão de 1 hora, `prevent_destroy`. Por enquanto só leem e gravam o próprio estado e carregam as negações |
+| Limite de permissões | `acp-ci-boundary-staging` e `acp-ci-boundary-production` | Política gerenciada pelo cliente (sem custo), uma por ambiente, `prevent_destroy`. Teto dos papéis que o apply cria |
 
-Os papéis `apply` ainda não aplicam nada: a #166 cria o limite de permissões `acp-ci-boundary-<env>`, a #167 e a #169 dão as permissões de escrita (a #169 fecha a #124) e a #125 cria o papel `prices`. Até a #166, a negação `DenyRoleWithoutBoundary` impede criar qualquer papel IAM pelo apply (falha fechada).
+Os papéis `apply` ainda não aplicam nada: a #167 e a #169 dão as permissões de escrita (a #169 fecha a #124) e a #125 cria o papel `prices`. O módulo `functions` passa a declarar o limite na #165; sem ele, a negação `DenyRoleWithoutBoundary` impede o apply de criar ou alterar os papéis das funções (falha fechada).
 
 Nada aqui tem custo fixo: sem chave própria do KMS e sem tabela de lock (o lock é o nativo do S3). O ID da conta vem da credencial de quem aplica, nunca do código.
 
@@ -39,7 +40,7 @@ O job `plan` roda código do próprio PR, então o papel parte do princípio de 
 |---|---|
 | Quem assume | Só um job do GitHub Actions deste repositório que declare o GitHub Environment do papel e rode em `main`: `aud` igual a `sts.amazonaws.com`, `sub` igual a `repo:henriqueluza/aws-cost-playground:environment:<env>` e `ref` igual a `refs/heads/main`, tudo por `StringEquals` |
 | O que pode | Só o estado do próprio ambiente (política inline `state`): `s3:ListBucket` no bucket, `GetObject` e `PutObject` em `acp-<stg\|prod>/terraform.tfstate`, e `GetObject`, `PutObject` e `DeleteObject` no `.tflock`. Nenhuma outra permissão ainda (#167 e #169) |
-| O que não pode | O que a política inline `deny-guardrails` nega, na tabela abaixo. Negação explícita vence qualquer `Allow` futuro |
+| O que não pode | O que as políticas inline `deny-guardrails` e `deny-data` negam, nas tabelas abaixo. Negação explícita vence qualquer `Allow` futuro |
 
 O `sub` de environment não carrega o branch, então o `ref` é fixado no IAM. Um job de `pull_request` não passa, porque o `ref` dele não é `refs/heads/main`.
 
@@ -54,13 +55,28 @@ O `sub` de environment não carrega o branch, então o `ref` é fixado no IAM. U
 | `DenyStateBucketConfig` | No bucket de estado do ambiente, tudo que não for ler, gravar, apagar e listar objetos | Política, versionamento, criptografia, bloqueio público, ciclo de vida e exclusão de versões. Apagar um objeto só cria um marcador: as versões antigas continuam lá |
 | `DenyOtherEnvironmentState` | `s3:*` no bucket de estado do outro ambiente | Um ambiente não lê nem grava o estado do outro |
 
+O apply gerencia a infraestrutura, não o dado. A política inline `deny-data` só tem `Deny`, em qualquer recurso:
+
+| Sid | Nega | Por quê |
+|---|---|---|
+| `DenyTableItems` | Ler e gravar itens (`GetItem`, `BatchGetItem`, `Query`, `Scan`, `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `ConditionCheckItem`), `PartiQL*`, `GetRecords`, `ExportTableToPointInTime` e `EnableKinesisStreamingDestination` | Designs e contadores de quota. A exportação e o stream do Kinesis levariam a tabela inteira para outro lugar |
+| `DenyUserData` | `cognito-idp:Admin*` e `cognito-idp:ListUsers*` | Ler, criar e alterar usuários, trocar senha e autenticar como um usuário. Nenhuma ação de configuração do pool começa com `Admin` |
+| `DenySecrets` | `secretsmanager:*` | O projeto não usa o serviço. Os parâmetros do SSM já caem em `DenyParameterStore` |
+| `DenyLogEvents` | Ler eventos (`GetLogEvents`, `FilterLogEvents`, `GetLogRecord`, `GetLogObject`, `StartQuery`, `GetQueryResults`, `StartLiveTail`, `Unmask`) e mandá-los para fora (`CreateExportTask`, `PutSubscriptionFilter`, `PutAccountPolicy`) | Os logs carregam o `sub` dos usuários |
+| `DenyFunctionInvoke` | `lambda:Invoke*` | Um evento forjado pula o JWT do API Gateway e faz a função agir como qualquer usuário |
+| `DenyAssumeRole` | `sts:AssumeRole` | O papel não troca de identidade, mesmo que o trust de outro papel da conta o cite |
+
+As ações de controle continuam livres dessas negações (criar e alterar tabela, user pool, log group e função); o teste confere uma a uma. Consequência para os módulos: sem filtro de assinatura de log, sem exportação de tabela e sem `aws_lambda_invocation`.
+
 Limites conhecidos:
 
+- A negação de dado cobre os serviços que o projeto usa. Serviço novo com dado (fila, stream, bucket com dado de usuário) pede negação nova aqui.
+- Ela não fecha o caminho pela configuração: quem aplica pode trocar o código de uma função, um gatilho do user pool ou o destino de um alarme. A revisão do PR e o `plan-guard` são as outras camadas.
 - O branch é garantido no IAM pelo `ref`. Restringir os GitHub Environments `staging` e `production` ao branch `main` é a segunda camada e é feita pelo autor (#77).
 - Não existe chave de condição para o evento, e o trust não fixa o arquivo de workflow. Qualquer job de um workflow que esteja em `main`, declare o Environment e rode com `ref` igual a `refs/heads/main` assume o papel: push, `workflow_dispatch`, `schedule` e também `pull_request_target` e `workflow_run`. Por isso nenhum job com `environment:` pode rodar em `pull_request_target` ou `workflow_run` executando código do PR (regra para a #22 e a #23). Quando os workflows de deploy existirem, o trust pode fixar também `job_workflow_ref` (#169).
 - O papel grava o próprio estado, então consegue sobrescrevê-lo. O que ele não consegue é excluir versões nem desligar o versionamento: o autor recupera a versão anterior. A negação `DenyStateBucketConfig` não escolhe quais objetos do bucket são lidos ou gravados; isso é do `Allow`, que só cita o estado e o `.tflock`. O bucket de estado casa com `acp-<prefixo>-*`: nenhum `Allow` de S3 das continuações pode usar esse prefixo.
 - O trust só é provado no primeiro deploy depois da #77: os testes usam provider simulado.
-- `iam:CreateRole` aceita qualquer trust. O apply pode criar um papel `acp-<prefixo>-*` que confie em outra conta, sempre dentro do limite; a #166 trata disso no limite.
+- `iam:CreateRole` aceita qualquer trust, e não existe chave de condição que o restrinja. O apply pode criar um papel `acp-<prefixo>-*` que confie em outra conta, sempre dentro do limite; veja "Limite de permissões" abaixo para o que esse papel alcança.
 - Quem faz deploy controla o código das Lambdas. Dentro do limite, esse código lê e apaga itens e lê a chave. O IAM não fecha isso; a revisão do PR e o `plan-guard` são as outras camadas.
 - Para quem escreve módulos:
   - papéis só com política inline: sem `aws_iam_policy`, sem `aws_iam_role_policy_attachment` e sem `data "aws_iam_policy"`;
@@ -68,6 +84,39 @@ Limites conhecidos:
   - sem `aws_ssm_parameter`;
   - sem papel vinculado a serviço criado pelo apply (o do API Gateway nasce no bootstrap, #169);
   - trocar o trust de um papel existente é tarefa manual do autor.
+
+## Limite de permissões
+
+`acp-ci-boundary-<env>`, com `<env>` igual a `staging` ou `production` (o nome do ambiente, não o prefixo `stg`/`prod`). O ARN é `arn:aws:iam::<id da conta>:policy/acp-ci-boundary-<env>`, sem caminho. Todo papel que o apply cria ou altera tem de carregar esse limite (`DenyRoleWithoutBoundary`), e o apply não altera nem apaga a política, porque o nome casa com `policy/acp-ci-*` (`DenyCiIdentity`).
+
+O limite não concede nada: é o teto. Um papel só faz o que a política inline dele **e** o limite permitem.
+
+| Sid | Permite | Onde | Condição |
+|---|---|---|---|
+| `FunctionLogs` | `logs:CreateLogStream`, `logs:PutLogEvents` | Log groups `/aws/lambda/acp-<stg\|prod>-*` | Nenhuma |
+| `TableItems` | `dynamodb:GetItem`, `PutItem`, `UpdateItem`, `DeleteItem`, `Query`, `BatchWriteItem` | Tabelas `acp-<stg\|prod>-*` | A chamada sai do código da função `acp-<stg\|prod>-api` ou `acp-<stg\|prod>-llm-proxy` |
+| `DeleteOwnAccount` | `cognito-idp:AdminDeleteUser` | User pool com a tag `environment` igual ao ambiente | A chamada sai do código da função `api` |
+| `ClaudeApiKey` | `ssm:GetParameter` | Só o parâmetro `/acp/<env>/anthropic-api-key` | A chamada sai do código da função `llm-proxy` |
+
+| Sid | Nega | Por quê |
+|---|---|---|
+| `DenyDataDeletion` | As mesmas cinco ações do papel apply | Uma função não apaga tabela, user pool, bucket nem zona, nem com política de recurso a favor |
+| `DenyIdentity` | `iam:*` e `sts:AssumeRole` | Uma função não mexe em IAM nem troca de papel |
+
+Nada de KMS (o parâmetro usa a chave gerenciada `aws/ssm`, que não pede `kms:Decrypt` do papel), de S3, de outros parâmetros nem de leitura de log.
+
+A condição é `ArnEquals` em `lambda:SourceFunctionArn` com o ARN exato da função, sem versão nem alias. O Lambda põe essa chave nas credenciais quando a chamada sai do ambiente de execução da função ([documentação](https://docs.aws.amazon.com/lambda/latest/dg/permissions-source-function-arn.html)). Fora de uma função a chave não existe e o `Allow` não vale: um papel criado com trust para outra conta, ou entregue a uma função nova, não lê item, usuário nem a chave.
+
+Limites conhecidos:
+
+- **O trust não é restringido.** O limite não impede criar um papel `acp-<prefixo>-*` com trust para fora; só tira dele o dado. Esse papel ainda escreve eventos nos log groups do ambiente, porque `FunctionLogs` não tem condição (a #166 condiciona só os `Allow` de dado). Ele não lê log.
+- **Código novo numa função que já existe lê dado dentro do limite.** O `UpdateFunctionCode` do deploy, ou apagar e recriar a função com o mesmo nome, mantém o ARN. Risco aceito, não resolvido: revisão do PR e `plan-guard`.
+- **O limite não repete o `dynamodb:LeadingKeys` nem separa as duas funções na tabela.** Isso é da política inline de cada papel, que o apply pode reescrever dentro do limite.
+- **O escopo por tag só vale se o apply não puder trocar a tag `environment` do user pool.** A regra de tags entra na #169; até lá, o apply de um ambiente que ganhe escrita no Cognito poderia marcar o pool do outro.
+- **A documentação cita política baseada em identidade e SCP, não limite de permissões.** Um limite é uma política gerenciada de identidade avaliada contra o mesmo contexto da requisição, então a chave vale; a prova é o primeiro deploy. Se não valesse, a falha seria fechada: as funções receberiam `AccessDenied` no dado.
+- **Chamadas que o Lambda faz fora do ambiente de execução não levam a chave** (ler um stream por event source mapping, por exemplo). Nenhuma função usa isso hoje; se usar, o limite muda.
+- **Permissão nova numa função exige mudar o limite aqui**, por Issue que autorize o bootstrap, e o autor reaplica à mão. A região é fixa em `us-east-1`.
+- `#trivy:ignore:AVD-AWS-0057` na política: os curingas são o sufixo `:*` dos log streams, o prefixo `acp-<prefixo>-*` e o ID do user pool, que a AWS gera. Nenhuma ação tem curinga.
 
 ## Como aplicar (autor)
 
@@ -79,6 +128,8 @@ terraform init -lockfile=readonly
 terraform plan -out=bootstrap.tfplan   # confira: só criação, nenhum delete ou replace
 terraform apply bootstrap.tfplan
 ```
+
+Reaplicar depois de uma mudança neste diretório é o mesmo roteiro. Aplique o bootstrap **antes** do primeiro apply de um ambiente que use o limite (#165): sem a política, a criação dos papéis das funções falha.
 
 Se a conta já tiver um provedor OIDC do GitHub (só pode haver um por conta), importe-o antes do `apply`:
 
@@ -142,6 +193,8 @@ O bootstrap cria o bucket onde o estado dos ambientes mora, então o estado dele
 | `aws_iam_role.apply["<env>"]` | `acp-ci-apply-<env>` |
 | `aws_iam_role_policy.apply_state["<env>"]` | `acp-ci-apply-<env>:state` |
 | `aws_iam_role_policy.apply_deny["<env>"]` | `acp-ci-apply-<env>:deny-guardrails` |
+| `aws_iam_role_policy.apply_deny_data["<env>"]` | `acp-ci-apply-<env>:deny-data` |
+| `aws_iam_policy.apply_boundary["<env>"]` | `arn:aws:iam::<id da conta>:policy/acp-ci-boundary-<env>` |
 
 ## Verificação sem credenciais
 
@@ -151,6 +204,6 @@ terraform -chdir=infra/bootstrap validate
 terraform -chdir=infra/bootstrap test
 ```
 
-Os testes (`tests/bootstrap.tftest.hcl` e `tests/apply.tftest.hcl`) usam provider simulado. O CI roda `fmt`, `tflint` e `trivy config` neste diretório, mas não `validate` nem `test` (#117). O `terraform test` não enxerga `lifecycle` nem recurso que não foi declarado: o `prevent_destroy` dos buckets e do provedor OIDC é conferido por leitura. Para os papéis `apply`, isso fica com `infra/tools/tests/test_bootstrap_apply_roles.py`, que o CI roda com os testes do `plan-guard`: ele confere o `prevent_destroy` e compara os recursos de IAM do diretório com um inventário fechado. Política inline, anexo de política gerenciada ou papel novo reprova até entrar no inventário de propósito, e o conteúdo das duas políticas dos papéis `apply` é travado por igualdade em `tests/apply.tftest.hcl`. É assim que o critério "sem `AdministratorAccess`" e o "único `Allow`" são verificados.
+Os testes (`tests/bootstrap.tftest.hcl`, `tests/apply.tftest.hcl` e `tests/boundary.tftest.hcl`) usam provider simulado. O CI roda `fmt`, `validate`, `terraform test`, `tflint` e `trivy config` neste diretório (`infra/tools/tf_checks.sh`). O `terraform test` não enxerga `lifecycle` nem recurso que não foi declarado: o `prevent_destroy` dos buckets e do provedor OIDC é conferido por leitura. Para os papéis `apply` e para o limite de permissões, isso fica com `infra/tools/tests/test_bootstrap_apply_roles.py`, que o CI roda com os testes do `plan-guard`: ele confere o `prevent_destroy` dos dois e compara os recursos de IAM do diretório com um inventário fechado. Política inline, política gerenciada, anexo ou papel novo reprova até entrar no inventário de propósito. O conteúdo das políticas dos papéis `apply` é travado por igualdade em `tests/apply.tftest.hcl`, e o do limite e da negação de dado em `tests/boundary.tftest.hcl`. É assim que o critério "sem `AdministratorAccess`" e o "único `Allow`" são verificados.
 
 `.terraform.lock.hcl` é versionado, com os hashes `h1:` de linux_amd64, linux_arm64 e darwin_arm64.
