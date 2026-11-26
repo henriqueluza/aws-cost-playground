@@ -16,7 +16,7 @@ const inside = (a: Box, c: Box) =>
   a.x + a.width <= c.x + c.width + 0.5 &&
   a.y + a.height <= c.y + c.height + 0.5;
 
-/** Retângulos, na tela, do canvas, dos nós, da legenda e dos controles. */
+/** Retângulos, na tela, do canvas, dos nós, da legenda, dos controles e das etiquetas visíveis. */
 async function boxes(page: Page) {
   await page.waitForSelector('.react-flow__node');
   await page.waitForTimeout(500); // o ajuste espera os nós serem medidos
@@ -31,24 +31,30 @@ async function boxes(page: Page) {
       legend: one('[aria-label="Legenda das conexões"]'),
       tools: one('[aria-label="Zoom do diagrama"]'),
       nodes: [...document.querySelectorAll('.react-flow__node')].map(box),
+      tags: [...document.querySelectorAll('.react-flow__edgelabel-renderer span')]
+        .filter((tag) => getComputedStyle(tag).display !== 'none')
+        .map(box),
     };
   });
 }
 
 async function expectLegible(page: Page, nodeCount = 21) {
-  const { canvas, legend, tools, nodes } = await boxes(page);
+  const { canvas, legend, tools, nodes, tags } = await boxes(page);
   expect(nodes).toHaveLength(nodeCount);
   // 1. todo nó está dentro da área visível do canvas
   expect(nodes.filter((node) => !inside(node, canvas))).toEqual([]);
   // 2. nenhum nó sob a legenda nem sob os controles
   expect(nodes.filter((node) => hit(node, legend) || hit(node, tools))).toEqual([]);
+  // 3. nenhum par de etiquetas de aresta se sobrepõe
+  const pairs = tags.flatMap((a, i) => tags.slice(i + 1).filter((b) => hit(a, b)));
+  expect(pairs).toEqual([]);
 }
 
 for (const [width, height] of [
   [1440, 900],
   [1024, 768],
 ] as const) {
-  test(`o template abre inteiro, sem nó cortado nem sob a legenda ou os controles em ${width}x${height}`, async ({
+  test(`o template abre inteiro, sem nó sob a legenda e sem etiquetas sobrepostas em ${width}x${height}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height });
@@ -74,7 +80,7 @@ const SCENARIOS = [
 ] as const;
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`${theme}: os cenários abrem inteiros e centralizados, e Novo design volta ao template`, async ({
+  test(`${theme}: os cenários abrem inteiros, centralizados e sem etiquetas sobrepostas, e Novo design volta ao template`, async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: theme });
