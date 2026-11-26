@@ -95,16 +95,30 @@ def test_variation_is_reported_and_still_written(tmp_path: Path) -> None:
 def test_provisional_service_keeps_its_file_and_the_manifest_is_seed(tmp_path: Path) -> None:
     kept = render_price_file("sqs", "us-east-1", ())
     put(tmp_path, "us-east-1/sqs.json", kept)
+    put(tmp_path, "sa-east-1/sqs.json", render_price_file("sqs", "sa-east-1", ()))
     result = generate([LAMBDA, SQS], fetch_at("1"), tmp_path, NOW)
     assert "us-east-1/sqs.json" not in result.files
     manifest = json.loads(result.files["manifest.json"])
     assert manifest["source"] == "seed"
-    assert [f["path"] for f in manifest["files"]] == [SA, US, "us-east-1/sqs.json"]
-    assert manifest["files"][2]["sha256"] == sha256_hex(kept)
+    assert [f["path"] for f in manifest["files"]] == [
+        SA,
+        "sa-east-1/sqs.json",
+        US,
+        "us-east-1/sqs.json",
+    ]
+    assert manifest["files"][3]["sha256"] == sha256_hex(kept)
     assert result.report[-1] == "serviço provisório: sqs"
 
 
 def test_only_provisional_services_write_nothing(tmp_path: Path) -> None:
+    with pytest.raises(PricingError) as caught:
+        generate([SQS], fetch_at("1"), tmp_path, NOW)
+    assert str(caught.value).split("\n") == [
+        "sa-east-1/sqs.json: arquivo ausente",
+        "us-east-1/sqs.json: arquivo ausente",
+    ]
+    for region in ("us-east-1", "sa-east-1"):
+        put(tmp_path, f"{region}/sqs.json", render_price_file("sqs", region, ()))
     result = generate([SQS], fetch_at("1"), tmp_path, NOW)
     assert dict(result.files) == {}
     assert result.report == (
@@ -263,3 +277,34 @@ def test_failed_write_leaves_the_directory_intact(
     with pytest.raises(PricingError, match="falha ao gravar o catálogo"):
         write(tmp_path, {US: b"new", "manifest.json": b"new"})
     assert tree(tmp_path) == before
+
+
+def test_failed_rename_is_reported_and_leaves_no_temporary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tmp_path, {SA: b"old", US: b"old", "manifest.json": b"old"})
+    real = os.replace
+    calls: list[Path] = []
+
+    def replace(source: str, target: Path) -> None:
+        calls.append(target)
+        if len(calls) == 2:
+            raise OSError("disco cheio")
+        real(source, target)
+
+    monkeypatch.setattr(os, "replace", replace)
+    with pytest.raises(PricingError, match="falha ao gravar o catálogo"):
+        write(tmp_path, {SA: b"new", US: b"new", "manifest.json": b"new"})
+    # O manifest antigo fica: o web/ recusa pelo sha256 o arquivo que já foi trocado.
+    assert tree(tmp_path) == {SA: b"new", US: b"old", "manifest.json": b"old"}
+
+
+def test_write_refuses_a_region_directory_linked_outside(tmp_path: Path) -> None:
+    out, outside = tmp_path / "prices", tmp_path / "fora"
+    out.mkdir()
+    outside.mkdir()
+    (out / "us-east-1").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(PricingError, match="falha ao gravar o catálogo"):
+        write(out, {SA: b"a", US: b"b", "manifest.json": b"m"})
+    assert tree(outside) == {}
+    assert tree(out) == {}

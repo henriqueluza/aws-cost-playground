@@ -61,8 +61,8 @@ def _fail(errors: Sequence[str]) -> None:
 def generate(specs: Sequence[ServiceSpec], fetch: Fetch, prices_dir: Path, now: datetime) -> Result:
     """Catálogo a partir da Price List; não grava. Junta todos os erros num `PricingError`.
 
-    Serviço provisório (sem consulta) não gera arquivo: o que já está em disco é mantido e entra
-    no manifest, que então sai como `seed`. Sem nenhum serviço com consulta, nada é gravado.
+    Serviço provisório (sem consulta) não gera arquivo: o arquivo versionado é exigido, mantido e
+    entra no manifest, que então sai como `seed`. Sem nenhum serviço com consulta, nada é gravado.
     """
     files: dict[str, bytes] = {}
     kept: dict[str, bytes] = {}
@@ -76,7 +76,9 @@ def generate(specs: Sequence[ServiceSpec], fetch: Fetch, prices_dir: Path, now: 
             queries = spec.queries(region)
             if not queries:
                 provisional.add(spec.slug)
-                if previous is not None:
+                if previous is None:
+                    errors.append(f"{key}: arquivo ausente")
+                else:
                     kept[key] = previous
                     errors.extend(f"{key}: {e}" for e in _file_errors(previous, region, spec.slug))
                 continue
@@ -125,10 +127,12 @@ def seed(specs: Sequence[ServiceSpec], prices_dir: Path) -> Result:
 def write(prices_dir: Path, files: Mapping[str, bytes]) -> None:
     """Grava dentro de `prices_dir`: tudo em arquivo temporário, depois rename, manifest por último.
 
-    A chave de cada arquivo passa pela allowlist de `file_key`; nada é trocado se algum
-    temporário falhar.
+    A chave de cada arquivo passa pela allowlist de `file_key` e o diretório da região não pode
+    ser link para fora. Nada é trocado se algum temporário falhar. Se um rename falhar no meio,
+    o manifest antigo fica e o `web/` recusa o arquivo trocado pelo `sha256`.
     """
     staged: list[tuple[str, Path]] = []
+    base = prices_dir.resolve()
     try:
         for key in files:
             region, _, name = key.partition("/")
@@ -137,6 +141,8 @@ def write(prices_dir: Path, files: Mapping[str, bytes]) -> None:
         for key in sorted(files, key=lambda k: (k == MANIFEST, k)):
             target = prices_dir / key
             target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.parent.resolve().is_relative_to(base):
+                raise ValueError("diretório de saída aponta para fora")
             handle, temporary = tempfile.mkstemp(dir=target.parent, prefix=".tmp-", suffix=".json")
             staged.append((temporary, target))
             with os.fdopen(handle, "wb") as stream:
