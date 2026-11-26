@@ -5,7 +5,7 @@ import { Button, Notice } from '../../../shared/ui';
 import { useAuth } from '../../auth';
 import { useDeleteAccount, useQuota } from '../hooks/useAccount';
 import { formatResetsAt, quotaSummary } from '../model/format';
-import { isRetryable, quotaErrorMessage } from '../model/accountMessages';
+import { accountErrorMessage, isRetryable } from '../model/accountMessages';
 import { DeleteAccountDialog } from './DeleteAccountDialog';
 import styles from './AccountPage.module.css';
 
@@ -38,7 +38,7 @@ export function AccountPage() {
     const kind = kindOf(quota.error);
     quotaBody = (
       <div className={styles.block}>
-        <Notice tone="negative" message={quotaErrorMessage(kind)} />
+        <Notice tone="negative" message={accountErrorMessage(kind)} />
         {kind === 'unauthenticated' ? (
           <Button variant="primary" onClick={signIn}>
             Entrar

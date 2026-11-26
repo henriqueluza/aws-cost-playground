@@ -8,32 +8,19 @@ export function confirmationMatches(typed: string): boolean {
   return typed.trim() === CONFIRM_WORD;
 }
 
-/** Frase própria por código; nunca o texto do erro nem o da resposta. */
-export function deleteErrorMessage(kind: ApiErrorKind): string {
+/** Frase própria por código, para a exclusão e a leitura da quota; nunca o texto do erro. */
+export function accountErrorMessage(kind: ApiErrorKind): string {
   switch (kind) {
     case 'unauthenticated':
-      return 'Sua sessão expirou. Entre de novo para excluir a conta.';
+      return 'Sua sessão expirou. Entre de novo para continuar.';
     case 'network':
-      return 'Sem conexão com o serviço. Sua conta não foi excluída. Confira a rede e tente de novo.';
+      return 'Sem conexão com o serviço. Nada foi alterado na sua conta. Confira a rede e tente de novo.';
     case 'unavailable':
-      return 'O serviço está indisponível. A exclusão pode ter ficado pela metade; tente de novo, é seguro repetir.';
+      return 'O serviço está indisponível agora. Tente de novo em instantes; repetir é seguro.';
     case 'invalid-request':
-      return 'O serviço não aceitou o pedido. Sua conta não foi excluída.';
+      return 'O serviço não aceitou o pedido. Nada foi alterado na sua conta.';
     default:
-      return 'Não conseguimos confirmar a exclusão. Tente de novo.';
-  }
-}
-
-export function quotaErrorMessage(kind: ApiErrorKind): string {
-  switch (kind) {
-    case 'unauthenticated':
-      return 'Sua sessão expirou. Entre de novo para ver sua conta.';
-    case 'network':
-      return 'Sem conexão com o serviço. Confira a rede e tente de novo.';
-    case 'unavailable':
-      return 'O serviço está indisponível no momento. Tente de novo.';
-    default:
-      return 'Não conseguimos ler suas estimativas. Tente de novo.';
+      return 'Não conseguimos concluir o pedido. Tente de novo.';
   }
 }
 

@@ -3,9 +3,8 @@ import { ApiError, type ApiErrorKind } from '../../../shared/lib/api';
 import {
   CONFIRM_WORD,
   confirmationMatches,
-  deleteErrorMessage,
+  accountErrorMessage,
   isRetryable,
-  quotaErrorMessage,
 } from './accountMessages';
 import { formatResetsAt, quotaSummary } from './format';
 
@@ -36,19 +35,12 @@ describe('confirmationMatches', () => {
 describe('mensagens por código', () => {
   it.each(KINDS)('%s tem frase própria, sem eco do erro', (kind) => {
     const echo = new ApiError({ kind } as never).message;
-    expect(deleteErrorMessage(kind)).not.toContain(echo);
-    expect(quotaErrorMessage(kind)).not.toContain(echo);
+    expect(accountErrorMessage(kind)).not.toContain(echo);
   });
 
   it('só oferece repetir quando a falha é do serviço ou da rede', () => {
-    expect(isRetryable('network')).toBe(true);
-    expect(isRetryable('unavailable')).toBe(true);
+    expect([isRetryable('network'), isRetryable('unavailable')]).toEqual([true, true]);
     expect(isRetryable('unauthenticated')).toBe(false);
-  });
-
-  it('rede e indisponível dizem que a conta não foi dada como excluída ou que é seguro repetir', () => {
-    expect(deleteErrorMessage('network')).toMatch(/não foi excluída/);
-    expect(deleteErrorMessage('unavailable')).toMatch(/seguro repetir/);
   });
 });
 

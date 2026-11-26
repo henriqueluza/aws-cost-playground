@@ -35,12 +35,7 @@ const newApi = (): Api =>
     globalDailyLimit: 300,
   });
 
-const failing = (kind: ApiErrorKind, patch: 'quota' | 'account', base = newApi()): Api => {
-  const boom = () => Promise.reject(new ApiError({ kind } as never));
-  return patch === 'quota'
-    ? { ...base, quota: { get: boom } }
-    : { ...base, account: { deleteAccount: boom } };
-};
+const reject = (kind: ApiErrorKind) => () => Promise.reject(new ApiError({ kind } as never));
 
 function mount(api: Api = newApi()) {
   const auth = fakeAuth({ status: 'authenticated', user: { sub: 'u1', email: EMAIL } });
@@ -108,7 +103,7 @@ describe('AccountPage', () => {
   });
 
   it('quota com sessão expirada convida a entrar, sem tentar de novo', async () => {
-    const { auth } = mount(failing('unauthenticated', 'quota'));
+    const { auth } = mount({ ...newApi(), quota: { get: reject('unauthenticated') } });
     expect(await screen.findByRole('alert')).toHaveTextContent('Sua sessão expirou');
     expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Entrar' }));
@@ -212,7 +207,10 @@ describe('AccountPage', () => {
 
     it('sessão expirada na exclusão convida a entrar e não repete a exclusão', async () => {
       const user = userEvent.setup();
-      const { auth } = mount(failing('unauthenticated', 'account'));
+      const { auth } = mount({
+        ...newApi(),
+        account: { deleteAccount: reject('unauthenticated') },
+      });
       const dialog = await open(user);
       await user.type(within(dialog).getByRole('textbox'), 'EXCLUIR');
       await user.click(within(dialog).getByRole('button', { name: 'Excluir conta' }));

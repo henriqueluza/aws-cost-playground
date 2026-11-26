@@ -4,7 +4,7 @@ import { Button, Dialog, Notice, TextField } from '../../../shared/ui';
 import {
   CONFIRM_WORD,
   confirmationMatches,
-  deleteErrorMessage,
+  accountErrorMessage,
   isRetryable,
 } from '../model/accountMessages';
 import styles from './AccountPage.module.css';
@@ -72,7 +72,7 @@ function DeleteForm({ pending, failure, onCancel, onConfirm, onSignIn }: DeleteA
         spellCheck={false}
         disabled={pending}
       />
-      {failure !== null && <Notice tone="negative" message={deleteErrorMessage(failure)} />}
+      {failure !== null && <Notice tone="negative" message={accountErrorMessage(failure)} />}
       {pending && (
         <p role="status" className={styles.text}>
           Excluindo a conta…
