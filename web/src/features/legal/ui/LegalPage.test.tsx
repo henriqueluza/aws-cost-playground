@@ -28,10 +28,8 @@ describe.each(pages)('%s', (path, doc) => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     const toc = screen.getByRole('navigation', { name: 'Nesta página' });
     for (const s of doc.sections) {
-      expect(within(toc).getByRole('link', { name: s.heading })).toHaveAttribute(
-        'href',
-        `#${s.id}`,
-      );
+      const link = within(toc).getByRole('link', { name: s.heading });
+      expect(link).toHaveAttribute('href', `#${s.id}`);
       expect(container.querySelector(`h2#${s.id}`)).toHaveTextContent(s.heading);
     }
   });
@@ -48,10 +46,8 @@ describe.each(pages)('%s', (path, doc) => {
     const { container } = renderAt(path);
     expect(screen.getByRole('status')).toHaveTextContent('Rascunho');
     const legal = screen.getByRole('navigation', { name: 'Informações legais' });
-    expect(within(legal).getByRole('link', { name: 'Privacidade' })).toHaveAttribute(
-      'href',
-      '/privacidade',
-    );
+    const privacy = within(legal).getByRole('link', { name: 'Privacidade' });
+    expect(privacy).toHaveAttribute('href', '/privacidade');
     await expectNoAxeViolations(container);
   });
 

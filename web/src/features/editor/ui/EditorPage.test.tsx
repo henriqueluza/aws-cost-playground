@@ -11,8 +11,6 @@ it('o rodapé do editor leva às páginas legais (Issue #59)', () => {
   );
   const footer = screen.getByRole('contentinfo');
   const legal = within(footer).getByRole('navigation', { name: 'Informações legais' });
-  const hrefs = within(legal)
-    .getAllByRole('link')
-    .map((a) => a.getAttribute('href'));
-  expect(hrefs).toEqual(['/privacidade', '/termos']);
+  const links = within(legal).getAllByRole('link');
+  expect(links.map((a) => a.getAttribute('href'))).toEqual(['/privacidade', '/termos']);
 });
