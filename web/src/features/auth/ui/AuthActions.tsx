@@ -71,6 +71,9 @@ export function SignInButton({ beforeSignIn }: { beforeSignIn?: () => void }) {
       <Button variant="primary" onClick={() => go('sign-in')} aria-disabled={busy !== null}>
         {busy === null ? 'Entrar' : 'Abrindo…'}
       </Button>
+      <span role="status" className={styles.hidden}>
+        {busy !== null ? 'Abrindo o login…' : ''}
+      </span>
       {dialog}
     </>
   );
@@ -104,7 +107,8 @@ export function AuthActions({ beforeSignIn }: { beforeSignIn?: () => void }) {
           onClick={() => {
             if (leaving) return;
             setLeaving(true);
-            void service.signOut();
+            // `signOut` não rejeita; se rejeitasse, o botão não pode ficar preso em "Saindo…".
+            service.signOut().catch(() => setLeaving(false));
           }}
         >
           {leaving ? 'Saindo…' : 'Sair'}

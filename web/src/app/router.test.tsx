@@ -1,10 +1,13 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { ApiProvider } from '../shared/lib/api/ApiProvider';
 import { createInMemoryApi } from '../shared/lib/api/inMemoryApi';
 import { AuthProvider } from '../features/auth';
+import { designStore } from '../features/editor';
+import { adrExampleDesign } from '../test/designFixtures';
 import { fakeAuth } from '../test/authFixtures';
 import { routes } from './router';
 
@@ -86,5 +89,31 @@ describe('routes', () => {
     );
     for (const name of names) expect(screen.getByRole('button', { name })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument();
+  });
+
+  it('Entrar, na barra, guarda o design em edição antes de ir ao login', async () => {
+    const auth = fakeAuth();
+    const draftAtSignIn: (string | null)[] = [];
+    auth.service.signIn.mockImplementation(() => {
+      draftAtSignIn.push(sessionStorage.getItem('aws-cost-playground:design-draft'));
+      return Promise.resolve();
+    });
+    designStore.getState().loadDesign(adrExampleDesign);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ApiProvider api={api}>
+          <AuthProvider service={auth.service}>
+            <RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />
+          </AuthProvider>
+        </ApiProvider>
+      </QueryClientProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect(draftAtSignIn).toHaveLength(1);
+    expect(draftAtSignIn[0]).toContain('API REST com 3 milh');
+    sessionStorage.clear();
+    designStore
+      .getState()
+      .loadDesign({ ...adrExampleDesign, blocks: [], edges: [], workload: { description: '' } });
   });
 });

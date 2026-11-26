@@ -105,6 +105,17 @@ describe('AuthActions', () => {
     );
   });
 
+  it('se Sair falhar, o botão volta a Sair', async () => {
+    const auth = fakeAuth(USER);
+    auth.service.signOut.mockRejectedValueOnce(new Error('x'));
+    mount(auth);
+    await userEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(await screen.findByRole('button', { name: 'Sair' })).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
+  });
+
   it('sem e-mail verificado, o link diz só "Conta"', () => {
     mount(fakeAuth({ status: 'authenticated', user: { sub: 'u1', email: null } }));
     expect(screen.getByRole('link', { name: 'Conta' })).toBeInTheDocument();
