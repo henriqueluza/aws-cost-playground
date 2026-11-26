@@ -71,6 +71,7 @@ function FilePicker(props: {
   name?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const chosen = props.name !== undefined;
   const [error, setError] = useState<{ name: string; error: DesignFileError } | null>(null);
   const pick = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
@@ -92,13 +93,10 @@ function FilePicker(props: {
           aria-label="Arquivo JSON do design B"
           onChange={(event) => void pick(event)}
         />
-        <Button
-          variant={props.name === undefined ? 'primary' : 'secondary'}
-          onClick={() => input.current?.click()}
-        >
-          {props.name === undefined ? 'Escolher arquivo JSON' : 'Trocar arquivo'}
+        <Button variant={chosen ? 'secondary' : 'primary'} onClick={() => input.current?.click()}>
+          {chosen ? 'Trocar arquivo' : 'Escolher arquivo JSON'}
         </Button>
-        {props.name !== undefined && (
+        {chosen && (
           <span className={styles.fileName} title={props.name}>
             {props.name}
           </span>

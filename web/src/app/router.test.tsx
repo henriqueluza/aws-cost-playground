@@ -53,21 +53,6 @@ describe('routes', () => {
     expect(auth.service.signIn).toHaveBeenCalledWith({ returnTo: path });
   });
 
-  it('o editor oferece o link "Comparar" também para o anônimo, e /comparar não pede login', () => {
-    const auth = fakeAuth();
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <ApiProvider api={api}>
-          <AuthProvider service={auth.service}>
-            <RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />
-          </AuthProvider>
-        </ApiProvider>
-      </QueryClientProvider>,
-    );
-    expect(screen.getByRole('link', { name: 'Comparar' })).toHaveAttribute('href', '/comparar');
-    expect(auth.service.signIn).not.toHaveBeenCalled();
-  });
-
   it('o editor anônimo abre sem pedir login', () => {
     const auth = fakeAuth();
     render(
@@ -80,6 +65,7 @@ describe('routes', () => {
       </QueryClientProvider>,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Editor' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Comparar' })).toHaveAttribute('href', '/comparar');
     expect(auth.service.signIn).not.toHaveBeenCalled();
     expect(auth.service.getAccessToken).not.toHaveBeenCalled();
   });

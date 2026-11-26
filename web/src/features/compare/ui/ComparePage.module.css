@@ -53,7 +53,9 @@
   text-decoration-thickness: 2px;
 }
 
+/* Alvo de 24px no mínimo (WCAG 2.2) mesmo sendo link de texto. */
 .back {
+  padding-block: var(--space-2);
   margin-inline-start: auto;
 }
 

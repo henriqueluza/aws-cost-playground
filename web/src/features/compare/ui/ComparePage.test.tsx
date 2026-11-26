@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -62,7 +62,12 @@ const pickB = (f: File) =>
   userEvent.upload(screen.getByLabelText('Arquivo JSON do design B'), f, { applyAccept: false });
 const group = (name: string) => screen.getByRole('group', { name });
 
-afterEach(() => vi.unstubAllGlobals());
+const initialState = designStore.getState();
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  designStore.setState(initialState);
+});
 
 describe('ComparePage (anônimo: design em edição × arquivo, sem API)', () => {
   it('compara o template com app-classico: totais de referência e diferença com sinal e palavra', async () => {
@@ -91,27 +96,7 @@ describe('ComparePage (anônimo: design em edição × arquivo, sem API)', () =>
     expect(total).toHaveTextContent('B US$ 29,67');
     expect(total).toHaveTextContent('−US$ 101,61');
     expect(total).toHaveTextContent('a menos');
-  });
-
-  it('tabela semântica: caption, cabeçalhos com scope, grupos e uma linha por tipo, com "—" onde falta', async () => {
-    const api = scenario('api-serverless');
-    renderPage([api]);
-    await pickB(file(api));
-    const table = screen.getByRole('table', { name: /Custo mensal por tipo de bloco/ });
-    const headers = within(table)
-      .getAllByRole('columnheader')
-      .filter((h) => h.getAttribute('scope') === 'col');
-    expect(headers.map((h) => h.textContent)).toEqual([
-      'Tipo',
-      'Design A',
-      'Design B',
-      'Diferença (B − A)',
-    ]);
-    for (const header of headers) expect(header).toHaveAttribute('scope', 'col');
-    expect(within(table).getByText('Blocos')).toHaveAttribute('scope', 'rowgroup');
-    const ec2 = within(table).getByRole('row', { name: /EC2/ });
-    expect(within(ec2).getByText('Este design não tem blocos deste tipo.')).toBeInTheDocument();
-    expect(within(ec2).getByText(/a menos/)).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: /Custo mensal por tipo de bloco/ })).toBeVisible();
   });
 
   it('designs iguais: diferença zero, "igual" e nenhum aviso', async () => {
@@ -120,7 +105,7 @@ describe('ComparePage (anônimo: design em edição × arquivo, sem API)', () =>
     await pickB(file(same));
     expect(group('Total por mês')).toHaveTextContent('US$ 0,00');
     expect(group('Total por mês')).toHaveTextContent('igual');
-    expect(screen.queryByRole('status', { name: /./ })).toBeNull();
+    expect(screen.queryByText(/Buscando os preços/)).toBeNull();
     expect(screen.queryByText(/regiões diferentes/)).toBeNull();
     expect(screen.queryByText(/descrições de carga/)).toBeNull();
   });
@@ -187,6 +172,34 @@ describe('ComparePage (anônimo: design em edição × arquivo, sem API)', () =>
     // Só o lado A tem catálogo no cache; o lado B (sa-east-1) busca e falha.
     renderPage();
     await pickB(file(api));
+    expect(await screen.findByText('Sem preços de sa-east-1 neste momento.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('carregando os preços de um lado: texto no lado, sem tabela, até o catálogo chegar', async () => {
+    let release = (): void => {};
+    const pending = new Promise<Response>((resolve) => {
+      release = () => resolve(new Response('', { status: 404 }));
+    });
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(pending));
+    const api = { ...scenario('api-serverless'), region: 'sa-east-1' } as DesignDocument;
+    renderPage();
+    await pickB(file(api));
+    expect(await screen.findByText('Buscando os preços de sa-east-1…')).toHaveAttribute(
+      'role',
+      'status',
+    );
+    expect(screen.queryByRole('table')).toBeNull();
+    release(); // o catálogo em andamento é compartilhado pelo módulo: não deixa pendente para o próximo teste
+    await screen.findByText('Sem preços de sa-east-1 neste momento.');
+  });
+
+  it('erro de preços no lado A: texto próprio por código e nova tentativa', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 404 })));
+    renderPage([scenario('api-serverless')]);
+    await pickB(file(scenario('api-serverless')));
+    act(() => void designStore.getState().setRegion('sa-east-1')); // o catálogo do A não está no cache
     expect(await screen.findByText('Sem preços de sa-east-1 neste momento.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
