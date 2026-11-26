@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { expectNoAxeViolations } from '../../../test/axe';
 import { adrExampleDesign } from '../../../test/designFixtures';
 import { designStore } from '../hooks/designStore';
+import { EMPTY_HISTORY } from '../model/history';
 import { EMPTY_STATE } from '../model/editorState';
 import { InspectorPanel } from './InspectorPanel';
 
@@ -16,7 +17,7 @@ const select = (id: string | null) => {
 };
 
 beforeEach(() => {
-  designStore.setState({ ...EMPTY_STATE, document: doc });
+  designStore.setState({ ...EMPTY_STATE, document: doc, history: EMPTY_HISTORY });
 });
 afterEach(cleanup);
 
@@ -99,22 +100,28 @@ describe('InspectorPanel', () => {
     const label = screen.getByLabelText('Nome do bloco');
     await user.clear(label);
     await user.type(label, '<img src=x onerror=alert(1)>');
+    expect(block().label).toBe('API handler'); // por tecla, nada grava
+    expect(designStore.getState().history.past).toHaveLength(0);
+    await user.keyboard('{Enter}');
     expect(block().label).toBe('<img src=x onerror=alert(1)>');
+    expect(designStore.getState().history.past).toHaveLength(1); // um passo por confirmação
     expect(document.querySelector('img')).toBeNull();
 
     await user.clear(label);
     await user.click(label);
     await user.paste('a'.repeat(81));
     expect(screen.getByRole('alert')).toHaveTextContent('Use até 80 caracteres.');
-    expect(block().label).toBe('');
+    await user.tab(); // inválido: não grava, e o texto não fica no campo
+    expect(block().label).toBe('<img src=x onerror=alert(1)>');
+    expect(label).toHaveValue('<img src=x onerror=alert(1)>');
 
     await user.clear(label);
     await user.paste('a‮b');
     expect(screen.getByRole('alert')).toHaveTextContent('caracteres de controle');
-    expect(block().label).toBe('');
-    await user.tab(); // o texto inválido não fica no campo: a store é a verdade
-    expect(label).toHaveValue('');
+    await user.tab();
+    expect(block().label).toBe('<img src=x onerror=alert(1)>');
     expect(screen.queryByRole('alert')).toBeNull();
+    expect(designStore.getState().history.past).toHaveLength(1);
   });
 
   it('sem violações de acessibilidade, com e sem erro', async () => {

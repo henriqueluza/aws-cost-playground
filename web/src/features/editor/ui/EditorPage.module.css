@@ -117,6 +117,11 @@
 }
 
 /* Ações da barra superior, à direita; cada feature põe os seus botões dentro dela. */
+.history {
+  display: flex;
+  gap: var(--space-1);
+}
+
 .actions {
   margin-inline-start: auto;
   display: flex;

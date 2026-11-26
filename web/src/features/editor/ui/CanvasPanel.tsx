@@ -135,6 +135,8 @@ function Canvas(): ReactElement {
         nodeTypes={NODE_TYPES}
         onNodesChange={onNodesChange as never}
         onEdgesChange={onEdgesChange as never}
+        onNodeDragStart={() => designStore.getState().beginGesture()}
+        onNodeDragStop={() => designStore.getState().endGesture()}
         onConnect={onConnect}
         onConnectStart={() => setRefusal(null)}
         onConnectEnd={onConnectEnd}
