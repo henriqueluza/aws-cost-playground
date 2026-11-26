@@ -240,7 +240,7 @@ Repetir a chamada após qualquer falha termina o trabalho (idempotente). IAM da 
 
 **Apaga:** todos os itens de `USER#<sub>` (designs `DESIGN#<ulid>` e contadores `QUOTA#<aaaa-mm-dd>`) e o usuário no Cognito (com ele, o e-mail e os refresh tokens).
 
-**Não apaga:** a quota global (`PK = GLOBAL`, que não é do usuário e o papel da `api` não alcança); backups de recuperação pontual (PITR, só em produção; 35 dias, o padrão do DynamoDB, já que `infra/modules/database` não define outro período; o dado apagado continua recuperável nessa janela e some sozinho ao fim dela); logs do CloudWatch até a retenção de 7 dias (o log da aplicação não tem e-mail nem `sub`; o log de acesso do API Gateway registra o `sub`, pseudônimo, em toda requisição, inclusive nesta); o que já foi enviado à Anthropic nas estimativas.
+**Não apaga:** a quota global (`PK = GLOBAL`, que não é do usuário e o papel da `api` não alcança); backups de recuperação pontual (PITR, só em produção; 35 dias, o padrão do DynamoDB, já que `infra/modules/database` não define outro período; o dado apagado continua recuperável nessa janela e some sozinho ao fim dela); logs do CloudWatch até a retenção de 7 dias (o log da aplicação não tem e-mail; o evento de exclusão não leva `sub`, mas os eventos de quota e de estimativa do `llm-proxy` levam o `sub`, pseudônimo; o log de acesso do API Gateway registra o `sub`, pseudônimo, em toda requisição, inclusive nesta); o que já foi enviado à Anthropic nas estimativas.
 
 **Tempo no pior caso:** 50 designs de até 350 KB (cerca de 17,5 MB, 18 páginas de `Query`) mais até 35 contadores: cerca de 85 itens, 4 lotes e 22 chamadas por volta, normalmente bem abaixo de 1 a 2 s. As esperas de reenvio somam menos de 2 s. Se a Lambda estourar os 10 s, o cliente repete.
 
