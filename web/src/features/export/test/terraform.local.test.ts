@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { adrExampleDesign } from '../../../test/designFixtures';
+import { exportDesign } from '../application/exportDesign';
 import { hcl, renderHcl } from '../model/hcl';
 import { INJECTION_PAYLOADS } from './injectionPayloads';
 
@@ -42,6 +44,16 @@ describe.skipIf(!enabled)('conferência com o binário terraform', { timeout: 12
         join(dir, 'keys.tf'),
         renderHcl([hcl.block('locals', [], [hcl.attr('keys', keys)])]),
       );
+
+      // O export inteiro, com as cargas nos rótulos: o `fmt` lê a sintaxe sem precisar do provider.
+      const blocks = payloads.map((payload, i) => ({
+        ...adrExampleDesign.blocks[1],
+        id: `blk_${i}`,
+        label: payload.slice(0, 80),
+      }));
+      const exported = exportDesign({ ...adrExampleDesign, blocks, edges: [] });
+      if (!exported.ok) throw new Error(exported.error);
+      terraform(['fmt', '-check', '-'], exported.files[0]?.content);
 
       terraform(['fmt', '-check', 'main.tf']);
       terraform(['init', '-backend=false', '-input=false']);
