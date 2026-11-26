@@ -1,12 +1,14 @@
 import type { BlockType } from '../../../pricing';
 import type { BlockGenerator } from '../generator';
 import { alb } from './alb';
+import { cloudfront } from './cloudfront';
 import { cloudwatch } from './cloudwatch';
 import { ec2 } from './ec2';
 import { elasticache } from './elasticache';
 import { natGateway } from './nat-gateway';
 import { notSupportedYet } from './provisional';
 import { rds } from './rds';
+import { s3 } from './s3';
 
 /**
  * Registro dos geradores: um por tipo de bloco, cada um no seu arquivo. O compilador recusa um
@@ -14,13 +16,13 @@ import { rds } from './rds';
  */
 export const BLOCK_GENERATORS: Readonly<Record<BlockType, BlockGenerator>> = {
   'aws.lambda': notSupportedYet,
-  'aws.s3': notSupportedYet,
+  'aws.s3': s3,
   'aws.sqs': notSupportedYet,
   'aws.dynamodb': notSupportedYet,
   'aws.ec2': ec2,
   'aws.rds': rds,
   'aws.elasticache': elasticache,
-  'aws.cloudfront': notSupportedYet,
+  'aws.cloudfront': cloudfront,
   'aws.alb': alb,
   'aws.cloudwatch': cloudwatch,
   'aws.nat-gateway': natGateway,
