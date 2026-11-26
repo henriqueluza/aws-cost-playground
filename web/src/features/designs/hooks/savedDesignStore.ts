@@ -37,3 +37,8 @@ export const savedDesignStore = createSavedDesignStore();
 export function useSavedDesign<T>(selector: (state: SavedDesignState) => T): T {
   return useStore(savedDesignStore, selector);
 }
+
+/** Esquece o design salvo associado (a conta saiu ou foi excluída): o próximo salvar cria um novo. */
+export function forgetSavedDesign(): void {
+  savedDesignStore.setState({ saved: null, saving: false, error: null });
+}
