@@ -9,41 +9,57 @@ from fastapi import FastAPI
 from app.logs import JsonFormatter, RequestLogMiddleware, configure_logging, get_request_id
 from tests.conftest import FakeContext, invoke, make_event
 
+EMAIL = "someone@example.com"
+
 
 def _probe_app() -> FastAPI:
     probe = FastAPI()
-    probe.post("/x")(lambda: {"ok": True})
+    probe.post("/x/{key}")(lambda key: {"ok": True})
     probe.get("/boom")(lambda: 1 / 0)
     return probe
 
 
-def _request_lines(out: str) -> list[dict[str, Any]]:
-    lines = [json.loads(line) for line in out.splitlines() if line]
-    return [x for x in lines if x["logger"] == "app.request"]
+def _lines(out: str, logger: str) -> list[dict[str, Any]]:
+    return [x for x in map(json.loads, filter(None, out.splitlines())) if x["logger"] == logger]
+
+
+def _run_asgi(asgi: Any) -> None:
+    async def send(_: Any) -> None: ...
+
+    scope: Any = {"type": "http", "method": "GET", "path": "/y"}
+    asyncio.run(RequestLogMiddleware(asgi)(scope, None, send))
 
 
 def test_request_log_has_id_and_no_sensitive_data(capsys: pytest.CaptureFixture[str]) -> None:
     configure_logging("INFO")  # com o capsys ativo, o handler liga ao stdout capturado
-    headers = {"authorization": "Bearer secret-token", "x-user-email": "someone@example.com"}
+    headers = {"authorization": "Bearer secret-token", "x-user-email": EMAIL}
     event = make_event(
-        "/x",
-        headers=headers,
-        query="email=someone@example.com",
-        body='{"email":"someone@example.com"}',
+        f"/x/{EMAIL}",
         method="POST",
+        headers=headers,
+        query=f"email={EMAIL}",
+        body=f'{{"email":"{EMAIL}"}}',
     )
     status, _, _ = invoke(_probe_app(), event)
     out = capsys.readouterr().out
-    assert "secret-token" not in out and "someone@example.com" not in out
-    (line,) = _request_lines(out)
-    assert (line["request_id"], line["method"], line["path"], line["status"]) == (
+    assert "secret-token" not in out and EMAIL not in out
+    (line,) = _lines(out, "app.request")
+    assert (line["request_id"], line["method"], line["route"], line["status"]) == (
         "req-test-1",
         "POST",
-        "/x",
+        "/x/{key}",  # o template da rota, nunca o path com o e-mail
         status,
     )
     assert line["duration_ms"] >= 0
     assert get_request_id() == "-"
+
+
+def test_unmatched_route_is_not_logged_raw(capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging("INFO")
+    status, _, _ = invoke(_probe_app(), make_event(f"/nope/{EMAIL}"))
+    out = capsys.readouterr().out
+    assert status == 404 and EMAIL not in out
+    assert _lines(out, "app.request")[0]["route"] == "<unmatched>"
 
 
 def test_fallback_id_is_uuid_hex(capsys: pytest.CaptureFixture[str]) -> None:
@@ -52,13 +68,39 @@ def test_fallback_id_is_uuid_hex(capsys: pytest.CaptureFixture[str]) -> None:
     async def asgi(scope: Any, receive: Any, send: Any) -> None:
         await send({"type": "http.response.start", "status": 204, "headers": []})
 
-    async def send(_: Any) -> None: ...
-
-    scope: Any = {"type": "http", "method": "GET", "path": "/y"}
-    asyncio.run(RequestLogMiddleware(asgi)(scope, None, send))  # type: ignore[arg-type]
-    (line,) = _request_lines(capsys.readouterr().out)
+    _run_asgi(asgi)
+    (line,) = _lines(capsys.readouterr().out, "app.request")
     assert len(line["request_id"]) == 32 and int(line["request_id"], 16) >= 0
     assert line["status"] == 204
+
+
+def test_error_before_response_is_logged_and_reraised(capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging("INFO")
+
+    async def asgi(scope: Any, receive: Any, send: Any) -> None:
+        raise RuntimeError(EMAIL)
+
+    with pytest.raises(RuntimeError):
+        _run_asgi(asgi)
+    out = capsys.readouterr().out
+    assert EMAIL not in out
+    assert [x["error_type"] for x in _lines(out, "app.error")] == ["RuntimeError"]
+    assert [x["status"] for x in _lines(out, "app.request")] == [500]
+
+
+def test_error_after_response_started_is_logged(capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging("INFO")
+
+    async def asgi(scope: Any, receive: Any, send: Any) -> None:
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        raise RuntimeError(EMAIL)  # ex.: falha no meio do corpo
+
+    _run_asgi(asgi)  # absorvida: a resposta já começou
+    out = capsys.readouterr().out
+    assert EMAIL not in out
+    [error] = _lines(out, "app.error")
+    assert (error["level"], error["error_type"]) == ("ERROR", "RuntimeError")
+    assert [x["status"] for x in _lines(out, "app.request")] == [200]
 
 
 def test_formatter_drops_fields_outside_allowlist() -> None:
@@ -77,4 +119,17 @@ def test_unhandled_exception_returns_500_and_is_absorbed(
     configure_logging("INFO")
     response = create_handler(_probe_app())(make_event("/boom"), FakeContext())
     assert response["statusCode"] == 500
-    assert [x["status"] for x in _request_lines(capsys.readouterr().out)] == [500]
+    out = capsys.readouterr().out
+    assert [x["status"] for x in _lines(out, "app.request")] == [500]
+    assert [x["error_type"] for x in _lines(out, "app.error")] == ["ZeroDivisionError"]
+
+
+def test_non_http_scope_passes_through_without_log(capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging("INFO")
+    seen: list[str] = []
+
+    async def asgi(scope: Any, receive: Any, send: Any) -> None:
+        seen.append(scope["type"])
+
+    asyncio.run(RequestLogMiddleware(asgi)({"type": "lifespan"}, None, None))  # type: ignore[arg-type]
+    assert seen == ["lifespan"] and capsys.readouterr().out == ""

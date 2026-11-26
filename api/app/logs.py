@@ -3,6 +3,7 @@
 import json
 import logging
 import sys
+import traceback
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from time import perf_counter
@@ -11,12 +12,14 @@ from uuid import uuid4
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 ALLOWED_FIELDS: frozenset[str] = frozenset(
-    {"method", "path", "status", "duration_ms", "error_type", "stack"}
+    {"method", "route", "status", "duration_ms", "error_type", "stack"}
 )
 
 
 _request_id: ContextVar[str] = ContextVar("request_id", default="-")
 _request_logger = logging.getLogger("app.request")
+_error_logger = logging.getLogger("app.error")
+UNMATCHED_ROUTE = "<unmatched>"
 
 
 def get_request_id() -> str:
@@ -24,11 +27,20 @@ def get_request_id() -> str:
     return _request_id.get()
 
 
+def _frames(exc: BaseException) -> str:
+    """Arquivo, linha e função de cada frame. Sem a mensagem da exceção nem o texto da linha."""
+    return "".join(
+        f"{frame.f_code.co_filename}:{lineno} in {frame.f_code.co_name}\n"
+        for frame, lineno in traceback.walk_tb(exc.__traceback__)
+    )
+
+
 class JsonFormatter(logging.Formatter):
     """Uma linha JSON: timestamp, level, logger, message, request_id e extras de ALLOWED_FIELDS."""
 
     def format(self, record: logging.LogRecord) -> str:
-        # exc_info/stack_info ficam de fora de propósito: quem precisa manda `stack` explícito.
+        # exc_info/stack_info ficam de fora de propósito, inclusive em `logger.exception` de
+        # bibliotecas: só a linha `app.error` do middleware carrega `stack`, sem a mensagem.
         data = {
             "timestamp": datetime.fromtimestamp(record.created, UTC).isoformat(),
             "level": record.levelname,
@@ -54,8 +66,10 @@ class RequestLogMiddleware:
     """Middleware ASGI puro, camada mais externa (fora do ServerErrorMiddleware do Starlette).
 
     Define o id (`scope["aws.context"].aws_request_id`, senão uuid4) e grava uma linha por
-    requisição no logger `app.request`. A exceção que o Starlette relança depois de responder 500
-    termina aqui, para o Mangum não registrá-la com a mensagem.
+    requisição no logger `app.request`, com o template da rota (nunca o path cru, que pode ter
+    dado pessoal). Toda exceção não tratada chega aqui: o ServerErrorMiddleware do Starlette
+    responde 500 e relança. Ela é registrada em `app.error` sem a mensagem e termina aqui, para
+    o Mangum não registrá-la.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -78,15 +92,18 @@ class RequestLogMiddleware:
         start = perf_counter()
         try:
             await self.app(scope, receive, capture)
-        except Exception:
+        except Exception as exc:
+            extra = {"error_type": type(exc).__name__, "stack": _frames(exc)}
+            _error_logger.error("unhandled error", extra=extra)
             if status is None:
                 raise  # resposta não começou: deixa o Mangum tratar
         finally:
+            route = getattr(scope.get("route"), "path", None)
             _request_logger.info(
                 "request",
                 extra={
                     "method": scope["method"],
-                    "path": scope["path"],
+                    "route": route or UNMATCHED_ROUTE,
                     "status": status or 500,
                     "duration_ms": round((perf_counter() - start) * 1000, 2),
                 },

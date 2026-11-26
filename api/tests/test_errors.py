@@ -1,9 +1,10 @@
-import logging
+import json
 
 import pytest
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from app.logs import configure_logging
 from tests.conftest import invoke, make_event
 
 LEAK = "leak@example.com"
@@ -24,7 +25,7 @@ def probe(app: FastAPI) -> FastAPI:
 
     @app.get("/boom")
     def boom() -> None:
-        raise ValueError(LEAK)
+        raise ValueError("literal-leak@example.com") from KeyError(LEAK)
 
     return app
 
@@ -46,11 +47,17 @@ def test_validation_error_never_echoes_input(probe: FastAPI) -> None:
 
 
 def test_unhandled_error_is_500_and_logs_no_message(
-    probe: FastAPI, caplog: pytest.LogCaptureFixture
+    probe: FastAPI, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    with caplog.at_level(logging.DEBUG):
-        status, _, body = invoke(probe, make_event("/boom"))
-    assert (status, "detail" in body) == (500, False)
-    [record] = [r for r in caplog.records if r.name == "app.error"]
-    assert record.error_type == "ValueError"  # type: ignore[attr-defined]
-    assert LEAK not in caplog.text
+    configure_logging("DEBUG")  # o stdout capturado recebe as linhas JSON de verdade
+    status, _, body = invoke(probe, make_event("/boom"))
+    out = capsys.readouterr().out
+    assert (status, body["title"], "detail" in body) == (500, "Internal Server Error", False)
+    assert "leak" not in str(body) and "leak" not in out  # nem a mensagem nem o texto da linha
+    [line] = [x for x in map(json.loads, out.splitlines()) if x["logger"] == "app.error"]
+    assert (line["level"], line["error_type"], line["request_id"]) == (
+        "ERROR",
+        "ValueError",
+        "req-test-1",
+    )
+    assert "in boom" in line["stack"]

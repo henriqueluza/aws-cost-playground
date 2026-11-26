@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -64,6 +65,16 @@ def env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     yield
     get_settings.cache_clear()
     get_table.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def restore_logging() -> Iterator[None]:
+    """`configure_logging` troca os handlers do root; cada teste começa e termina igual."""
+    root, mangum = logging.getLogger(), logging.getLogger("mangum")
+    saved = (root.handlers[:], root.level, mangum.level)
+    yield
+    root.handlers[:], root.level = saved[0], saved[1]
+    mangum.setLevel(saved[2])
 
 
 @pytest.fixture
