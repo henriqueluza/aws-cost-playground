@@ -174,6 +174,13 @@ run "funcoes_logs_e_ambiente" {
   }
 
   assert {
+    condition = alltrue([
+      for f in aws_lambda_function.this : f.runtime == "python3.14" && f.architectures == tolist(["arm64"])
+    ])
+    error_message = "As duas funções rodam em python3.14 (o Python de api/.python-version) e arm64, o alvo do zip."
+  }
+
+  assert {
     condition     = aws_lambda_function.this["api"].environment[0].variables == tomap({ TABLE_NAME = "acp-stg-main", USER_POOL_ID = "us-east-1_EXEMPLO" })
     error_message = "A api recebe só o nome da tabela e o id do pool."
   }
