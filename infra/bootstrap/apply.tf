@@ -205,6 +205,14 @@ resource "aws_iam_role_policy" "apply_deny_data" {
         Resource = "*"
       },
       {
+        # Uma URL de função é uma saída pública que pula o API Gateway e o JWT. Fica aqui, e
+        # não na política gerenciada, para valer também contra qualquer `Allow` futuro.
+        Sid      = "DenyFunctionUrl"
+        Effect   = "Deny"
+        Action   = ["lambda:CreateFunctionUrlConfig", "lambda:UpdateFunctionUrlConfig"]
+        Resource = "*"
+      },
+      {
         # O papel não troca de identidade: o trust de outro papel da conta poderia citá-lo.
         Sid      = "DenyAssumeRole"
         Effect   = "Deny"

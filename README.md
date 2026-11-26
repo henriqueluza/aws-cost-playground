@@ -42,7 +42,7 @@ architecture-discovery → project-bootstrap (ADR + PRD + Issues) → sprint-pla
 
 ## Deploy
 
-Agentes nunca fazem deploy (o hook bloqueia deploy, `apply` e `submit`). Depois do **seu** merge em `main`, o CI publica em **staging**; **produção** usa o mesmo artefato e só sai quando **você** dispara o workflow `deploy-production` (botão "Run workflow") com o digest validado em staging — o mesmo workflow serve de rollback. (Em repositório privado, aprovação obrigatória em Environments exige GitHub Enterprise; o disparo manual funciona em qualquer plano.) Detalhes: `.claude/skills/devops-standards/`.
+Agentes nunca fazem deploy (o hook bloqueia deploy, `apply` e `submit`). Depois do **seu** merge em `main`, o CI publica em **staging**; **produção** usa o mesmo artefato e só sai quando **você** dispara o workflow `deploy-production` (botão "Run workflow") com o SHA validado em staging (runbook: `docs/runbooks/rollback.md`) — o mesmo workflow serve de rollback. (Em repositório privado, aprovação obrigatória em Environments exige GitHub Enterprise; o disparo manual funciona em qualquer plano.) Detalhes: `.claude/skills/devops-standards/`.
 
 ## PRs pequenos
 
