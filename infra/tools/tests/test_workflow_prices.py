@@ -1,9 +1,8 @@
 """Testes do workflow prices.yml (#29, parte 2).
 
-O workflow é lido como texto (sem PyYAML, que o runner não garante) e existe em
-`.github/workflows/` ou, até o `git mv` do autor, em `.github/workflows-pending/`: exige-se
-exatamente um. O passo `gate` é executado de verdade com bash. O script de publicação tem
-os próprios testes em test_prices_pr_script.py. Sem rede.
+O workflow é lido como texto (sem PyYAML, que o runner não garante), no caminho definitivo
+`.github/workflows/prices.yml`. Os passos `gate` e `apply` são executados de verdade com
+bash. O script de publicação tem os próprios testes em test_prices_pr_script.py. Sem rede.
 """
 
 from __future__ import annotations
@@ -17,23 +16,21 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-LIVE = ROOT / ".github" / "workflows" / "prices.yml"
+WORKFLOW = ROOT / ".github" / "workflows" / "prices.yml"
 PENDING = ROOT / ".github" / "workflows-pending" / "prices.yml"
 STEP_START = re.compile(r"^      - ", re.M)
 GATE_CONDITION = "if: steps.gate.outputs.configured == 'true'"
-STEP_IDS = ["gate", "checkout", "uv", "aws", "generate", "publish"]
+STEP_IDS = {
+    "generate": ["gate", "checkout", "uv", "deps", "aws", "generate", "upload"],
+    "publish": ["checkout", "download", "apply", "publish"],
+}
+ARTIFACT = "path: ${{ runner.temp }}/catalog"
+NOTHING = "nenhum serviço com consulta: nada a gravar"
 FORBIDDEN = [r"gh pr " + r"merge", r"--label", r"skip-review", r"--force", r"\+refs"]
 
 
-def workflow_path() -> Path:
-    found = [p for p in (LIVE, PENDING) if p.exists()]
-    if len(found) != 1:
-        raise AssertionError(f"esperado exatamente um prices.yml, achei: {found}")
-    return found[0]
-
-
 def text() -> str:
-    return workflow_path().read_text(encoding="utf-8")
+    return WORKFLOW.read_text(encoding="utf-8")
 
 
 def strip_comments(raw: str) -> str:
@@ -64,11 +61,25 @@ def steps(job_text: str) -> list[tuple[str | None, str]]:
     return out
 
 
-def step(sid_wanted: str) -> str:
-    for sid, chunk in steps(job("catalog")):
+def all_steps() -> list[tuple[str, str | None, str]]:
+    return [(name, sid, chunk) for name in STEP_IDS for sid, chunk in steps(job(name))]
+
+
+def step(job_name: str, sid_wanted: str) -> str:
+    for sid, chunk in steps(job(job_name)):
         if sid == sid_wanted:
             return chunk
-    raise AssertionError(f"passo `{sid_wanted}` não encontrado")
+    raise AssertionError(f"passo `{job_name}.{sid_wanted}` não encontrado")
+
+
+def permissions(job_name: str) -> list[str]:
+    block = job(job_name).split("    permissions:\n", 1)[1]
+    perms = []
+    for line in block.splitlines():
+        if not line.startswith("      "):
+            break
+        perms.append(line.strip())
+    return sorted(perms)
 
 
 def run_block(step_text: str) -> str:
@@ -90,8 +101,9 @@ def run_block(step_text: str) -> str:
 
 
 class TriggerAndPermissionsTest(unittest.TestCase):
-    def test_exactly_one_workflow_file(self) -> None:
-        self.assertTrue(workflow_path().exists())
+    def test_workflow_lives_only_in_the_final_path(self) -> None:
+        self.assertTrue(WORKFLOW.is_file())
+        self.assertFalse(PENDING.exists())
 
     def test_trigger_is_only_schedule_and_dispatch(self) -> None:
         on = text().split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
@@ -99,59 +111,101 @@ class TriggerAndPermissionsTest(unittest.TestCase):
         self.assertIn("cron: '17 9 * * 1'", on.replace('"', "'"))
 
     def test_no_forbidden_trigger_anywhere(self) -> None:
-        for name in ("pull_request", "pull_request_target", "push"):
+        for name in ("pull_request", "pull_request_target", "push", "workflow_run"):
             self.assertNotRegex(code(), rf"(?m)^\s*{name}\b", f"gatilho proibido: {name}")
 
     def test_top_level_permissions_are_empty(self) -> None:
         self.assertRegex(text(), r"(?m)^permissions: \{\}\s*$")
 
-    def test_job_is_main_only_with_exact_permissions(self) -> None:
-        catalog = job("catalog")
-        self.assertRegex(catalog, r"(?m)^    if: github\.ref == 'refs/heads/main'\s*$")
-        block = catalog.split("    permissions:\n", 1)[1]
-        perms = []
-        for line in block.splitlines():
-            if not line.startswith("      "):
-                break
-            perms.append(line.strip())
-        self.assertEqual(
-            sorted(perms),
-            ["contents: write", "id-token: write", "pull-requests: write"],
+    def test_jobs_are_generate_then_publish(self) -> None:
+        body = text().split("\njobs:\n", 1)[1]
+        self.assertEqual(re.findall(r"(?m)^  (\w[\w-]*):\s*$", body), list(STEP_IDS))
+        self.assertRegex(job("publish"), r"(?m)^    needs: generate\s*$")
+
+    def test_aws_job_cannot_write_and_publish_job_has_no_oidc(self) -> None:
+        self.assertEqual(permissions("generate"), ["contents: read", "id-token: write"])
+        self.assertEqual(permissions("publish"), ["contents: write", "pull-requests: write"])
+
+    def test_both_jobs_run_only_on_main_and_never_in_an_environment(self) -> None:
+        self.assertRegex(job("generate"), r"(?m)^    if: github\.ref == 'refs/heads/main'\s*$")
+        self.assertRegex(
+            job("publish"),
+            r"(?m)^    if: github\.ref == 'refs/heads/main' && "
+            r"needs\.generate\.outputs\.configured == 'true'\s*$",
+        )
+        self.assertNotRegex(code(), r"(?m)^\s*environment:")
+
+    def test_concurrency_never_cancels_a_running_publication(self) -> None:
+        self.assertRegex(
+            text(), r"(?m)^concurrency:\n  group: prices\n  cancel-in-progress: false$"
         )
 
-    def test_only_one_job(self) -> None:
-        body = text().split("\njobs:\n", 1)[1]
-        self.assertEqual(re.findall(r"(?m)^  (\w[\w-]*):\s*$", body), ["catalog"])
+    def test_a_change_to_the_workflow_runs_these_tests_in_ci(self) -> None:
+        terraform = (WORKFLOW.parent / "terraform.yml").read_text(encoding="utf-8")
+        paths = terraform.split("    paths:\n", 1)[1].split("\n\n", 1)[0]
+        self.assertIn('- ".github/workflows/prices.yml"', paths)
+        self.assertIn("python3 -m unittest discover -s infra/tools/tests", terraform)
 
 
 class StepsTest(unittest.TestCase):
     def test_step_ids_in_order(self) -> None:
-        self.assertEqual([sid for sid, _ in steps(job("catalog"))], STEP_IDS)
+        for name, expected in STEP_IDS.items():
+            self.assertEqual([sid for sid, _ in steps(job(name))], expected, name)
 
-    def test_every_step_after_the_gate_requires_it_configured(self) -> None:
-        for sid, chunk in steps(job("catalog"))[1:]:
+    def test_every_generate_step_after_the_gate_requires_it_configured(self) -> None:
+        for sid, chunk in steps(job("generate"))[1:]:
             self.assertIn(GATE_CONDITION, chunk, f"passo {sid} sem a condição do gate")
+        self.assertIn("configured: ${{ steps.gate.outputs.configured }}", job("generate"))
 
     def test_gate_reads_role_from_a_variable_only(self) -> None:
-        self.assertIn("ROLE: ${{ vars.AWS_PRICES_ROLE_ARN }}", step("gate"))
+        self.assertIn("ROLE: ${{ vars.AWS_PRICES_ROLE_ARN }}", step("generate", "gate"))
 
-    def test_aws_and_checkout_settings(self) -> None:
-        self.assertIn("role-to-assume: ${{ vars.AWS_PRICES_ROLE_ARN }}", step("aws"))
-        self.assertIn("persist-credentials: false", step("checkout"))
+    def test_oidc_assumes_the_prices_role_in_us_east_1_only_in_generate(self) -> None:
+        aws = step("generate", "aws")
+        self.assertIn("role-to-assume: ${{ vars.AWS_PRICES_ROLE_ARN }}", aws)
+        self.assertRegex(aws, r"(?m)^\s+aws-region: us-east-1\s*$")
+        self.assertNotIn("configure-aws-credentials", job("publish"))
+        self.assertNotIn("AWS_", job("publish"))
+
+    def test_checkouts_keep_no_credentials_and_follow_the_branch(self) -> None:
+        for name in STEP_IDS:
+            checkout = step(name, "checkout")
+            self.assertIn("persist-credentials: false", checkout, name)
+            self.assertNotRegex(checkout, r"(?m)^\s+ref:", name)
+
+    def test_dependencies_are_installed_locked_before_the_aws_credentials(self) -> None:
+        deps = step("generate", "deps")
+        self.assertEqual(run_block(deps), "uv sync --locked")
+        self.assertRegex(deps, r"(?m)^\s+working-directory: pricing\s*$")
 
     def test_generate_runs_catalog_and_summary_in_pricing(self) -> None:
-        generate = step("generate")
+        generate = step("generate", "generate")
         self.assertRegex(generate, r"(?m)^\s+working-directory: pricing\s*$")
         run = run_block(generate)
         self.assertRegex(run, r"python -m app(\s|$)")
         self.assertIn("python -m app.summary", run)
+        self.assertIn('>> "$GITHUB_STEP_SUMMARY"', run)
+
+    def test_generate_warns_when_the_generator_wrote_nothing(self) -> None:
+        run = run_block(step("generate", "generate"))
+        self.assertRegex(run, rf"grep -qxF '{NOTHING}' .*\n\s+echo \"::warning::")
+
+    def test_catalog_travels_between_jobs_as_a_short_lived_artifact(self) -> None:
+        upload, download = step("generate", "upload"), step("publish", "download")
+        for chunk in (upload, download):
+            self.assertRegex(chunk, r"(?m)^\s+name: catalog\s*$")
+            self.assertIn(ARTIFACT, chunk)
+        self.assertRegex(upload, r"(?m)^\s+retention-days: 1\s*$")
+        self.assertRegex(upload, r"(?m)^\s+if-no-files-found: error\s*$")
 
     def test_publish_uses_the_script_and_only_it_gets_the_token(self) -> None:
-        publish = step("publish")
+        publish = step("publish", "publish")
         self.assertIn("GH_TOKEN: ${{ github.token }}", publish)
-        self.assertIn('bash scripts/prices-pr.sh "$RUNNER_TEMP/body.md"', run_block(publish))
-        for sid, chunk in steps(job("catalog")):
-            if sid != "publish":
+        self.assertIn(
+            'bash scripts/prices-pr.sh "$RUNNER_TEMP/catalog/body.md"', run_block(publish)
+        )
+        for name, sid, chunk in all_steps():
+            if (name, sid) != ("publish", "publish"):
                 self.assertNotIn("GH_TOKEN", chunk, sid)
                 self.assertNotIn("github.token", chunk, sid)
 
@@ -159,12 +213,12 @@ class StepsTest(unittest.TestCase):
 class HardeningTest(unittest.TestCase):
     def test_every_uses_is_pinned_by_sha_with_version_comment(self) -> None:
         uses = re.findall(r"(?m)^\s*(?:- )?uses:.*$", code())
-        self.assertTrue(uses)
+        self.assertEqual(len(uses), 6)
         for line in uses:
             self.assertRegex(line, r"uses: \S+@[0-9a-f]{40}\s+# v\S+", line)
 
     def test_run_blocks_never_interpolate_expressions(self) -> None:
-        for sid, chunk in steps(job("catalog")):
+        for _, sid, chunk in all_steps():
             self.assertNotIn("${{", run_block(chunk), sid)
 
     def test_no_secrets_context(self) -> None:
@@ -173,22 +227,28 @@ class HardeningTest(unittest.TestCase):
     def test_no_forbidden_publication_command_in_workflow(self) -> None:
         for pattern in FORBIDDEN:
             self.assertNotRegex(code(), pattern)
-        for line in code().splitlines():
-            if "git push" in line:
-                self.assertNotRegex(line, r"\s-f(\s|$)", line)
+        self.assertNotIn("git push", code())
+
+
+def run_step(script: str, env: dict[str, str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    if not script:
+        raise AssertionError("passo sem bloco run")
+    return subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", script],
+        env={"PATH": os.environ["PATH"], **env},
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def run_gate(role: str) -> tuple[subprocess.CompletedProcess[str], str]:
-    script = run_block(step("gate"))
-    if not script:
-        raise AssertionError("o passo gate não tem bloco run")
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "output"
         out.write_text("")
-        env = {"PATH": os.environ["PATH"], "ROLE": role, "GITHUB_OUTPUT": str(out)}
-        proc = subprocess.run(
-            ["bash", "-c", script], env=env, capture_output=True, text=True, check=False
-        )
+        script = run_block(step("generate", "gate"))
+        proc = run_step(script, {"ROLE": role, "GITHUB_OUTPUT": str(out)}, Path(tmp))
         return proc, out.read_text()
 
 
@@ -207,6 +267,55 @@ class GateExecutionTest(unittest.TestCase):
         self.assertIn("configured=true", out)
         self.assertNotIn("configured=false", out)
         self.assertNotIn(role, proc.stdout + proc.stderr + out)
+
+
+class ApplyExecutionTest(unittest.TestCase):
+    """O passo `apply` troca web/public/prices pelo catálogo do artefato, ou recusa."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = Path(tmp.name) / "repo"
+        self.catalog = Path(tmp.name) / "temp" / "catalog"
+        old = self.repo / "web" / "public" / "prices" / "us-east-1"
+        old.mkdir(parents=True)
+        (old / "gone.json").write_text("{}")
+        (old.parent / "manifest.json").write_text('{"old": true}')
+        new = self.catalog / "prices" / "us-east-1"
+        new.mkdir(parents=True)
+        (new / "s3.json").write_text("{}")
+        (new.parent / "manifest.json").write_text('{"new": true}')
+        (self.catalog / "body.md").write_text("corpo\n")
+
+    def apply(self) -> subprocess.CompletedProcess[str]:
+        script = run_block(step("publish", "apply"))
+        return run_step(script, {"RUNNER_TEMP": str(self.catalog.parent)}, self.repo)
+
+    def assert_refused(self) -> None:
+        proc = self.apply()
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertRegex(proc.stdout, r"(?m)^::error::")
+        self.assertTrue((self.repo / "web/public/prices/us-east-1/gone.json").exists())
+
+    def test_replaces_the_whole_directory(self) -> None:
+        proc = self.apply()
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        prices = self.repo / "web" / "public" / "prices"
+        files = sorted(str(p.relative_to(prices)) for p in prices.rglob("*") if p.is_file())
+        self.assertEqual(files, ["manifest.json", "us-east-1/s3.json"])
+        self.assertEqual((prices / "manifest.json").read_text(), '{"new": true}')
+
+    def test_refuses_artifact_without_manifest(self) -> None:
+        (self.catalog / "prices" / "manifest.json").unlink()
+        self.assert_refused()
+
+    def test_refuses_artifact_without_body(self) -> None:
+        (self.catalog / "body.md").write_text("")
+        self.assert_refused()
+
+    def test_refuses_artifact_with_symlink(self) -> None:
+        (self.catalog / "prices" / "link.json").symlink_to("/etc/hosts")
+        self.assert_refused()
 
 
 if __name__ == "__main__":
