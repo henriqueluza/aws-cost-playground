@@ -70,6 +70,83 @@ run "papeis_de_menor_privilegio" {
   }
 }
 
+# O papel de CI (infra/bootstrap/apply.tf, `DenyRoleWithoutBoundary`) compara o ARN por igualdade:
+# sufixo é o nome completo do ambiente, não o prefixo (`stg`/`prod`).
+run "limite_de_permissoes_em_staging" {
+  command = plan
+
+  assert {
+    condition     = alltrue([for r in aws_iam_role.this : r.permissions_boundary == "arn:aws:iam::123456789012:policy/acp-ci-boundary-staging"])
+    error_message = "Os dois papéis levam o limite acp-ci-boundary-staging da conta do ambiente."
+  }
+
+  assert {
+    condition     = length(aws_iam_role.this) == 2
+    error_message = "O módulo cria exatamente os papéis api e llm-proxy."
+  }
+}
+
+run "limite_de_permissoes_em_producao" {
+  command = plan
+
+  variables {
+    environment = "production"
+    table_arn   = "arn:aws:dynamodb:us-east-1:210987654321:table/acp-prod-main"
+  }
+
+  assert {
+    condition     = alltrue([for r in aws_iam_role.this : r.permissions_boundary == "arn:aws:iam::210987654321:policy/acp-ci-boundary-production"])
+    error_message = "Os dois papéis levam o limite acp-ci-boundary-production, com a conta do ARN da tabela."
+  }
+}
+
+# Contrato com a política de limite do bootstrap (#166): a permissão efetiva é a interseção do
+# limite com as políticas inline, e uma ação fora do limite é negada em execução sem erro no plano.
+# Este teste trava, por igualdade, tudo o que o módulo concede. Se ele falhar por ação nova, ajuste
+# primeiro o limite em infra/bootstrap/ e só depois esta lista.
+run "politicas_inline_cabem_no_limite" {
+  command = apply
+
+  assert {
+    condition = toset(flatten([
+      for p in concat(values(aws_iam_role_policy.logs), [aws_iam_role_policy.api, aws_iam_role_policy.llm_proxy]) :
+      [for s in jsondecode(p.policy).Statement : s.Action]
+      ])) == toset([
+      "logs:CreateLogStream", "logs:PutLogEvents",
+      "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:BatchWriteItem",
+      "cognito-idp:AdminDeleteUser",
+      "ssm:GetParameter",
+    ])
+    error_message = "Ação nova nas políticas inline: o limite acp-ci-boundary-<env> do bootstrap precisa permiti-la antes."
+  }
+
+  assert {
+    condition = alltrue(flatten([
+      for p in concat(values(aws_iam_role_policy.logs), [aws_iam_role_policy.api, aws_iam_role_policy.llm_proxy]) :
+      [for s in jsondecode(p.policy).Statement : s.Effect == "Allow" && !strcontains(jsonencode(s.Action), "*")]
+    ]))
+    error_message = "As políticas inline só têm Allow de ações enumeradas, sem curinga."
+  }
+
+  assert {
+    condition = alltrue(flatten([
+      for p in [aws_iam_role_policy.api, aws_iam_role_policy.llm_proxy] : [
+        for s in jsondecode(p.policy).Statement : (
+          startswith(s.Resource, "arn:aws:dynamodb:us-east-1:123456789012:table/acp-stg-")
+          || s.Resource == var.user_pool_arn
+          || s.Resource == "arn:aws:ssm:us-east-1:123456789012:parameter/acp/staging/anthropic-api-key"
+        )
+      ]
+    ]))
+    error_message = "Os recursos de dado ficam nos que o limite cobre: tabela acp-stg-*, o pool do ambiente e o parâmetro exato da chave."
+  }
+
+  assert {
+    condition     = alltrue([for g in aws_cloudwatch_log_group.this : startswith(g.name, "/aws/lambda/acp-stg-")])
+    error_message = "Os log groups ficam em /aws/lambda/acp-stg-*, o prefixo que o limite cobre."
+  }
+}
+
 run "parametro_da_chave_fica_fora_do_terraform" {
   command = plan
 

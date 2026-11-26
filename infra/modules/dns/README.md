@@ -96,4 +96,4 @@ terraform -chdir=infra/modules/dns validate
 terraform -chdir=infra/modules/dns test
 ```
 
-`tests/dns.tftest.hcl` usa provider simulado e só faz `plan`, sem credenciais. Cobre os alias, com e sem alvo. O run `consumidor_com_cognito_sem_ciclo` planeja `tests/consumer/`, um consumidor mínimo com Cognito, e falha com `Cycle` se o módulo voltar a um `for_each` único. O `.terraform.lock.hcl` gerado no módulo não é versionado (só os das raízes são): o `.gitignore` cobre `infra/modules/**/.terraform.lock.hcl`. O CI roda tflint e trivy em todo `infra/`, mas `validate` só nos ambientes, e não roda `terraform test`.
+`tests/dns.tftest.hcl` usa provider simulado e só faz `plan`, sem credenciais. Cobre os alias, com e sem alvo. O run `consumidor_com_cognito_sem_ciclo` planeja `tests/consumer/`, um consumidor mínimo com Cognito, e falha com `Cycle` se o módulo voltar a um `for_each` único. O `.terraform.lock.hcl` gerado no módulo não é versionado (só os das raízes são): o `.gitignore` cobre `infra/modules/**/.terraform.lock.hcl`. O CI roda `fmt`, `validate`, `terraform test`, tflint e trivy neste módulo (`infra/tools/tf_checks.sh`).

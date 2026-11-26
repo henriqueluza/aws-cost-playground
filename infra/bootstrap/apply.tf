@@ -12,8 +12,8 @@ locals {
     for env, prefix in local.environments : env => "${local.state_bucket_arn[env]}/acp-${prefix}/terraform.tfstate"
   }
 
-  # Limite de permissões dos papéis que o apply cria. A política nasce na #166; até lá
-  # a negação `DenyRoleWithoutBoundary` impede criar qualquer papel.
+  # Limite de permissões dos papéis que o apply cria: `aws_iam_policy.apply_boundary`, em
+  # `boundary.tf`. O teste compara este ARN com o nome da política.
   apply_boundary_arn = { for env in keys(local.environments) : env => "${local.iam_arn}:policy/acp-ci-boundary-${env}" }
 }
 
@@ -143,6 +143,73 @@ resource "aws_iam_role_policy" "apply_deny" {
         Effect   = "Deny"
         Action   = "s3:*"
         Resource = flatten([for env, arn in local.state_bucket_arn : [arn, "${arn}/*"] if env != each.key])
+      },
+    ]
+  })
+}
+
+# O apply gerencia a infraestrutura, não o dado: cria e altera tabela, user pool, log group e
+# função, mas não lê nem grava o que está dentro. Só `Deny`; o SSM inteiro já cai em
+# `deny-guardrails`. Política separada para as travas de identidade não disputarem espaço.
+resource "aws_iam_role_policy" "apply_deny_data" {
+  for_each = local.environments
+
+  name = "deny-data"
+  role = aws_iam_role.apply[each.key].name
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        # Itens, PartiQL, leitura do stream e as duas saídas em massa (exportação para S3 e
+        # stream do Kinesis, que podem apontar para fora da conta).
+        Sid    = "DenyTableItems"
+        Effect = "Deny"
+        Action = [
+          "dynamodb:BatchGetItem", "dynamodb:BatchWriteItem", "dynamodb:ConditionCheckItem", "dynamodb:DeleteItem",
+          "dynamodb:EnableKinesisStreamingDestination", "dynamodb:ExportTableToPointInTime", "dynamodb:GetItem",
+          "dynamodb:GetRecords", "dynamodb:PartiQL*", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:UpdateItem",
+        ]
+        Resource = "*"
+      },
+      {
+        # Toda a API administrativa de usuários (ler, criar, trocar senha, autenticar como
+        # o usuário) e as listagens. Nenhuma ação de configuração do pool começa com `Admin`.
+        Sid      = "DenyUserData"
+        Effect   = "Deny"
+        Action   = ["cognito-idp:Admin*", "cognito-idp:ListUsers*"]
+        Resource = "*"
+      },
+      {
+        # O projeto não usa o Secrets Manager: o serviço inteiro fica fechado.
+        Sid      = "DenySecrets"
+        Effect   = "Deny"
+        Action   = "secretsmanager:*"
+        Resource = "*"
+      },
+      {
+        # Ler eventos e as três formas de mandá-los para outro lugar (exportação, filtro de
+        # assinatura do grupo e da conta). Os logs carregam o `sub` dos usuários.
+        Sid    = "DenyLogEvents"
+        Effect = "Deny"
+        Action = [
+          "logs:CreateExportTask", "logs:FilterLogEvents", "logs:GetLogEvents", "logs:GetLogObject", "logs:GetLogRecord",
+          "logs:GetQueryResults", "logs:PutAccountPolicy", "logs:PutSubscriptionFilter", "logs:StartLiveTail", "logs:StartQuery", "logs:Unmask",
+        ]
+        Resource = "*"
+      },
+      {
+        # Um evento forjado pula o JWT do API Gateway e faz a função agir como qualquer usuário.
+        Sid      = "DenyFunctionInvoke"
+        Effect   = "Deny"
+        Action   = "lambda:Invoke*"
+        Resource = "*"
+      },
+      {
+        # O papel não troca de identidade: o trust de outro papel da conta poderia citá-lo.
+        Sid      = "DenyAssumeRole"
+        Effect   = "Deny"
+        Action   = "sts:AssumeRole"
+        Resource = "*"
       },
     ]
   })
