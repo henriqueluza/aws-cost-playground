@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { adrExampleDesign } from '../../../test/designFixtures';
 import { INJECTION_PAYLOADS } from '../test/injectionPayloads';
-import { EXPORT_PATHS, exportDesign } from './exportDesign';
+import { BLOCK_GENERATORS } from '../model/generators';
+import { hcl } from '../model/hcl';
+import { EXPORT_PATHS, createExporter, exportDesign } from './exportDesign';
 
 const mainTf = (design: unknown): string => {
   const result = exportDesign(design);
@@ -130,6 +132,72 @@ describe('exportDesign', () => {
     ],
   ])('recusa design inválido: %s', (_name, design) => {
     expect(exportDesign(design)).toEqual({ ok: false, error: 'invalid-design' });
+  });
+
+  describe('com um gerador real', () => {
+    /** Gerador de teste: põe o rótulo num valor e liga o bloco aos pares das suas arestas. */
+    const withS3 = (bucketAttribute: string) =>
+      createExporter({
+        ...BLOCK_GENERATORS,
+        'aws.s3': ({ block, links }) => ({
+          exported: true,
+          nodes: [
+            hcl.block(
+              'resource',
+              ['aws_s3_bucket', block.name],
+              [
+                hcl.attr(bucketAttribute, hcl.string(block.label)),
+                hcl.attr(
+                  'depends_on',
+                  hcl.list(
+                    links.flatMap((l) => (l.peer ? [hcl.ref('aws_s3_bucket', l.peer.name)] : [])),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        }),
+      });
+
+    it.each(INJECTION_PAYLOADS)(
+      'a carga "%s" no rótulo não cria nem altera linha de código',
+      (_n, p) => {
+        const exporter = withS3('bucket');
+        const files = (label: string) => {
+          const result = exporter(withLabels(label));
+          if (!result.ok) throw new Error(result.error);
+          return code(result.files[0]?.content ?? '');
+        };
+        const [evil, safe] = [files(p.slice(0, 80)), files('ok')];
+        expect(evil).toHaveLength(safe.length);
+        const changed = evil.filter((line, i) => line !== safe[i]);
+        expect(
+          changed.every((line) =>
+            /^(resource "aws_s3_bucket" "[a-z][a-z0-9_]*" \{| {2}bucket {5}= ".*")$/.test(line),
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it('conta o bloco como exportado e entrega as ligações com o nome do par', () => {
+      const design = withLabels('Origem', 'Destino');
+      const edges = [
+        { ...adrExampleDesign.edges[0], id: 'edg_1', source: 'blk_0', target: 'blk_1' },
+      ];
+      const result = withS3('bucket')({ ...design, edges });
+      const text = result.ok ? (result.files[0]?.content ?? '') : '';
+      expect(text).toContain('# Blocos exportados: 2 de 2.');
+      expect(text).toContain(
+        'resource "aws_s3_bucket" "origem" {\n  bucket     = "Origem"\n  depends_on = [aws_s3_bucket.destino]',
+      );
+    });
+
+    it('nó que o construtor recusa não gera arquivo', () => {
+      expect(withS3('bucket" {}')(withLabels('x'))).toEqual({
+        ok: false,
+        error: 'generation-failed',
+      });
+    });
   });
 
   it('só produz caminhos da lista fixa', () => {
