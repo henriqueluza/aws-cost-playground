@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** Versão do formato do documento que este build lê e escreve. */
+export const CURRENT_SCHEMA_VERSION = 1;
+
 /** Regiões aceitas no MVP (PRD F6). */
 export const REGIONS = ['us-east-1', 'sa-east-1'] as const;
 /** `data`: tráfego cobrado; `runs-on`: ECS sobre EC2; `logs`: bloco para o CloudWatch. */
@@ -9,7 +12,7 @@ export const USAGE_SOURCES = ['llm', 'default'] as const;
 /** Nó fixo, sem preço, que representa a internet. É o destino das arestas de egress. */
 export const CLIENT_NODE_ID = 'client';
 
-/** Limites do documento. `maxBlocks` e `maxDescriptionLength` vêm do ADR-0001; os outros foram decididos na #98. */
+/** Limites do documento. `maxBlocks`, `maxDescriptionLength` e `maxDocBytes` vêm do ADR-0001; os outros foram decididos na #98. */
 export const DESIGN_LIMITS = {
   maxBlocks: 100,
   maxEdges: 400,
@@ -17,6 +20,8 @@ export const DESIGN_LIMITS = {
   maxLabelLength: 80,
   maxUsageValue: 1e12,
   maxFieldsPerRecord: 32,
+  /** Tamanho do documento serializado, em bytes: o mesmo teto da API (ADR-0001) e do arquivo aberto (#50). */
+  maxDocBytes: 350 * 1024,
 } as const;
 
 /**
@@ -75,7 +80,7 @@ export const edgeSchema = z.object({
  */
 export const designDocumentSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
     region: z.enum(REGIONS),
     workload: z.object({ description: z.string().max(DESIGN_LIMITS.maxDescriptionLength) }),
     blocks: z.array(blockSchema).max(DESIGN_LIMITS.maxBlocks),
