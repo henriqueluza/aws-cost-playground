@@ -47,7 +47,8 @@ resource "aws_lambda_function" "this" {
 
   function_name = "${local.prefix}-${each.key}"
   role          = aws_iam_role.this[each.key].arn
-  runtime       = "python3.13"
+  # Igual a api/.python-version: o zip leva wheels dessa versão (infra/tools/tests/test_functions_runtime.py).
+  runtime       = "python3.14"
   architectures = ["arm64"]
   handler       = each.value.handler
   timeout       = each.value.timeout

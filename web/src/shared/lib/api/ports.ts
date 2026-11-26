@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   DESIGN_LIMITS,
+  USAGE_SOURCES,
   blockSchema,
   designDocumentSchema,
   edgeSchema,
@@ -53,13 +54,17 @@ export const estimateRequestSchema = z.object({
   edges: z.array(edgeSchema.omit({ usage: true, overrides: true })).max(DESIGN_LIMITS.maxEdges),
 });
 
-/** Saída da estimativa: só ids e números (T2), mais a quota restante. */
+/**
+ * Saída da estimativa: só ids, números e a origem (`source`, enum calculado na API: `default`
+ * quando nenhum valor veio da LLM para o item), mais a quota restante. Sem `source`: `invalid-response`.
+ */
+const estimatedItem = { values: usageValuesSchema, source: z.enum(USAGE_SOURCES) };
 export const estimateResponseSchema = z.object({
   blocks: z
-    .array(z.object({ id: blockSchema.shape.id, values: usageValuesSchema }))
+    .array(z.object({ id: blockSchema.shape.id, ...estimatedItem }))
     .max(DESIGN_LIMITS.maxBlocks),
   edges: z
-    .array(z.object({ id: edgeSchema.shape.id, values: usageValuesSchema }))
+    .array(z.object({ id: edgeSchema.shape.id, ...estimatedItem }))
     .max(DESIGN_LIMITS.maxEdges),
   quota: quotaSchema,
 });

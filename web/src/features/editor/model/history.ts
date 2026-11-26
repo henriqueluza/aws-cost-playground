@@ -19,6 +19,8 @@ export type StepKind =
   | 'set-usage'
   | 'set-override'
   | 'set-region'
+  | 'set-description'
+  | 'apply-estimate'
   | 'replace-design';
 
 const STEP_TEXT: Record<StepKind, string> = {
@@ -32,6 +34,8 @@ const STEP_TEXT: Record<StepKind, string> = {
   'set-usage': 'mudar uso',
   'set-override': 'mudar valor',
   'set-region': 'mudar região',
+  'set-description': 'editar descrição da carga',
+  'apply-estimate': 'aplicar estimativa',
   'replace-design': 'substituir design',
 };
 export const stepText = (kind: StepKind): string => STEP_TEXT[kind];

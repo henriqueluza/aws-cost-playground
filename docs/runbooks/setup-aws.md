@@ -44,11 +44,10 @@ Em 26/11/2026 o código de `main` ainda não deixa o primeiro deploy passar. Con
 | #338 | Decisão do autor sobre as ações de escrita dos papéis `acp-ci-apply-<env>` que não se delimitam por ambiente. Sem ela o deploy deve parar no stage do HTTP API e no domínio do Cognito (`infra/bootstrap/README.md`, "Recursos com ARN por ID") | 6 |
 | #209 | Bucket de artefatos das funções no bootstrap. É a origem de `TF_VAR_PACKAGE_BUCKET` (`infra/README.md`, "Variáveis dos ambientes") | 4 e 6 |
 | #307 (e #210, mesmo assunto) | Runtime das Lambdas: `python3.13` em `infra/modules/functions/main.tf`, contra o pacote montado para Python 3.14 (`api/.python-version`) | 6 |
-| #125 | Papel `prices` do bootstrap | 8, só para o workflow |
-| #222 | Workflow semanal de preços | 8, só para o workflow |
+| #125 | Papel `prices` do bootstrap (já em `main`; reaplique o bootstrap se ainda não o aplicou) | 8, só para o workflow |
 
 ```bash
-for n in 167 169 209 307 210 125 222; do gh issue view "$n" --repo henriqueluza/aws-cost-playground --json number,state --jq '"\(.number) \(.state)"'; done
+for n in 167 169 209 307 210 125; do gh issue view "$n" --repo henriqueluza/aws-cost-playground --json number,state --jq '"\(.number) \(.state)"'; done
 ```
 
 O bootstrap (passo 3) pode ser aplicado antes e reaplicado depois de cada uma dessas Issues: reaplicar é o mesmo roteiro (`infra/bootstrap/README.md`, "Como aplicar").
@@ -196,9 +195,9 @@ A lista abaixo foi conferida nos workflows de `main`. Só `terraform.yml` e `dep
 | `AWS_PLAN_ROLE_ARN` | variável | repositório | Saída `github_variables` do bootstrap | `terraform.yml` (liga o job `plan`) |
 | `TF_VAR_PACKAGE_BUCKET` | variável | Environment `staging` | Bucket de artefatos de staging, criado pela #209 | `deploy-staging.yml` |
 | `AWS_APPLY_ROLE_ARN` | variável | Environment `staging` | Saída `github_environment_variables` do bootstrap | `deploy-staging.yml` (liga o deploy) |
-| `AWS_APPLY_ROLE_ARN` | variável | Environment `production` | Saída `github_environment_variables` do bootstrap | Nenhum workflow ainda (produção é a #23) |
+| `AWS_APPLY_ROLE_ARN` | variável | Environment `production` | Saída `github_environment_variables` do bootstrap | `deploy-production.yml` (só por disparo manual do autor) |
 
-Os cinco valores de repositório precisam ficar no repositório, e não no Environment: o job `plan` roda sem `environment:` e não enxerga variável de Environment (`infra/README.md`, "Variáveis do job plan"). O Environment `production` só recebe as demais variáveis quando o workflow de produção existir (#23).
+Os cinco valores de repositório precisam ficar no repositório, e não no Environment: o job `plan` roda sem `environment:` e não enxerga variável de Environment (`infra/README.md`, "Variáveis do job plan"). O workflow de produção (`deploy-production.yml`) também pede `TF_VAR_PACKAGE_BUCKET` no Environment `production` e falha fechado sem ela; as variáveis de produção estão em `docs/infra.md`, "Variáveis de produção que o autor cria", e o rollback em [`rollback.md`](rollback.md).
 
 A ordem importa. `AWS_PLAN_ROLE_ARN` liga o job `plan`, que falha fechado se faltar domínio ou e-mail. `AWS_APPLY_ROLE_ARN` liga o deploy, que falha fechado se faltar qualquer outro valor (`docs/infra.md`, "Ordem para ligar o pipeline").
 
@@ -409,58 +408,70 @@ Use dados fictícios em staging (ADR, tabela de ambientes). Não anote e-mail ne
 
 ## 8. Catálogo de preços (#77)
 
-O catálogo versionado em `web/public/prices/` é a semente. O gerador (`pricing/`) consulta a Price List API e regrava os arquivos; o PR com o catálogo real é revisado e mergeado por um humano.
+O catálogo versionado em `web/public/prices/` é a semente. O gerador (`pricing/`) consulta a Price List API e regrava os arquivos; o PR com o catálogo real é revisado e mergeado por um humano. O workflow `.github/workflows/prices.yml` (#222) faz isso toda segunda-feira, 09:17 UTC, e também por disparo manual. Ele só roda em `main`.
 
-### O que existe hoje em `main`
+### Primeira execução do workflow
 
-O workflow semanal ainda não existe em `.github/workflows/` (#222 e #29 abertas), e a variável `AWS_PRICES_ROLE_ARN` só vale quando ele existir. Até lá, o caminho é rodar o gerador na sua máquina, com a sua sessão da AWS (`pricing/README.md`, "Resumo do PR e publicação do catálogo").
-
-1. Na raiz do repositório, com `HEAD` igual a `origin/main` e a árvore limpa, instale as dependências.
+1. O papel `prices` sai do bootstrap (#125, passo 3). Cadastre a variável de repositório `AWS_PRICES_ROLE_ARN` com o valor da saída `github_variables` (`infra/bootstrap/README.md`, "Saídas que viram variáveis do GitHub"). Sem ela o workflow só avisa (`::warning::`), termina verde e o job `publish` é pulado.
 
    ```bash
-   (cd pricing && uv sync)
+   gh variable list --repo henriqueluza/aws-cost-playground
    ```
 
-2. Gere o catálogo. O comando só chama `pricing:GetProducts`. Se uma checagem falhar, ele sai com 1 e não grava nada.
+   Como conferir: a lista traz `AWS_PRICES_ROLE_ARN`.
+
+2. Ligue "Allow GitHub Actions to create and approve pull requests" em Settings → Actions → General. Sem isso o `gh pr create` falha com 403 (`scripts/prices-pr.sh`, mensagem de erro de `create_pr`). Essa opção também permite que workflows aprovem PR: é decisão de segurança do autor. Opcional: ligue "Automatically delete head branches", para que o PR seguinte não liste commits antigos da branch `prices/catalogo` depois de um squash merge (a árvore continua certa; é só ruído).
+
+   Como conferir: a opção aparece marcada em Settings → Actions → General.
+
+3. Dispare o workflow à mão em `main` e acompanhe.
 
    ```bash
-   (cd pricing && uv run python -m app generate > report.txt)
+   gh workflow run prices.yml --repo henriqueluza/aws-cost-playground --ref main
+   gh run list --workflow prices.yml --repo henriqueluza/aws-cost-playground --limit 1
    ```
 
-   Como conferir: o comando sai com 0, e `git status --short web/public/prices` lista os arquivos regravados. Se a última linha de `pricing/report.txt` for `nenhum serviço com consulta: nada a gravar`, nada foi atualizado.
+   Como conferir: os jobs `generate` e `publish` terminam verdes. O resumo do run traz o corpo do PR. O passo "Publicar PR" imprime `pr criado` (ou `sem mudança`, se o catálogo já for igual ao de `main`). Um aviso `Nenhum serviço com consulta` significa que o gerador não gravou nada (nenhum serviço consulta a Price List ainda): nesse caso o job `publish` é pulado, e um PR já aberto fica como está.
 
-3. Monte o corpo do PR.
+4. Faça a validação do PR (próxima subseção), revise e decida o merge.
 
-   ```bash
-   (cd pricing && uv run python -m app.summary < report.txt > body.md)
-   ```
+### Como o PR do catálogo é validado e juntado
 
-   Como conferir: `pricing/body.md` tem as seções `## SKUs adicionados`, `## SKUs removidos` e `## Variações acima de 30%`.
+O workflow tem dois jobs, para que nenhum passo tenha ao mesmo tempo credencial da AWS e token de escrita: `generate` (papel `prices` por OIDC, só `pricing:GetProducts`, sessão de 900 s, `contents: read`) entrega o catálogo e o corpo do PR num artefato de 1 dia; `publish` (sem AWS, `contents: write` e `pull-requests: write`) aplica o artefato em `web/public/prices/` e roda `scripts/prices-pr.sh` com o `GITHUB_TOKEN`.
 
-4. Publique. O script cria ou atualiza um único PR, da branch `prices/catalogo` para `main`, sem force push e sem push em `main`.
+**Passo manual: o PR do bot não roda o CI.** PR aberto ou atualizado pelo `GITHUB_TOKEN` não dispara os workflows de `pull_request` (`validate`, `security`, `pr-size`, `review-pr`). Antes de juntar:
 
-   ```bash
-   bash scripts/prices-pr.sh pricing/body.md
-   ```
+- feche e reabra o PR com a sua conta: o evento `reopened` feito por uma pessoa dispara todos, inclusive a revisão automática; ou
+- empurre um commit vazio na branch `prices/catalogo` com a sua conta.
 
-   Como conferir: a saída é uma linha entre `pr criado`, `pr atualizado`, `sem mudança` e `pr fechado`.
+Cada atualização semanal feita pelo bot (push novo na branch) também não dispara o CI: repita o passo antes de juntar. Não usamos token pessoal nem GitHub App para evitar isso, porque seria um segredo novo; a decisão é do autor e não está implementada.
 
-5. Apague `pricing/report.txt` e `pricing/body.md`, revise o PR e faça o merge.
+Como o PR é revisado e juntado:
 
-   ```bash
-   gh pr list --head prices/catalogo --repo henriqueluza/aws-cost-playground --json number,state,url
-   ```
+- O workflow não aplica label nenhuma (nem `skip-review`, nem aprovação) e não junta o PR. O merge é humano (ADR-0001, ameaça dos preços).
+- `web/public/prices/**` não conta no `pr-size` (`.github/pr-size-ignore`). O CODEOWNERS é o autor.
+- Confira o corpo (SKUs adicionados, removidos e variações acima de 30%), que o diff só mexe em `web/public/prices/` e que o CI ficou verde depois do reabrir. Então decida o merge.
+- Se o catálogo gerado voltar a ser igual ao de `main`, o script fecha o PR sozinho, com um comentário.
 
-   Como conferir: o PR só mexe em `web/public/prices/`, o corpo lista SKUs adicionados, removidos e variações acima de 30%, o CI está verde e, depois do merge, `web/public/prices/manifest.json` em `main` traz `"source": "price-list"`. Enquanto algum serviço registrado for provisório (sem consulta), o gerador grava `"source": "seed"` (`pricing/README.md`, "Serviço provisório e gravação"): nesse caso, anote na #77 quais serviços faltam.
+Como conferir:
 
-### O que passa a valer quando o workflow entrar (#222 e #125)
+```bash
+gh pr list --head prices/catalogo --repo henriqueluza/aws-cost-playground --json number,state,url
+```
 
-Ainda não está em `main`: confirme os nomes no arquivo do workflow e em `infra/bootstrap/README.md` quando a #222 fechar, e atualize esta seção.
+O PR só mexe em `web/public/prices/` e o CI está verde. Depois do merge, `web/public/prices/manifest.json` em `main` traz `"source": "price-list"`. Enquanto algum serviço registrado for provisório (sem consulta), o gerador grava `"source": "seed"` (`pricing/README.md`, "Serviço provisório e gravação"): nesse caso, anote na #77 quais serviços faltam.
 
-1. O papel `prices` já sai do bootstrap (#125, passo 3). Cadastre a variável que o workflow ler: o nome previsto na #222 é `AWS_PRICES_ROLE_ARN`, saída `github_variables`. Sem ela, o workflow deve terminar com aviso e sem falhar.
-2. Ligue "Allow GitHub Actions to create and approve pull requests" em Settings → Actions → General. Sem isso a criação do PR falha (`scripts/prices-pr.sh`, mensagem de erro de `create_pr`).
-3. Dispare o workflow à mão em `main` e espere o PR de `prices/catalogo`.
-4. O PR aberto pelo `GITHUB_TOKEN` não dispara os workflows de `pull_request`: feche e reabra o PR para o CI rodar (`pricing/README.md`).
+### Contingência: rodar na sua máquina
+
+Use se o workflow estiver indisponível. Na raiz do repositório, com `HEAD` igual a `origin/main`, a árvore limpa e sessão da AWS com `pricing:GetProducts`:
+
+```bash
+(cd pricing && uv sync && uv run python -m app generate > report.txt && uv run python -m app.summary < report.txt > body.md)
+bash scripts/prices-pr.sh pricing/body.md
+rm pricing/report.txt pricing/body.md
+```
+
+Como conferir: `git status --short web/public/prices` lista os arquivos regravados e o script imprime uma linha entre `pr criado`, `pr atualizado`, `sem mudança` e `pr fechado`. Se a última linha de `pricing/report.txt` for `nenhum serviço com consulta: nada a gravar`, nada foi atualizado. O PR vem do seu `gh`, então o CI roda sozinho, sem fechar e reabrir.
 
 ## O que conferir no primeiro staging
 

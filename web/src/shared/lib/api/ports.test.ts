@@ -95,15 +95,27 @@ describe('estimateRequestSchema', () => {
 });
 
 describe('estimateResponseSchema', () => {
-  const ok = { blocks: [{ id: 'blk_fn_api', values: { requestsPerMonth: 5 } }], edges: [], quota };
+  const ok = {
+    blocks: [{ id: 'blk_fn_api', values: { requestsPerMonth: 5 }, source: 'llm' }],
+    edges: [],
+    quota,
+  };
   it('aceita só números com a quota', () => {
     expect(estimateResponseSchema.safeParse(ok).success).toBe(true);
+  });
+  it.each([
+    ['sem source', undefined],
+    ['source fora do enum', 'manual'],
+    ['source com texto livre', '<b>llm</b>'],
+  ])('recusa %s (invalid-response)', (_n, source) => {
+    const item = { id: 'blk_fn_api', values: {}, ...(source ? { source } : {}) };
+    expect(estimateResponseSchema.safeParse({ ...ok, blocks: [item] }).success).toBe(false);
   });
   it.each([
     ['blocks', 'blk_fn_api'],
     ['edges', 'edg_1'],
   ])('recusa valor não numérico em %s', (key, id) => {
-    const bad = { ...ok, [key]: [{ id, values: { gbPerMonth: 'muito' } }] };
+    const bad = { ...ok, [key]: [{ id, values: { gbPerMonth: 'muito' }, source: 'llm' }] };
     expect(estimateResponseSchema.safeParse(bad).success).toBe(false);
   });
 });

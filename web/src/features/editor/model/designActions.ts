@@ -149,6 +149,11 @@ export function setRegion(doc: DesignDocument, region: Region): Result<DesignDoc
   return commit({ ...doc, region });
 }
 
+/** Troca só `workload.description`; acima do limite o schema recusa (`invalid-document`). */
+export function setDescription(doc: DesignDocument, description: string): Result<DesignDocument> {
+  return commit({ ...doc, workload: { ...doc.workload, description } });
+}
+
 /** Documento de fora (arquivo, API). A mensagem do zod nunca sai daqui. */
 export function parseDesign(raw: unknown): Result<DesignDocument> {
   return commit(raw);
