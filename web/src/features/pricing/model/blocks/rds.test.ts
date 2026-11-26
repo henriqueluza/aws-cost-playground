@@ -7,8 +7,8 @@ import { priceRds } from './rds';
 
 /**
  * Preços de us-east-1 iguais aos da semente, escritos aqui: a semente muda com o catálogo real.
- * Sem franquia e sem faixas: o RDS não tem franquia perpétua nem faixas na Price List. O limite do
- * backup incluído (até 100% do armazenamento) faz o papel do teste de franquia e de troca de faixa.
+ * Sem franquia e sem faixas: o RDS não tem franquia perpétua nem faixas na Price List, e o backup
+ * incluído (até 100% do armazenamento) fica fora de `backupStorageGb`, que é só o backup adicional.
  */
 const catalog = catalogOf({
   rds: [
@@ -38,7 +38,7 @@ const INSTANCE_CLASSES = [
 ];
 const DEPLOYMENTS = ['single-az', 'multi-az'];
 
-/** Bloco padrão do contrato (postgres, db.t3.micro, single-az, 20 GB, backup 20) e trocas. */
+/** Bloco padrão do contrato (postgres, db.t3.micro, single-az, 20 GB, backup adicional 20). */
 const ATTRIBUTES = { engine: 'postgres', instanceClass: 'db.t3.micro', deployment: 'single-az' };
 const USAGE = { storageGb: 20, backupStorageGb: 20 };
 const input = (
@@ -79,41 +79,42 @@ describe('priceRds', () => {
       expect(priceRds(input(attributes, { backupStorageGb: 30 }))).toStrictEqual([
         charge(`rds-${engine}-${instanceClass}-${deployment}`, '730', 'fixed'),
         charge(`rds-${engine}-gp3-${deployment}`, '20', 'fixed'),
-        charge(`rds-${engine}-backup`, '10', 'variable'),
+        charge(`rds-${engine}-backup`, '30', 'variable'),
       ]);
     },
   );
 
   it.each([
-    ['bloco padrão: backup igual ao armazenamento', 20, 20, '0', '0.000000'],
-    ['menor que o armazenamento, nunca negativo', 100, 0, '0', '0.000000'],
-    // Limite do incluído: (25,5 − 20) × 0,095 = 5,5 × 0,095 = 0,5225.
-    ['5,5 GB além de 20 GB', 20, 25.5, '5.5', '0.522500'],
-    // 20,1 − 20 em float dá 0,10000000000000142; 0,1 × 0,095 = 0,0095.
-    ['0,1 GB além de 20 GB', 20, 20.1, '0.1', '0.009500'],
-    // 65.536,1 − 65.536 em float dá 0,10000000000582077, visível nas 12 casas do Decimal.
-    ['0,1 GB além do armazenamento máximo', 65536, 65536.1, '0.1', '0.009500'],
-  ])('backup além do incluído: %s', (_, storageGb, backupStorageGb, over, usd) => {
+    ['sem backup adicional', 100, 0, '0', '0.000000'],
+    // O armazenamento não é descontado: 20 × 0,095 = 1,90, com 20 GB ou com 65.536 GB de disco.
+    ['igual ao armazenamento', 20, 20, '20', '1.900000'],
+    ['menor que o armazenamento', 65536, 20, '20', '1.900000'],
+    // Fração de GB: 5,5 × 0,095 = 0,5225.
+    ['5,5 GB', 20, 5.5, '5.5', '0.522500'],
+    // 0,1 × 0,095 = 0,0095.
+    ['0,1 GB', 20, 0.1, '0.1', '0.009500'],
+  ])('backup adicional cobrado inteiro: %s', (_, storageGb, backupStorageGb, backup, usd) => {
     const block = input({}, { storageGb, backupStorageGb });
     expect(priceRds(block)).toStrictEqual([
       charge('rds-postgres-db.t3.micro-single-az', '730', 'fixed'),
       charge('rds-postgres-gp3-single-az', String(storageGb), 'fixed'),
-      charge('rds-postgres-backup', over, 'variable'),
+      charge('rds-postgres-backup', backup, 'variable'),
     ]);
     expect(rate(createRater(catalog), block).lines[2]).toBe(
-      `rds-postgres-backup variable ${toFixed(decimal(over), 6)} ${usd}`,
+      `rds-postgres-backup variable ${toFixed(decimal(backup), 6)} ${usd}`,
     );
   });
 
-  it('bloco padrão custa 15,44 USD', () => {
-    // 730 × 0,018 = 13,14; 20 × 0,115 = 2,30; backup 0. Total: 13,14 + 2,30 = 15,44.
+  it('bloco padrão custa 17,34 USD', () => {
+    // 730 × 0,018 = 13,14; 20 × 0,115 = 2,30; 20 × 0,095 = 1,90.
+    // Total: 13,14 + 2,30 + 1,90 = 17,34.
     expect(rate(createRater(catalog), input())).toStrictEqual({
       lines: [
         'rds-postgres-db.t3.micro-single-az fixed 730.000000 13.140000',
         'rds-postgres-gp3-single-az fixed 20.000000 2.300000',
-        'rds-postgres-backup variable 0.000000 0.000000',
+        'rds-postgres-backup variable 20.000000 1.900000',
       ],
-      total: '15.440000',
+      total: '17.340000',
     });
   });
 
@@ -134,12 +135,12 @@ describe('priceRds', () => {
     });
   });
 
-  it('mysql db.r5.large multi-az com 50 GB e backup de 80 GB custa 364,75 USD', () => {
-    // 730 × 0,48 = 350,40; 50 × 0,23 = 11,50; (80 − 50) × 0,095 = 2,85.
+  it('mysql db.r5.large multi-az com 50 GB e backup adicional de 30 GB custa 364,75 USD', () => {
+    // 730 × 0,48 = 350,40; 50 × 0,23 = 11,50; 30 × 0,095 = 2,85.
     // Total: 350,40 + 11,50 + 2,85 = 364,75.
     const block = input(
       { engine: 'mysql', instanceClass: 'db.r5.large', deployment: 'multi-az' },
-      { storageGb: 50, backupStorageGb: 80 },
+      { storageGb: 50, backupStorageGb: 30 },
     );
     expect(rate(createRater(catalog), block)).toStrictEqual({
       lines: [
@@ -153,7 +154,7 @@ describe('priceRds', () => {
 
   it('Multi-AZ dobra o custo pelo preço da AWS, não pela quantidade', () => {
     // 730 × 0,036 = 26,28 = 2 × 13,14; 20 × 0,23 = 4,60 = 2 × 2,30. Total: 30,88 = 2 × 15,44.
-    const block = input({ deployment: 'multi-az' });
+    const block = input({ deployment: 'multi-az' }, { backupStorageGb: 0 });
     expect(rate(createRater(catalog), block)).toStrictEqual({
       lines: [
         'rds-postgres-db.t3.micro-multi-az fixed 730.000000 26.280000',

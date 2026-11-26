@@ -1,4 +1,4 @@
-import { compare, decimal, sub } from '../../../../shared/lib/money';
+import { decimal } from '../../../../shared/lib/money';
 import type { BlockPricer } from '../blockContract';
 
 /** Opções do contrato. `Set` compara por igualdade estrita: chave do protótipo não casa. */
@@ -16,7 +16,6 @@ const INSTANCE_CLASSES: ReadonlySet<string> = new Set([
 const DEPLOYMENTS: ReadonlySet<string> = new Set(['single-az', 'multi-az']);
 /** Horas de um mês na calculadora da AWS (como no DynamoDB); o contrato do RDS não tem horas. */
 const HOURS_PER_MONTH = decimal(730);
-const ZERO = decimal(0);
 
 /** O valor do atributo, se for uma das opções do contrato. */
 const contractOption = (options: ReadonlySet<string>, value: unknown): string | undefined =>
@@ -26,10 +25,10 @@ const contractOption = (options: ReadonlySet<string>, value: unknown): string | 
  * `aws.rds`: instância, armazenamento gp3 e backup do motor do bloco, emitidos mesmo com uso zero.
  * Instância: 730 h/mês da classe e da implantação. O Multi-AZ não multiplica nada: o preço por hora
  * da AWS já é o da instância com a réplica em espera. Armazenamento: os GB provisionados, custo
- * fixo, porque se paga por existir, não pelo uso. Backup: `backupStorageGb` é o backup total do
- * banco, e a AWS não cobra backup até 100% do armazenamento provisionado; só o excedente é cobrado.
- * Simplificação: a AWS soma esse incluído na região inteira; aqui é por bloco (como a calculadora
- * faz por banco), o que pode superestimar com vários bancos.
+ * fixo, porque se paga por existir, não pelo uso. Backup: `backupStorageGb` é só o backup ALÉM do
+ * incluído (o campo "Additional backup storage" da calculadora da AWS), cobrado inteiro. A AWS não
+ * cobra backup até 100% do armazenamento provisionado da região; esse incluído não entra na chave,
+ * e por isso a função não desconta `storageGb`.
  * O atributo `az` não muda o preço e não é lido. Os preços ficam no catálogo, não aqui; o RDS não
  * tem franquia perpétua nem faixas na Price List.
  * Fora de escopo: IOPS e throughput extras do gp3, io1/io2, gp2, Multi-AZ com standbys legíveis
@@ -50,19 +49,13 @@ export const priceRds: BlockPricer = ({ attributes, usage }) => {
   if (storageGb === undefined || backupStorageGb === undefined) {
     throw new RangeError('aws.rds: uso fora do contrato');
   }
-  const storage = decimal(storageGb);
-  const backupOverStorage = sub(decimal(backupStorageGb), storage);
   return [
     {
       sku: `rds-${engine}-${instanceClass}-${deployment}`,
       quantity: HOURS_PER_MONTH,
       charge: 'fixed',
     },
-    { sku: `rds-${engine}-gp3-${deployment}`, quantity: storage, charge: 'fixed' },
-    {
-      sku: `rds-${engine}-backup`,
-      quantity: compare(backupOverStorage, ZERO) > 0 ? backupOverStorage : ZERO,
-      charge: 'variable',
-    },
+    { sku: `rds-${engine}-gp3-${deployment}`, quantity: decimal(storageGb), charge: 'fixed' },
+    { sku: `rds-${engine}-backup`, quantity: decimal(backupStorageGb), charge: 'variable' },
   ];
 };
