@@ -20,6 +20,7 @@ import {
   type Result,
   type Selection,
 } from '../model/editorState';
+import { referenceDesign, referenceLayout } from '../model/template/referenceTemplate';
 
 export type IdSource = { blockId(): string; edgeId(): string };
 export type DesignActions = {
@@ -35,8 +36,11 @@ export type DesignActions = {
   setRegion(region: Region): Result<void>;
   loadDesign(raw: unknown): Result<void>;
   replaceDocument(doc: DesignDocument): Result<void>;
+  /** Troca o design inteiro pelo template inicial (PRD F5); o confirmar antes é de quem chama. */
+  newDesign(): void;
 };
-export type DesignStoreState = EditorState & DesignActions;
+/** `baseline`: o último documento carregado ou salvo; a comparação com ele diz se há alteração pendente. */
+export type DesignStoreState = EditorState & DesignActions & { readonly baseline: DesignDocument };
 export type DesignStore = StoreApi<DesignStoreState>;
 
 /** Ids aleatórios no formato do schema. */
@@ -83,6 +87,7 @@ export function createDesignStore(
     const doc = (): DesignDocument => get().document;
     return {
       ...initial,
+      baseline: initial.document,
       addBlock: (block, position) => {
         if (!finite(position)) return fail('invalid-position');
         const id = ids.blockId();
@@ -117,11 +122,27 @@ export function createDesignStore(
       },
       setRegion: (region) => apply(act.setRegion(doc(), region), undefined),
       loadDesign: (raw) =>
-        apply(act.parseDesign(raw), undefined, () => ({ selection: null, layout: {} })),
-      replaceDocument: (next) => apply(act.parseDesign(next), undefined, prune),
+        apply(act.parseDesign(raw), undefined, (_, loaded) => ({
+          selection: null,
+          layout: {},
+          baseline: loaded,
+        })),
+      replaceDocument: (next) =>
+        apply(act.parseDesign(next), undefined, (s, replaced) => ({
+          ...prune(s, replaced),
+          baseline: replaced,
+        })),
+      newDesign: () => {
+        const template = referenceDesign();
+        set({ document: template, baseline: template, layout: referenceLayout(), selection: null });
+      },
     };
   });
 }
 
-/** Store única do editor no app. */
-export const designStore: DesignStore = createDesignStore();
+/** Store única do editor no app. Sem design aberto, ela começa no template inicial. */
+export const designStore: DesignStore = createDesignStore({
+  document: referenceDesign(),
+  layout: referenceLayout(),
+  selection: null,
+});

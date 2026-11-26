@@ -2,7 +2,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations } from '../../../test/axe';
 import { catalogOf } from '../../../test/catalogFixtures';
 import { adrExampleDesign } from '../../../test/designFixtures';
@@ -62,6 +62,8 @@ function renderPage(matches: boolean | null, client?: QueryClient) {
     media,
   };
 }
+
+beforeEach(() => designStore.setState(EMPTY_STATE));
 
 afterEach(() => {
   vi.unstubAllGlobals();
