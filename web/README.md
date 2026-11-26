@@ -105,7 +105,10 @@ Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de 
 
 ## Autenticação (`features/auth`)
 
-Existem o serviço de sessão, em TypeScript puro (sem React, React Flow nem `fetch` na camada `application`), e o provedor do Cognito completo (#262 e #286): descoberta OIDC, início do login, retorno, renovação e logout. A ligação ao app fica para #263: nenhuma tela, rota nem chamada do app usa ainda o serviço.
+Existem o serviço de sessão, em TypeScript puro (sem React, React Flow nem `fetch` na camada `application`), e o provedor do Cognito completo (#262 e #286): descoberta OIDC, início do login, retorno, renovação e logout. A ligação ao app começou em #263 (primeira fatia): provedor React, rota de retorno e proteção de rotas. Ainda faltam os controles de entrar e sair na interface (#299).
+
+- **Ligação ao app**: o bootstrap cria o serviço (`createBrowserAuth`) e o injeta em `AuthProvider`; as telas leem o estado com `useAuth()`. O `getAccessToken` do transporte HTTP vem do serviço de sessão. `/auth/callback` (`AuthCallbackPage`) conclui o login e mostra os estados carregando e erro. `RequireAuth` protege `/designs` e `/conta`: anônimo é enviado ao login e volta ao destino original (via `safeReturnTo`).
+- **Cache por usuário** (`app/sessionCache.ts`): o cache do TanStack Query é limpo ao entrar, sair ou trocar de usuário, para que dados de uma conta nunca apareçam em outra.
 
 - **Portas** (`application/ports.ts`): `IdentityProvider` (login gerenciado: `beginSignIn`, `completeSignIn`, `refresh`, `endSession`), `SessionStore` (`read`, `write`, `clear`; nenhum método lança) e `Navigate` (navegação de página inteira). `createAuthService({ provider, store, navigate, now? })` junta as três; criá-lo não faz chamada de rede.
 - **Sessão só em memória** (`infrastructure/memorySessionStore.ts`): os tokens nunca vão para `localStorage`, `sessionStorage`, IndexedDB nem cookie, para que um XSS não os leve embora. O custo é que recarregar a página encerra a sessão local; entrar de novo é rápido porque o login gerenciado do Cognito mantém o próprio cookie. A interface só enxerga `AuthSnapshot` (anônimo ou autenticado com o usuário), nunca os tokens; o snapshot tem referência estável (`useSyncExternalStore`).

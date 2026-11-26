@@ -3,6 +3,7 @@ import type { Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isApiError, type Api } from '../shared/lib/api';
 import { useApi } from '../shared/lib/api/ApiProvider';
+import { fakeAuth } from '../test/authFixtures';
 import { reply, validConfig as valid } from '../test/fixtures';
 import { bootstrap, type BootstrapOptions } from './bootstrap';
 
@@ -97,6 +98,18 @@ describe('bootstrap: portas da API', () => {
       expect(new URL(String(url)).origin).toBe(valid.apiBaseUrl);
       expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer tok');
     }
+  });
+
+  it('em produção, o token do serviço de sessão sai só pelo transporte, só para a origem da API', async () => {
+    production();
+    const fetchSpy = spyFetch();
+    const auth = fakeAuth({ status: 'authenticated', user: { sub: 'u1', email: null } });
+    auth.service.getAccessToken.mockResolvedValue('token-da-sessao');
+    const api = await start({ auth: auth.service });
+    await api?.quota.get().catch(() => undefined);
+    const [[url, init]] = fetchSpy.mock.calls as [[string, RequestInit]];
+    expect(new URL(String(url)).origin).toBe(valid.apiBaseUrl);
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-da-sessao');
   });
 
   it('em produção, sem provedor de token, responde unauthenticated sem chamar a API', async () => {
