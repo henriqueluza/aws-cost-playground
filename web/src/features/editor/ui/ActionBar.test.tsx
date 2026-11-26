@@ -6,19 +6,10 @@ import { expectNoAxeViolations } from '../../../test/axe';
 import { usePriceCatalog } from '../../pricing';
 import { designStore } from '../hooks/designStore';
 import { useDesignStore } from '../hooks/useDesignStore';
-import { referenceDesign, referenceLayout } from '../model/template/referenceTemplate';
+import { referenceDesign } from '../model/template/referenceTemplate';
 import { ActionBar } from './ActionBar';
 
-const template = () => ({
-  document: referenceDesign(),
-  layout: referenceLayout(),
-  selection: null,
-});
-
-beforeEach(() => {
-  const document = referenceDesign();
-  designStore.setState({ ...template(), document, baseline: document });
-});
+beforeEach(() => designStore.setState(designStore.getInitialState()));
 afterEach(() => vi.unstubAllGlobals());
 
 function Harness() {
@@ -104,11 +95,7 @@ describe('Novo design', () => {
     renderBar();
     designStore.getState().setRegion('sa-east-1');
     await user.click(screen.getByRole('button', { name: 'Novo design' }));
-    await user.click(
-      within(await screen.findByRole('dialog')).getByRole('button', {
-        name: 'Descartar e criar novo design',
-      }),
-    );
+    await user.click(await screen.findByRole('button', { name: 'Descartar e criar novo design' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     const { document, baseline } = designStore.getState();
     expect(document).toEqual(referenceDesign());

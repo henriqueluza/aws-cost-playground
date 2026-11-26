@@ -3,6 +3,8 @@ import { EMPTY_DESIGN } from './editorState';
 import { hasUnsavedChanges } from './unsaved';
 import { referenceDesign } from './template/referenceTemplate';
 
+type Doc = ReturnType<typeof referenceDesign>;
+
 describe('hasUnsavedChanges', () => {
   it('é falso para o mesmo documento e para uma cópia estrutural', () => {
     const design = referenceDesign();
@@ -16,33 +18,14 @@ describe('hasUnsavedChanges', () => {
     expect(hasUnsavedChanges(reordered, EMPTY_DESIGN)).toBe(false);
   });
 
-  it.each([
-    [
-      'a região',
-      (d: ReturnType<typeof referenceDesign>) => ({ ...d, region: 'sa-east-1' as const }),
-    ],
-    [
-      'a descrição',
-      (d: ReturnType<typeof referenceDesign>) => ({ ...d, workload: { description: 'x' } }),
-    ],
-    [
-      'um bloco a menos',
-      (d: ReturnType<typeof referenceDesign>) => ({ ...d, blocks: d.blocks.slice(1) }),
-    ],
-    [
-      'uma aresta a menos',
-      (d: ReturnType<typeof referenceDesign>) => ({ ...d, edges: d.edges.slice(1) }),
-    ],
-    [
-      'um valor de uso',
-      (d: ReturnType<typeof referenceDesign>) => ({
-        ...d,
-        blocks: d.blocks.map((b, i) =>
-          i === 0 ? { ...b, overrides: { ...b.overrides, requestsPerMonth: 1 } } : b,
-        ),
-      }),
-    ],
-  ])('é verdadeiro quando muda %s', (_name, change) => {
+  const CHANGES: [string, (d: Doc) => Doc][] = [
+    ['a região', (d) => ({ ...d, region: 'sa-east-1' })],
+    ['a descrição', (d) => ({ ...d, workload: { description: 'x' } })],
+    ['um bloco a menos', (d) => ({ ...d, blocks: d.blocks.slice(1) })],
+    ['uma aresta a menos', (d) => ({ ...d, edges: d.edges.slice(1) })],
+    ['um valor', (d) => ({ ...d, blocks: d.blocks.map((b) => ({ ...b, overrides: { k: 1 } })) })],
+  ];
+  it.each(CHANGES)('é verdadeiro quando muda %s', (_name, change) => {
     const saved = referenceDesign();
     expect(hasUnsavedChanges(change(saved), saved)).toBe(true);
   });

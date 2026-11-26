@@ -60,10 +60,7 @@ export type DesignActions = {
   beginGesture(): void;
   endGesture(): void;
 };
-/**
- * Fora de `EditorState` (que é o que se desenha): o histórico e `baseline`, o último documento
- * carregado ou salvo (`markSaved`); a comparação com ele diz se há alteração pendente.
- */
+/** Fora de `EditorState` (o que se desenha): o histórico e `baseline`, o último documento carregado ou salvo. */
 export type DesignStoreState = EditorState &
   DesignActions & { readonly history: History; readonly baseline: DesignDocument };
 export type DesignStore = StoreApi<DesignStoreState>;
