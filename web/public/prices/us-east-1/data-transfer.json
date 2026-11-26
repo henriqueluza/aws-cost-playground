@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "service": "data-transfer",
+  "region": "us-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "data-transfer-inter-az",
+      "description": "Tráfego entre zonas de disponibilidade, por direção",
+      "unit": "GB",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.01"
+        }
+      ]
+    },
+    {
+      "sku": "data-transfer-internet-out",
+      "description": "Saída da região para a internet",
+      "unit": "GB",
+      "tiers": [
+        {
+          "upTo": "10240",
+          "unitPrice": "0.09"
+        },
+        {
+          "upTo": "51200",
+          "unitPrice": "0.085"
+        },
+        {
+          "upTo": "153600",
+          "unitPrice": "0.07"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.05"
+        }
+      ],
+      "freeTier": {
+        "quantity": "100"
+      }
+    }
+  ]
+}
