@@ -161,6 +161,7 @@ describe('renderHcl', () => {
     ['índice negativo', () => hcl.attr('a', hcl.ref('a', -1))],
     ['índice fracionário', () => hcl.attr('a', hcl.ref('a', 1.5))],
     ['número não finito', () => hcl.attr('a', hcl.number(NaN))],
+    ['valor de tipo desconhecido', () => hcl.attr('a', { kind: 'raw', value: 'x' } as never)],
     ['número dentro de lista', () => hcl.attr('a', hcl.list([hcl.number(Infinity)]))],
   ])('recusa %s em vez de escrever texto cru', (_name, node) => {
     expect(() => renderHcl([node()])).toThrow(HclError);
