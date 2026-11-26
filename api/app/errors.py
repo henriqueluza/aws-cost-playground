@@ -18,6 +18,14 @@ MAX_LOC_PART_LENGTH = 40
 """Teto da lista `errors` do 422: entrada adversarial não multiplica o tamanho da resposta."""
 
 
+class ProblemError(HTTPException):
+    """HTTPException com campos de extensão do problem details (ex.: `scope` no 429 de quota)."""
+
+    def __init__(self, status_code: int, extra: dict[str, object]) -> None:
+        super().__init__(status_code)
+        self.extra = extra
+
+
 def _build(
     status: int, detail: str | None, headers: Mapping[str, str] | None, extra: dict[str, object]
 ) -> JSONResponse:
@@ -34,7 +42,8 @@ def _build(
 async def _handle(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, HTTPException):
         detail = exc.detail if isinstance(exc.detail, str) else None
-        return _build(exc.status_code, detail, exc.headers, {})
+        extra = exc.extra if isinstance(exc, ProblemError) else {}
+        return _build(exc.status_code, detail, exc.headers, extra)
     if isinstance(exc, RequestValidationError):
         if any(e["type"] == TOO_LARGE_ERROR for e in exc.errors()):
             return _build(413, "Design document too large", None, {})

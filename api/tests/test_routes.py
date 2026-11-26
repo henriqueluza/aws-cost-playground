@@ -114,6 +114,8 @@ def test_ordem_401_422_501(app, method, path, valid, invalid, _ok) -> None:  # t
             status, headers, problem = invoke(app, event(method, path, raw=raw))
             assert (status, headers["content-type"]) == (422, PROBLEM)
             assert all(set(error) == {"loc", "msg"} for error in problem["errors"])
+    if (method, path) == ("GET", "/quota"):
+        return  # implementada: `tests/test_quotas.py`
     status, headers, problem = invoke(app, event(method, path, valid))
     assert (status, headers["content-type"]) == (501, PROBLEM)
     assert problem == {**NOT_IMPLEMENTED, "requestId": "req-test-1"}  # sem `detail` interno
