@@ -233,6 +233,8 @@ function networkNodes(input: GeneratorInput): HclNode[] {
     hcl.comment(
       'Custo: EC2, RDS, ElastiCache, ALB e NAT Gateway cobram por hora mesmo sem tráfego.',
     ),
+    hcl.comment('Identificadores como db-1 e cache-1 seguem a ordem dos blocos do design: quem já'),
+    hcl.comment('aplicou um export anterior deve ler o plano antes de aplicar um novo.'),
     resource('aws_vpc', 'main', [
       hcl.attr('cidr_block', hcl.string(VPC_CIDR)),
       hcl.attr('enable_dns_support', hcl.bool(true)),
