@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import edgesJson from '../../../../../contracts/edges.json';
-import { blocksFileSchema, edgesFileSchema } from './blockContract';
+import { BLOCK_TYPES, PRD_BLOCK_LEVELS, blocksFileSchema, edgesFileSchema } from './blockContract';
+
+/** PRD F2, na ordem do texto. Lista escrita à mão de propósito: não deriva do código testado. */
+const prdBlocks =
+  'route53 cloudfront waf alb ec2 ecs lambda elasticache rds dynamodb s3 sqs cognito iam secrets-manager cloudwatch cloudtrail codepipeline cloudformation nat-gateway'
+    .split(' ')
+    .map((name) => `aws.${name}`);
 
 const requests = { key: 'requestsPerMonth', unit: 'requests', default: 10, min: 0, max: 100 };
 const lambda = {
@@ -23,6 +29,15 @@ const edgeKinds = [
   { kind: 'logs', usage: [gb], pairs: [pair(['aws.lambda'], ['aws.cloudwatch'])] },
 ];
 const edgesFile = (kinds: object[]) => ({ schemaVersion: 1, kinds });
+
+describe('PRD_BLOCK_LEVELS', () => {
+  it('traz os 20 blocos do PRD (F2): 11 de nível A, 6 B e 3 C de custo zero', () => {
+    expect([...BLOCK_TYPES].sort()).toEqual([...prdBlocks].sort());
+    const ofLevel = (level: string) => BLOCK_TYPES.filter((t) => PRD_BLOCK_LEVELS[t] === level);
+    expect([ofLevel('A').length, ofLevel('B').length]).toEqual([11, 6]);
+    expect(ofLevel('C').sort()).toEqual(['aws.cloudformation', 'aws.ecs', 'aws.iam']);
+  });
+});
 
 describe('blocksFileSchema', () => {
   it('aceita uma definição completa e descarta chave desconhecida', () => {
@@ -57,6 +72,7 @@ describe('blocksFileSchema', () => {
     ['sem opções', { key: 'architecture', options: [] }],
     ['com opção repetida', { key: 'architecture', options: ['arm64', 'arm64'] }],
     ['com opção booleana', { key: 'architecture', options: [true] }],
+    ['com opções de tipos diferentes', { key: 'memoryMb', options: [512, '512'] }],
   ])('recusa atributo %s', (_case, attribute) => {
     expect(blocksFileSchema.safeParse(withAttribute(attribute)).success).toBe(false);
   });
@@ -103,13 +119,15 @@ describe('edgesFileSchema', () => {
     expect(edgesFileSchema.safeParse(edgesFile(kinds as object[])).success).toBe(false);
   });
 
-  it('contracts/edges.json segue o schema, com runs-on só de ECS para EC2', () => {
+  it('contracts/edges.json segue o schema: gbPerMonth em data e logs, runs-on só de ECS para EC2', () => {
     const { kinds } = edgesFileSchema.parse(edgesJson);
+    const usage = Object.fromEntries(kinds.map((e) => [e.kind, e.usage.map((u) => u.key)]));
+    expect(usage).toEqual({ data: ['gbPerMonth'], 'runs-on': [], logs: ['gbPerMonth'] });
     const runsOn = kinds.find((edge) => edge.kind === 'runs-on');
     expect(runsOn?.pairs).toEqual([{ sources: ['aws.ecs'], targets: ['aws.ec2'] }]);
   });
 
-  it('contracts/edges.json só leva à internet a partir de CloudFront, S3, ALB e EC2 (ADR-0001)', () => {
+  it('contracts/edges.json: internet só de CloudFront, S3, ALB e EC2; logs só para o CloudWatch', () => {
     const { kinds } = edgesFileSchema.parse(edgesJson);
     const toClient = kinds.flatMap((edge) =>
       edge.pairs.filter((p) => p.targets.includes('client')),
@@ -117,5 +135,7 @@ describe('edgesFileSchema', () => {
     expect(toClient).toEqual([
       { sources: ['aws.cloudfront', 'aws.s3', 'aws.alb', 'aws.ec2'], targets: ['client'] },
     ]);
+    const logs = kinds.find((edge) => edge.kind === 'logs');
+    expect(logs?.pairs.flatMap((p) => p.targets)).toEqual(['aws.cloudwatch']);
   });
 });

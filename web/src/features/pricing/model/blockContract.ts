@@ -75,6 +75,7 @@ const attributeSchema = z
     default: optionValue.optional(),
   })
   .refine((a) => new Set(a.options).size === a.options.length, 'Opção repetida.')
+  .refine((a) => new Set(a.options.map((o) => typeof o)).size === 1, 'Opções de tipos diferentes.')
   .refine((a) => a.default === undefined || a.options.includes(a.default), {
     path: ['default'],
     message: 'O padrão não está entre as opções.',
