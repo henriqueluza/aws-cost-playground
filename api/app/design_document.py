@@ -7,8 +7,9 @@ Leitura tolerante: chave desconhecida é descartada, não recusada (rollback ent
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 from pydantic.alias_generators import to_camel
+from pydantic_core import PydanticCustomError
 
 Region = Literal["us-east-1", "sa-east-1"]
 EdgeKind = Literal["data", "runs-on", "logs"]
@@ -38,6 +39,19 @@ class ContractModel(BaseModel):
         validate_by_name=True,
         validate_by_alias=True,
     )
+
+
+def utf16_max(limit: int) -> AfterValidator:
+    """Limita o tamanho em unidades UTF-16, como o `.max()` do zod (`string.length` do JS)."""
+
+    def check(value: str) -> str:
+        if len(value.encode("utf-16-le", "surrogatepass")) // 2 > limit:
+            raise PydanticCustomError(
+                "string_too_long", "String should have at most {limit} characters", {"limit": limit}
+            )
+        return value
+
+    return AfterValidator(check)
 
 
 # Regex só com classes ASCII explícitas (`[0-9]`, nunca `\d`).
