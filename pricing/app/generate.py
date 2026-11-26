@@ -87,12 +87,12 @@ def generate(specs: Sequence[ServiceSpec], fetch: Fetch, prices_dir: Path, now: 
                 errors.append(f"{key}: {exc}")
                 continue
             content = render_price_file(spec.slug, region, prices)
-            problems = [
-                *blocking(spec, prices, content),
-                *_file_errors(content, region, spec.slug),
-                *regression(previous, prices),
-            ]
-            errors.extend(f"{key}: {problem}" for problem in problems)
+            problems = [*blocking(spec, prices, content), *_file_errors(content, region, spec.slug)]
+            # A comparação com o arquivo anterior só roda sobre preços já aprovados pelo schema.
+            problems = problems or regression(previous, prices)
+            if problems:
+                errors.extend(f"{key}: {problem}" for problem in problems)
+                continue
             files[key] = content
             report.extend(f"{key}: {line}" for line in variation(previous, prices))
     _fail(errors)

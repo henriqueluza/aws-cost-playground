@@ -15,6 +15,7 @@ from app.model import (
     Product,
     Query,
     ServiceSpec,
+    Tier,
     region_filter,
 )
 from app.products import tiers
@@ -144,8 +145,16 @@ def test_output_outside_the_schema_blocks(tmp_path: Path) -> None:
     def bad(region: str, products: Sequence[Product]) -> Sequence[Price]:
         return [Price("sku com espaço", "d", "u", tiers(products[0].dimensions))]
 
+    def garbage(region: str, products: Sequence[Product]) -> Sequence[Price]:
+        return [Price("s3-storage", "d", "u", (Tier(None, "VAZOU"),))]
+
     with pytest.raises(PricingError, match=r"prices\[0\]\.sku: fora do formato"):
         generate([ServiceSpec("s3", "AmazonS3", queries, bad)], fetch_at("1"), tmp_path, NOW)
+    put(tmp_path, "us-east-1/s3.json", render_price_file("s3", "us-east-1", ()))
+    with pytest.raises(PricingError) as caught:
+        generate([ServiceSpec("s3", "AmazonS3", queries, garbage)], fetch_at("1"), tmp_path, NOW)
+    assert "unitPrice: decimal fora do formato" in str(caught.value)
+    assert "VAZOU" not in str(caught.value)
 
 
 def test_fetch_failure_blocks(tmp_path: Path) -> None:
