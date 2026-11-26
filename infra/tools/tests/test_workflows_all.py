@@ -18,6 +18,7 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 EXPECTED = {
     "deploy-production.yml",
     "deploy-staging.yml",
+    "export-validate.yml",
     "pr-size.yml",
     "prices.yml",
     "review-pr.yml",
@@ -142,6 +143,19 @@ class EveryWorkflow(unittest.TestCase):
             containers |= {(name, image) for image in values(lines, "container") + values(lines, "image") if "@sha256:" not in image}
         self.assertEqual(unpinned, UNPINNED)
         self.assertEqual(containers, UNPINNED_CONTAINERS)
+
+    def test_semgrep_e_gitleaks_rodam_em_todo_pr_e_falham_fechado(self) -> None:
+        raw = self.files["security.yml"]
+        lines = code(raw)
+        start = lines.index("on:")
+        self.assertEqual(lines[start + 1], "  pull_request:", "sem filtro de caminho nem de branch")
+        self.assertTrue(lines[start + 2].startswith("  push:"))
+        semgrep, gitleaks = raw.split("\n  gitleaks:\n")
+        self.assertRegex(semgrep, r"semgrep scan .*--severity ERROR --error\b")
+        self.assertIn("fetch-depth: 0", gitleaks, "gitleaks precisa do histórico inteiro do PR")
+        self.assertRegex(gitleaks, r"\./gitleaks detect --redact\b")
+        self.assertNotIn("continue-on-error", raw)
+        self.assertNotIn("|| true", raw)
 
     def test_o_plano_em_pr_nao_roda_em_fork(self) -> None:
         plan = "\n".join(code(self.files["terraform.yml"]))

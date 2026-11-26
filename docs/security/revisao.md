@@ -2,7 +2,7 @@
 
 Primeira rodada da Issue #73. Auditoria do repositório inteiro contra o threat model do ADR (`docs/architecture/aws-cost-playground/ADR-0001-stack.md`, seção "Segurança", ameaças T1 a T6).
 
-- **Data:** 26/11/2026. **Commit auditado:** `4f2a233` (`main`).
+- **Data:** 26/11/2026. **Commit auditado:** `4f2a233` (`main` no início da revisão). Durante a revisão `main` avançou até `0c8715f`; esse delta não foi auditado (ver "Fora desta rodada"), mas os testes novos rodam verdes sobre ele.
 - **Resultado:** nenhum achado crítico. Um achado **alto**, no CI (agente revisor de PR, #364). Um médio, doze baixos e três informativos, cada um com Issue ou corrigido neste PR. Nenhum segredo no repositório nem no histórico. Nenhuma dependência com vulnerabilidade conhecida.
 - **Não é a revisão final:** o código que ainda não está em `main` fica para a segunda rodada (#375). Ver "Fora desta rodada".
 
@@ -69,7 +69,7 @@ O que o modelo pode fazer com uma descrição maliciosa: devolver números dentr
 
 ### T3. Acesso ao design de outro usuário
 
-**Veredito: mitigada no que está em `main`.** Atualizar, renomear, duplicar e apagar respondem 501 e ficam para a #375.
+**Veredito: mitigada no commit auditado.** Atualizar, renomear, duplicar e apagar respondiam 501 nesse commit; a implementação entrou em `main` durante a revisão e fica para a #375.
 
 | Mitigação | Onde | Teste |
 |---|---|---|
@@ -93,11 +93,11 @@ Nenhum uso de id de usuário vindo de corpo, query, caminho ou cabeçalho em `ap
 | Arquivo: tamanho conferido antes de ler, 100 blocos antes do `JSON.parse`, zod antes da store | `web/src/features/editor/model/designFile.ts:77-104`, `web/src/features/editor/ui/DesignFileActions.tsx:88-94` | `designFile.test.ts` "arquivo grande demais é recusado sem ser lido"; `DesignFileActions.test.tsx` "com design vazio, abre direto e usa a store só depois de validar" |
 | Limites do documento e ids por regex | `web/src/shared/lib/design/designDocument.ts:16-65,86-87` | `designDocument.test.ts` "aceita até maxBlocks blocos e recusa um a mais" |
 | `__proto__` e `constructor` | `designDocument.ts:31-34` | `designFile.test.ts` "__proto__ em qualquer nível não polui o protótipo e é descartado" |
-| Rótulo, nome e e-mail só como texto React | `web/src/features/editor/ui/BlockNode.tsx:20-22`, `web/src/features/designs/ui/DesignsPage.tsx:50-51` | `CanvasPanel.test.tsx` "mostra o rótulo com marcação como texto, nunca como HTML"; `CompareTable.test.tsx` "tipo desconhecido e rótulo com HTML saem só como texto" |
+| Rótulo, nome e e-mail só como texto React | `web/src/features/editor/ui/BlockNode.tsx:20-22`, `web/src/features/designs/ui/DesignsPage.tsx:50-51` | `CanvasPanel.test.tsx` "mostra o rótulo com marcação como texto, nunca como HTML"; `web/src/features/compare/ui/CompareTable.test.tsx` "tipo desconhecido e rótulo com HTML saem só como texto" |
 | Nenhum sorvedouro de HTML ou de código (`dangerouslySetInnerHTML`, `innerHTML`, `eval` e afins) | todo `web/src` | `web/src/security.test.ts` "nenhum arquivo usa %s" (novo) |
 | Bundle sem `data:` e sem script ou estilo inline | `web/vite.config.ts:16`, `web/tooling/noDataUri.ts` | `tooling/noDataUri.test.ts` "falha o build com URI data: em chunk" |
 | CSP no CloudFront, nos dois comportamentos de cache | `infra/modules/site/headers.tf:2-15,27-30`, `infra/modules/site/cloudfront.tf:56,66` | `test_security_review.py::ContentSecurityPolicy::test_csp_inteira_e_fixada_diretiva_a_diretiva` (novo; o teste do módulo só conferia trechos) |
-| Export de Terraform: rótulo só vira comentário e, saneado, nome de recurso | `web/src/features/export/model/hcl.ts:67-122`, `web/src/features/export/model/names.ts:11-23` | `hcl.test.ts` "carga \"%s\" fica presa dentro de um literal de uma linha"; `exportDesign.test.ts` "a carga \"%s\" no rótulo não cria nem altera linha de código" (16 cargas) |
+| Export de Terraform: rótulo só vira comentário e, saneado, nome de recurso | `web/src/features/export/model/hcl.ts:67-122`, `web/src/features/export/model/names.ts:11-23` | `web/src/features/export/model/hcl.test.ts` (carga `%s` fica presa dentro de um literal de uma linha); `web/src/features/export/application/exportDesign.test.ts` (a carga `%s` no rótulo não cria nem altera linha de código). As 16 cargas estão em `web/src/features/export/test/injectionPayloads.ts`; nos nomes reais dos testes o `%s` vem entre aspas |
 
 ### T5. Vazamento da chave ou de credencial de CI
 
@@ -116,7 +116,7 @@ Nenhum uso de id de usuário vindo de corpo, query, caminho ou cabeçalho em `ap
 | `Authorization` só para a origem da API; sem cookie; não segue redirecionamento | `web/src/shared/lib/http/transport.ts:113-126,147-158` | `transport.test.ts` "não segue redirecionamento: o token não chega a outra origem" |
 | OIDC sem chave estática; trust por igualdade em `aud` e `sub` | `infra/bootstrap/oidc.tf:8-15`, `plan.tf:18-23`, `apply.tf:37-43`, `prices.tf:18-23` | `bootstrap.tftest.hcl` (`trust_do_papel_plan`), `apply.tftest.hcl` (`trust_dos_papeis_apply`); `infra/tools/tests/test_workflow_deploy_staging.py::test_no_static_aws_credentials` |
 | Regras da casa em todos os workflows: sem `pull_request_target`, sem expressão em `run:`, OIDC e environment só nos jobs conhecidos, actions por SHA | `.github/workflows/*.yml` | `infra/tools/tests/test_workflows_all.py` (novo; antes só os deploys e o `prices` tinham teste) |
-| gitleaks e Semgrep em todo PR | `.github/workflows/security.yml:18-26` | Sem teste; são checks obrigatórios do ruleset de `main` |
+| gitleaks (histórico inteiro do PR) e Semgrep em todo PR, falhando fechado | `.github/workflows/security.yml:2-5,16,22-26` | `test_workflows_all.py::EveryWorkflow::test_semgrep_e_gitleaks_rodam_em_todo_pr_e_falham_fechado` (novo). São checks obrigatórios do ruleset de `main` (`validate`, `semgrep`, `gitleaks`, `pr-size`) |
 
 ### T6. Adulteração dos preços
 
@@ -140,7 +140,7 @@ O hash do manifest protege contra deploy parcial e corrupção. Não protege con
 | Pergunta | Resposta |
 |---|---|
 | Identidade só do `sub`? | Sim. Tabela T3. |
-| Autorização por dono em toda operação de design? | Sim nas que existem (criar, ler, listar). As demais respondem 501: #375. |
+| Autorização por dono em toda operação de design? | Sim nas que existiam no commit auditado (criar, ler, listar). As demais: #375. |
 | Toda entrada validada? | Sim. Pydantic em todo corpo, com limites; o documento é validado em profundidade. zod no arquivo aberto, no `/config.json`, em toda resposta da API (`web/src/shared/lib/http/httpApi.ts:49-110`) e nos arquivos de preço. Os modelos descartam chave desconhecida em vez de recusar (`extra="ignore"`, `z.object`), por decisão registrada de leitura tolerante; a chave extra não chega ao item nem à LLM. |
 | Algum texto livre da LLM é exibido? | Não. Tabela T2. |
 | Gasto da LLM | Quota antes da chamada, `max_tokens` fixo, timeout, sem nova tentativa, interruptor desligado por padrão. Tabela T1. |
@@ -149,7 +149,7 @@ O hash do manifest protege contra deploy parcial e corrupção. Não protege con
 | Exclusão de conta | Apaga a partição `USER#<sub>` (designs e contadores) e o usuário no Cognito. Sobram: quota global, PITR por 35 dias (produção), logs por 7 dias e o que já foi à Anthropic. Falha parcial responde 503 e a repetição termina o trabalho. O access token vale até 15 min depois: decisão pendente do autor (#284), não tomada aqui. Ver API-1. |
 | Export de Terraform | O rótulo nunca vira código (tabela T4). Recursos gerados com padrão seguro: S3 privado e cifrado, RDS fechado com senha gerenciada, IMDSv2, `0.0.0.0/0` só nas portas 443 e 80 do ALB, IAM sem curinga (`web/src/features/export/model`, testes "nenhuma permissão usa curinga em ação nem em recurso" e "nenhum atributo de senha, segredo ou token recebe literal em lugar nenhum do arquivo"). |
 | OIDC do login | PKCE S256 com 64 bytes de `crypto.getRandomValues`; `state` de uso único com validade de 10 min; `nonce`, `iss`, `aud`, `exp` conferidos; descoberta presa ao emissor; `redirect_uri` fixo; destino de retorno por lista de rotas internas. A assinatura do ID token não é verificada no cliente, de propósito e documentado (`web/src/features/auth/model/tokens.ts:47-52`): o token chega por TLS direto do endpoint e o cliente não decide autorização. Risco residual: WEB-1. |
-| CloudFront e S3 | Bucket privado com os quatro bloqueios, OAC com SigV4, política presa à distribuição, TLS 1.2 (`TLSv1.2_2021`), `redirect-to-https`, versionamento, `prevent_destroy`. HSTS de 1 ano sem `includeSubDomains` nem `preload` (decisão em `docs/handoff/14.md`). Sem `Permissions-Policy` (informativo). |
+| CloudFront e S3 | Bucket privado com os quatro bloqueios, OAC com SigV4, política presa à distribuição, TLS 1.2 (`TLSv1.2_2021`), `redirect-to-https`, versionamento, `prevent_destroy`. HSTS de 1 ano sem `includeSubDomains` nem `preload` (decisão em `docs/handoff/14.md`). Sem `Permissions-Policy` (informativo, sem Issue: o app não usa nenhuma API de dispositivo). |
 | API Gateway | Authorizer JWT em todas as rotas, nenhuma pública; emissor e audiência do pool do ambiente; limite de taxa; endpoint padrão desligado; domínio com TLS 1.2. |
 | DynamoDB | Cifrado com chave da AWS, PITR em produção, proteção contra exclusão e `prevent_destroy`. |
 | Lambda | Papel mínimo por função, sem segredo em variável de ambiente, sem URL de função, invocação só pelo API Gateway com `source_arn`. Ver INF-2. |
@@ -160,7 +160,7 @@ O hash do manifest protege contra deploy parcial e corrupção. Não protege con
 
 | Conferência | Resultado |
 |---|---|
-| **Nenhum segredo no repositório, inclusive histórico** | Limpo. gitleaks no histórico de todas as refs: 812 commits, 1 achado, falso positivo (FP-1). Estado atual: 0 achados. Nenhum `.env`, `.pem`, `.tfstate` ou chave versionado, hoje ou no histórico. Os `terraform.tfvars` têm só nome de ambiente, booleanos e limites de taxa. |
+| **Nenhum segredo no repositório, inclusive histórico** | Limpo. `gitleaks git --redact --log-opts="--all"` em 26/11/2026, sobre todas as refs locais e remotas: 812 commits varridos, 1 achado, falso positivo (FP-1). Estado atual: 0 achados. Nenhum `.env`, `.pem`, `.tfstate` ou chave versionado, hoje ou no histórico. Os `terraform.tfvars` têm só nome de ambiente, booleanos e limites de taxa. |
 | **CSP efetiva** | `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://api.<domínio> https://auth.<domínio> https://cognito-idp.us-east-1.amazonaws.com; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; upgrade-insecure-requests`. Sem `unsafe-inline` nem `unsafe-eval`. O `connect-src` cobre exatamente o que o app chama (API, token e revogação em `auth.`, descoberta no `cognito-idp`) e nada mais. Agora fixada por teste. Falta a prova com o app rodando (#374). |
 | **CORS sem `*`** | API Gateway: uma origem, a do site, por ambiente; sem credenciais; curinga recusado pela validação da variável e por teste. FastAPI: nenhum middleware nem cabeçalho de CORS (teste novo em `api/tests/test_main.py`). |
 | **Nenhum papel IAM com `*` em ação e recurso** | Nenhum `Allow` com os dois. Nos módulos, curinga em ação só em negação (`s3:*` sem TLS) e nenhum `Resource = "*"`; fixado por teste. No bootstrap há `Resource = "*"` com ação enumerada onde a AWS não aceita recurso, e a política gerenciada de leitura no papel `plan`. Exceções de scanner abaixo. |
@@ -237,7 +237,7 @@ Cada um passou por `fp-check`. Severidade é a final, depois da verificação.
 | `web/src/security.test.ts` | Nenhum sorvedouro de HTML ou de código, nenhum `console`, nenhum `localStorage`, IndexedDB ou cookie; `sessionStorage` só nos dois arquivos conhecidos |
 | `api/tests/test_main.py` | A aplicação nunca emite cabeçalho de CORS e não tem o middleware |
 
-Limite conhecido: `infra/tools/tests` só roda no CI quando o PR toca `infra/**` ou dois workflows (`.github/workflows/terraform.yml`). Um PR que só mexa em outro workflow não dispara `test_workflows_all.py`. A #365 pede o gatilho.
+Limite conhecido: `infra/tools/tests` só roda no CI quando o PR toca `infra/**` ou um dos workflows listados em `paths` de `.github/workflows/terraform.yml`. Um PR que só mexa em outro workflow não dispara `test_workflows_all.py`. A #365 pede que o job rode para qualquer arquivo de `.github/workflows/`.
 
 ## Fora desta rodada
 
@@ -245,12 +245,13 @@ Código que não está em `main` no commit auditado. Fica para a #375, que fecha
 
 | Item | Issue | Estado |
 |---|---|---|
-| API de atualizar, renomear, duplicar e apagar designs (hoje 501) | #54 | Em andamento |
-| Tela dessas operações | #57 | Pronta para começar |
+| API de atualizar, renomear, duplicar e apagar designs (501 no commit auditado) | #54 | Entrou em `main` durante a revisão (PR #376, `0c8715f`). Não auditada aqui |
+| Tela dessas operações | #57 | Em andamento |
 | Rotas de designs no API Gateway | #252 | Pronta para começar |
 | Custo de leitura da partição de designs no pior caso (achado médio já registrado; decisão do autor) | #277 | `needs-human` |
-| Designs salvos na comparação | #351 | PR #362 aberto |
-| Tudo o que entrar em `main` depois de `4f2a233` | — | — |
+| Designs salvos na comparação | #351 | Entrou em `main` durante a revisão (PR #362). Não auditada aqui |
+| Workflow `export-validate.yml` | #359 | Entrou em `main` durante a revisão. Passa nos invariantes de `test_workflows_all.py`; não auditado além disso |
+| Tudo o mais que entrou em `main` depois de `4f2a233` | — | `git diff 4f2a233..origin/main` |
 
 ## O que só o primeiro staging confirma
 
