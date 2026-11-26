@@ -115,7 +115,7 @@ O domínio entra pela variável `zone_name`, sem default, a mesma `TF_VAR_zone_n
 
 **Papel vinculado a serviço.** O API Gateway cria `AWSServiceRoleForAPIGateway` na primeira API ou domínio, com a permissão de quem chama, e os papéis `apply` negam `iam:CreateServiceLinkedRole` (`DenyIamOutsideEnvironment`). A negação não foi aberta: o papel nasce aqui (`aws_iam_service_linked_role.apigateway`, com `prevent_destroy`). Se ele já existir na conta, importe-o antes de aplicar ("Estado deste diretório").
 
-**Fora, à espera de decisão do autor (#338).** Ações de escrita que não podem ser limitadas ao ambiente não entram só com um registro aqui:
+**Fora, à espera de decisão do autor (#338).** Estas ações de escrita não podem ser limitadas ao ambiente e por isso não estão na política:
 
 - a entrega de log do stage do HTTP API (`logs:CreateLogDelivery`, `UpdateLogDelivery`, `DeleteLogDelivery`, `PutResourcePolicy` e as leituras `GetLogDelivery`, `ListLogDeliveries`, `DescribeResourcePolicies`, todas só em `*`);
 - `cloudfront:UpdateDistribution` em `*`, que o Cognito exige de quem cria o domínio próprio do user pool;
