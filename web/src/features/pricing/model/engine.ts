@@ -87,7 +87,7 @@ function itemCost(lines: readonly CostLine[] | undefined): ItemCost {
 export function createEstimator(blocks: BlockPricing) {
   return (design: DesignDocument, catalog: PriceCatalog): CostEstimate => {
     const sameRegion = design.region === catalog.region;
-    const rater = createRater(sameRegion ? catalog : { ...catalog, services: new Map() });
+    const rater = createRater(catalog);
 
     const linesOf = (block: Block): readonly CostLine[] | undefined => {
       const definition = blocks.definition(block.type);
