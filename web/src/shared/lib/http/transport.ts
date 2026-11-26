@@ -23,7 +23,7 @@ export type HttpTransportOptions = {
 };
 
 export type HttpRequest = {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   /** Segmentos do caminho; cada um passa por `encodeURIComponent`. */
   path: readonly string[];
   body?: unknown;
@@ -104,8 +104,8 @@ async function toApiError(response: Response, request: HttpRequest): Promise<Api
   }
   void response.body?.cancel();
   if (status === 409) return new ApiError({ kind: request.conflict ?? 'version-conflict' });
-  if (status >= 500) return new ApiError({ kind: 'unavailable' });
-  return new ApiError({ kind: STATUS_KINDS[status] ?? 'invalid-response' });
+  const fallback = status >= 500 ? 'unavailable' : 'invalid-response';
+  return new ApiError({ kind: STATUS_KINDS[status] ?? fallback });
 }
 
 export function createHttpTransport(options: HttpTransportOptions): HttpTransport {
@@ -117,17 +117,22 @@ export function createHttpTransport(options: HttpTransportOptions): HttpTranspor
   const prefix = base.origin + base.pathname.replace(/\/+$/, '');
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  function buildUrl(path: readonly string[]): string {
-    if (path.length === 0 || path.some((segment) => /^\.{0,2}$/.test(segment))) {
-      fail('invalid-request');
+  /** URL e corpo já serializado. O que não dá para montar é `invalid-request`. */
+  function prepare({ path, body }: HttpRequest): { url: string; body: string | undefined } {
+    try {
+      const url = new URL(`${prefix}/${path.map(encodeURIComponent).join('/')}`);
+      const dots = path.length === 0 || path.some((segment) => /^\.{0,2}$/.test(segment));
+      if (!dots && url.origin === base.origin) {
+        return { url: url.href, body: body === undefined ? undefined : JSON.stringify(body) };
+      }
+    } catch {
+      // `URIError` do segmento ou corpo que não serializa: mesmo erro abaixo.
     }
-    const url = new URL(`${prefix}/${path.map(encodeURIComponent).join('/')}`);
-    if (url.origin !== base.origin) fail('invalid-request');
-    return url.href;
+    return fail('invalid-request');
   }
 
   async function request<T>(req: HttpRequest, schema: z.ZodType<T>): Promise<T> {
-    const url = buildUrl(req.path);
+    const { url, body } = prepare(req);
     const token = await Promise.resolve()
       .then(options.getAccessToken)
       .catch(() => null);
@@ -137,15 +142,14 @@ export function createHttpTransport(options: HttpTransportOptions): HttpTranspor
       Accept: 'application/json',
       Authorization: `Bearer ${token}`,
     };
-    if (req.body !== undefined) headers['Content-Type'] = 'application/json';
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
     try {
       const response = await fetch(url, {
         method: req.method,
         headers,
-        body: req.body === undefined ? undefined : JSON.stringify(req.body),
-        signal: controller.signal,
+        body,
+        // O tempo limite vale até o fim da leitura do corpo.
+        signal: AbortSignal.timeout(timeoutMs),
         // Sem cookies, sem seguir redirecionamento (o token não vai a outra origem), sem cache.
         credentials: 'omit',
         redirect: 'error',
@@ -160,8 +164,6 @@ export function createHttpTransport(options: HttpTransportOptions): HttpTranspor
       // Sem `cause`: o erro original pode trazer URL ou corpo.
       if (error instanceof ApiError) throw error;
       return fail('network');
-    } finally {
-      clearTimeout(timer);
     }
   }
 

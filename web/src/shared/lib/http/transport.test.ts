@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { isApiError, type ApiErrorKind } from '../api';
 import { createHttpTransport, MAX_RESPONSE_BYTES, type HttpRequest } from './transport';
 
-const BASE = 'https://api.example.com';
+const BASE = 'https://api.example.com/v1';
 const TOKEN = 'cabecalho.corpo.assinatura';
 const SERVER_TEXT = '<img src=x onerror=alert(1)>';
 const schema = z.object({ ok: z.literal(true) });
@@ -54,7 +54,7 @@ async function failure(promise: Promise<unknown>) {
 }
 
 describe('requisição', () => {
-  it('manda o token só em Authorization, sem cookies, para a origem configurada', async () => {
+  it('manda o token só em Authorization, sem cookies, para a origem e o prefixo configurados', async () => {
     const seen = respond(() => HttpResponse.json({ ok: true, extra: 'descartado' }));
     const body = { name: 'Meu design' };
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
@@ -62,11 +62,9 @@ describe('requisição', () => {
       { method: 'POST', path: ['designs', 'a/b ?c#d'], body },
       schema,
     );
-
     expect(result).toEqual({ ok: true });
     const [request] = seen;
     expect(request?.url).toBe(`${BASE}/designs/a%2Fb%20%3Fc%23d`);
-    expect(request?.url).not.toContain(TOKEN);
     expect(request?.headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
     expect(request?.headers.get('cookie')).toBeNull();
     expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
@@ -88,7 +86,6 @@ describe('requisição', () => {
     await client.request(get, schema);
     await client.request(get, schema);
     const third = await failure(client.request(get, schema));
-
     expect(seen.map((request) => request.headers.get('authorization'))).toEqual([
       'Bearer primeiro.token.a',
       'Bearer segundo.token.b',
@@ -107,21 +104,18 @@ describe('requisição', () => {
     expect(seen).toHaveLength(0);
   });
 
-  it.each([[['designs', '..']], [['.']], [['designs', '']], [[]]])(
-    'caminho %j: invalid-request sem chamar a API',
-    async (path) => {
-      const seen = respond(() => HttpResponse.json({ ok: true }));
-      const error = await failure(transport().request({ method: 'GET', path }, schema));
-      expect(error.kind).toBe('invalid-request');
-      expect(seen).toHaveLength(0);
-    },
-  );
-
-  it('preserva o prefixo de caminho da URL base', async () => {
+  it.each<[string[], unknown?]>([
+    [['designs', '..']],
+    [['.']],
+    [['designs', '']],
+    [[]],
+    [['\uD800']],
+    [['designs'], { naoSerializa: 1n }],
+  ])('caminho ou corpo inválido (%#): invalid-request sem chamar a API', async (path, body) => {
     const seen = respond(() => HttpResponse.json({ ok: true }));
-    const client = createHttpTransport({ baseUrl: `${BASE}/v1/`, getAccessToken: () => TOKEN });
-    await client.request(get, schema);
-    expect(seen[0]?.url).toBe(`${BASE}/v1/quota`);
+    const error = await failure(transport().request({ method: 'POST', path, body }, schema));
+    expect(error.kind).toBe('invalid-request');
+    expect(seen).toHaveLength(0);
   });
 
   it.each([
@@ -198,19 +192,24 @@ describe('resposta', () => {
 });
 
 describe('rede', () => {
-  it('falha de rede vira network, sem cause', async () => {
-    respond(() => HttpResponse.error());
+  it.each([
+    ['falha de rede', () => HttpResponse.error()],
+    ['tempo limite', () => delay('infinite').then(() => HttpResponse.json({ ok: true }))],
+  ])('%s vira network, sem cause', async (_name, resolver) => {
+    respond(resolver);
     const error = await failure(transport().request(get, schema));
-    expect(error.kind).toBe('network');
+    expect(error.detail).toEqual({ kind: 'network' });
     expect(error.cause).toBeUndefined();
   });
 
-  it('estoura o tempo limite e vira network', async () => {
-    respond(async () => {
-      await delay('infinite');
-      return HttpResponse.json({ ok: true });
+  it('o tempo limite também cobre a leitura do corpo', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+      const start = (c: ReadableStreamDefaultController) =>
+        init?.signal?.addEventListener('abort', () => c.error(new Error('abortado')));
+      return Promise.resolve(new Response(new ReadableStream({ start })));
     });
     expect((await failure(transport().request(get, schema))).kind).toBe('network');
+    fetchSpy.mockRestore();
   });
 
   it('não segue redirecionamento: o token não chega a outra origem', async () => {
