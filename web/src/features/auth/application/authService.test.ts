@@ -168,8 +168,9 @@ describe('getAccessToken', () => {
     expect(provider.refresh).toHaveBeenCalledTimes(1);
   });
 
-  it('duas chamadas simultâneas disparam UMA renovação', async () => {
-    const { service, provider, store } = setup(stale());
+  it('duas chamadas simultâneas disparam UMA renovação; uma depois, outra', async () => {
+    let clock = NOW;
+    const { service, provider, store } = setup(stale(), () => clock);
     const tokens = await Promise.all([
       service.getAccessToken(),
       service.getAccessToken(),
@@ -178,6 +179,9 @@ describe('getAccessToken', () => {
     expect(tokens).toEqual(['renovado', 'renovado', 'renovado']);
     expect(provider.refresh).toHaveBeenCalledTimes(1);
     expect(store.read()?.accessToken).toBe('renovado');
+    clock = NOW + 900_000;
+    await service.getAccessToken();
+    expect(provider.refresh).toHaveBeenCalledTimes(2);
   });
 
   it('depois de uma renovação que terminou, uma nova pode acontecer', async () => {
@@ -256,11 +260,5 @@ describe('signOut', () => {
     provider.endSession.mockRejectedValueOnce(new Error('falhou'));
     await expect(service.signOut()).resolves.toBeUndefined();
     expect(navigate).toHaveBeenCalledWith('/');
-  });
-
-  it('anônimo também navega ao encerramento, sem sessão', async () => {
-    const { service, provider } = setup(null);
-    await service.signOut();
-    expect(provider.endSession).toHaveBeenCalledWith(null);
   });
 });

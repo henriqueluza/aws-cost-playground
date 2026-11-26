@@ -67,7 +67,7 @@
       ],
       "usage": [
         {"key": "storageGb", "unit": "GB", "default": 20, "min": 20, "max": 65536, "integer": true},
-        {"key": "backupStorageGb", "unit": "GB", "default": 20, "min": 0, "max": 1000000, "integer": false}
+        {"key": "backupStorageGb", "unit": "GB", "default": 0, "min": 0, "max": 1000000, "integer": false}
       ]
     },
     {
