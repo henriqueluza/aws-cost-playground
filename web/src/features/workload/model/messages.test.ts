@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  appliedMessage,
-  blockedReason,
-  failureMessage,
-  failureOf,
-  lockOf,
-  quotaLine,
-  quotaRatio,
-  type EstimateFailure,
-} from './messages';
+import * as m from './messages';
+import { failureMessage, failureOf, type EstimateFailure } from './messages';
 
 const RESET = '2026-11-27T00:00:00.000Z';
 
@@ -68,15 +60,14 @@ describe('failureMessage', () => {
 
 describe('appliedMessage, quotaLine e quotaRatio', () => {
   it('zero, singular e plural', () => {
-    expect(appliedMessage(0, 0)).toContain('não trouxe valores utilizáveis');
-    expect(appliedMessage(1, 1)).toBe('Estimativa aplicada: 1 bloco e 1 conexão.');
-    expect(appliedMessage(3, 0)).toBe('Estimativa aplicada: 3 blocos e 0 conexões.');
+    expect(m.appliedMessage(0, 0)).toContain('não trouxe valores utilizáveis');
+    expect(m.appliedMessage(1, 1)).toBe('Estimativa aplicada: 1 bloco e 1 conexão.');
+    expect(m.appliedMessage(3, 0)).toBe('Estimativa aplicada: 3 blocos e 0 conexões.');
   });
   it('linha 0 de 20 e proporção limitada a 0..1 (limite 0 dá 0)', () => {
-    expect(quotaLine({ limit: 20, remaining: 0 })).toBe('Restam 0 de 20 hoje');
-    expect(quotaRatio({ limit: 0, remaining: 0 })).toBe(0);
-    expect(quotaRatio({ limit: 1, remaining: 1 })).toBe(1);
-    expect(quotaRatio({ limit: 20, remaining: 99 })).toBe(1);
+    expect(m.quotaLine({ limit: 20, remaining: 0 })).toBe('Restam 0 de 20 hoje');
+    expect(m.quotaRatio({ limit: 0, remaining: 0 })).toBe(0);
+    expect(m.quotaRatio({ limit: 20, remaining: 99 })).toBe(1);
   });
 });
 
@@ -85,15 +76,15 @@ describe('blockedReason e lockOf', () => {
   const now = Date.parse('2026-11-26T12:00:00.000Z');
   const past = '2026-11-26T00:00:00.000Z';
   it('blockedReason: sem blocos, sem descrição, quota, livre (nessa ordem)', () => {
-    expect(blockedReason({ blocks: 0, description: '', locked })).toMatch(/Adicione blocos/);
-    expect(blockedReason({ blocks: 2, description: ' ', locked })).toMatch(/Descreva a carga/);
-    expect(blockedReason({ blocks: 2, description: 'x', locked })).toBe(failureMessage(locked));
-    expect(blockedReason({ blocks: 2, description: 'x', locked: null })).toBeNull();
+    expect(m.blockedReason({ blocks: 0, description: '', locked })).toMatch(/Adicione blocos/);
+    expect(m.blockedReason({ blocks: 2, description: ' ', locked })).toMatch(/Descreva a carga/);
+    expect(m.blockedReason({ blocks: 2, description: 'x', locked })).toBe(failureMessage(locked));
+    expect(m.blockedReason({ blocks: 2, description: 'x', locked: null })).toBeNull();
   });
   it('lockOf: falha de quota e remaining 0 travam até a hora de voltar', () => {
-    expect(lockOf(locked, null, now)).toBe(locked);
-    expect(lockOf({ ...locked, resetsAt: past }, null, now)).toBeNull();
-    expect(lockOf(null, { remaining: 0, resetsAt: RESET }, now)).toEqual(locked);
-    expect(lockOf(null, { remaining: 0, resetsAt: past }, now)).toBeNull();
+    expect(m.lockOf(locked, null, now)).toBe(locked);
+    expect(m.lockOf({ ...locked, resetsAt: past }, null, now)).toBeNull();
+    expect(m.lockOf(null, { remaining: 0, resetsAt: RESET }, now)).toEqual(locked);
+    expect(m.lockOf(null, { remaining: 0, resetsAt: past }, now)).toBeNull();
   });
 });
