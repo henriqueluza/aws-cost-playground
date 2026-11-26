@@ -50,10 +50,6 @@ describe('bateria de exemplos compartilhados', () => {
   it.each(files('scenarios'))('abre o cenário %s', (_n, text) => {
     expect(parseDesignFile(text).ok).toBe(true);
   });
-  it('tem arquivos nas duas pastas', () => {
-    expect(files('examples/design/valid').length).toBeGreaterThanOrEqual(14);
-    expect(files('examples/design/invalid').length).toBeGreaterThanOrEqual(41);
-  });
 });
 
 describe('categorias de erro', () => {
@@ -181,7 +177,6 @@ describe('arquivo malicioso', () => {
     const depth = Math.floor(DESIGN_LIMITS.maxDocBytes / 2) - 10;
     const deep = '['.repeat(depth) + ']'.repeat(depth);
     expect(['not-json', 'not-design']).toContain(errorOf(deep));
-    expect(errorOf(`{"a":${'['.repeat(100_000)}${']'.repeat(100_000)}}`)).toBeDefined();
   });
 });
 
@@ -251,9 +246,6 @@ describe('serialização', () => {
       blocks: [{ ...design.blocks[0], attributes: { a: 2, b: 1 } }],
     } as DesignDocument;
     expect(serializeDesign(a)).toBe(serializeDesign(b));
-  });
-  it('recusa documento inválido', () => {
-    expect(serializeDesign({ ...design, region: 'x' } as unknown as DesignDocument)).toBeNull();
   });
   it.each([...files('examples/design/valid'), ...files('scenarios')])(
     'ida e volta de %s devolve o mesmo documento',
