@@ -7,3 +7,9 @@ output "github_variables" {
     TF_STATE_BUCKET_PRODUCTION = aws_s3_bucket.state["production"].bucket
   }
 }
+
+# Chave externa: nome do GitHub Environment. Chave interna: nome da variável desse Environment.
+output "github_environment_variables" {
+  description = "Variáveis de cada GitHub Environment (não são segredos) que o autor cadastra depois do apply"
+  value       = { for env, role in aws_iam_role.apply : env => { AWS_APPLY_ROLE_ARN = role.arn } }
+}
