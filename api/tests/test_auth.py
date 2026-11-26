@@ -41,9 +41,12 @@ def test_sub_valido_identifica_o_usuario(probe: FastAPI) -> None:
     ],
 )
 def test_sem_identidade_valida_responde_401(probe: FastAPI, event: dict[str, Any]) -> None:
-    status, headers, _ = invoke(probe, event)
+    status, headers, body = invoke(probe, event)
     assert status == 401
     assert headers["www-authenticate"] == "Bearer"
+    assert headers["content-type"] == "application/problem+json"
+    assert (body["type"], body["title"], body["status"]) == ("about:blank", "Unauthorized", 401)
+    assert body["detail"] == "Missing or invalid identity"
 
 
 def test_so_auth_le_a_identidade_do_evento() -> None:

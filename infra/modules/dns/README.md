@@ -24,7 +24,7 @@ A zona do Route 53, que é do autor. O módulo a lê como data source (`data "aw
 | `zone_name` | `string` | obrigatória | Zona pública existente (ex.: `example.com`). |
 | `site_domain` | `string` | obrigatória | `zone_name` em production, `staging.<zone_name>` em staging. Precisa ser a zona ou um subdomínio dela. |
 | `site_alias` | `object({ name = string, zone_id = string })` | `null` | Alvo do site: `domain_name` e `hosted_zone_id` do `aws_cloudfront_distribution`. `null` = sem registro. |
-| `api_alias` | `object({ name = string, zone_id = string })` | `null` | Alvo da API: `target_domain_name` e `hosted_zone_id` de `aws_apigatewayv2_domain_name` (dentro de `domain_name_configuration[0]`). `null` = sem registro. |
+| `api_alias` | `object({ name = string, zone_id = string })` | `null` | Alvo da API: `target_domain_name` e `hosted_zone_id` de `aws_apigatewayv2_domain_name` (dentro de `domain_name_configuration[0]`). O módulo `http-api` já entrega esse objeto na saída `domain_alias`. `null` = sem registro. |
 | `auth_alias` | `object({ name = string, zone_id = string })` | `null` | Alvo do login: `cloudfront_distribution` e `cloudfront_distribution_zone_id` de `aws_cognito_user_pool_domain`. `null` = sem registro. |
 
 ## Outputs

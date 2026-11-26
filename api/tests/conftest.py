@@ -1,4 +1,6 @@
+import base64
 import json
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -14,12 +16,18 @@ class FakeContext:
 
 
 def make_event(
-    path: str = "/", *, claims: dict[str, Any] | None = None, headers: dict[str, str] | None = None
+    path: str = "/",
+    *,
+    method: str = "GET",
+    claims: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    query: str = "",
+    body: str | None = None,
 ) -> dict[str, Any]:
-    """Evento GET do API Gateway HTTP API (payload 2.0). `claims=None` = sem authorizer."""
+    """Evento do API Gateway HTTP API (payload 2.0). `claims=None` = sem authorizer."""
     context: dict[str, Any] = {
         "requestId": "apigw-req-1",
-        "http": {"method": "GET", "path": path, "sourceIp": "203.0.113.9", "protocol": "HTTP/1.1"},
+        "http": {"method": method, "path": path, "sourceIp": "203.0.113.9", "protocol": "HTTP/1.1"},
     }
     if claims is not None:
         context["authorizer"] = {"jwt": {"claims": claims, "scopes": None}}
@@ -27,9 +35,10 @@ def make_event(
         "version": "2.0",
         "routeKey": "$default",
         "rawPath": path,
-        "rawQueryString": "",
+        "rawQueryString": query,
         "headers": {"host": "api.test", **(headers or {})},
         "requestContext": context,
+        "body": body,
         "isBase64Encoded": False,
     }
 
@@ -40,6 +49,8 @@ def invoke(app: FastAPI, event: dict[str, Any]) -> tuple[int, dict[str, str], An
 
     response = create_handler(app)(event, FakeContext())
     raw = response.get("body") or ""
+    if response.get("isBase64Encoded"):  # Mangum codifica application/problem+json em base64
+        raw = base64.b64decode(raw).decode()
     return response["statusCode"], response["headers"], json.loads(raw) if raw else None
 
 
@@ -54,6 +65,16 @@ def env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     yield
     get_settings.cache_clear()
     get_table.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def restore_logging() -> Iterator[None]:
+    """`configure_logging` troca os handlers do root; cada teste começa e termina igual."""
+    root, app_logger = logging.getLogger(), logging.getLogger("app")
+    saved = (root.handlers[:], root.level, app_logger.level)
+    yield
+    root.handlers[:], root.level = saved[0], saved[1]
+    app_logger.setLevel(saved[2])
 
 
 @pytest.fixture
