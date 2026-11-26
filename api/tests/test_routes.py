@@ -79,6 +79,8 @@ ROUTES = [
 IDS = [f"{m} {p}" for m, p, *_ in ROUTES]
 PROBLEM = "application/problem+json"
 NOT_IMPLEMENTED = {"type": "about:blank", "title": "Not Implemented", "status": 501}
+IMPLEMENTED = {("DELETE", "/me")}
+"""Rotas que já saíram do 501; o comportamento delas é testado no arquivo do módulo."""
 
 
 def test_conjunto_exato_de_rotas_e_status_de_sucesso(app: FastAPI) -> None:
@@ -114,6 +116,8 @@ def test_ordem_401_422_501(app, method, path, valid, invalid, _ok) -> None:  # t
             status, headers, problem = invoke(app, event(method, path, raw=raw))
             assert (status, headers["content-type"]) == (422, PROBLEM)
             assert all(set(error) == {"loc", "msg"} for error in problem["errors"])
+    if (method, path) in IMPLEMENTED:
+        return
     status, headers, problem = invoke(app, event(method, path, valid))
     assert (status, headers["content-type"]) == (501, PROBLEM)
     assert problem == {**NOT_IMPLEMENTED, "requestId": "req-test-1"}  # sem `detail` interno
