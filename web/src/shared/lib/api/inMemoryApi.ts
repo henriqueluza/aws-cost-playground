@@ -86,8 +86,8 @@ function descending(a: string, b: string): number {
 
 function emptyEstimate(request: EstimateRequest): Pick<EstimateResponse, 'blocks' | 'edges'> {
   return {
-    blocks: request.blocks.map(({ id }) => ({ id, values: {} })),
-    edges: request.edges.map(({ id }) => ({ id, values: {} })),
+    blocks: request.blocks.map(({ id }) => ({ id, values: {}, source: 'default' as const })),
+    edges: request.edges.map(({ id }) => ({ id, values: {}, source: 'default' as const })),
   };
 }
 
