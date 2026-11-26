@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIRM_WORD, confirmationMatches, accountErrorMessage } from './accountMessages';
+import { CONFIRM_WORD, confirmationMatches } from './accountMessages';
 import { formatResetsAt, quotaSummary } from './format';
 
 describe('confirmationMatches', () => {
