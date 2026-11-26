@@ -78,7 +78,14 @@ Raiz: `{ "schemaVersion": 1, "kinds": [...] }`. Cada tipo de aresta (`data`, `ru
 - `inferKind(kinds)`: entre os tipos permitidos (`allowedKinds`, que embrulha `edgeKindsFor`), escolhe o que o contrato aceita em menos pares origem/destino; empate, a ordem de `edges.json`. Por isso ECS para EC2 vira `runs-on` e não `data`.
 - `setEdgeKind(doc, id, kind)` (`designActions.ts`, exposta na store do design): troca o tipo da aresta. Falha com `unknown-edge` se a aresta não existe e com `kind-not-allowed` se o contrato não permite o tipo para o par de blocos (o documento não muda).
 - `retargetUsage(edge, kind)`: ao trocar o tipo, `usage.values` e `overrides` mantêm só as chaves que o novo tipo tem em `edges.json`, cada uma limitada à faixa do novo tipo (inteiros arredondados). `runs-on` não tem `gbPerMonth`, então o uso e o override somem; `usage.source` não muda.
-- Canvas: as arestas usam o tipo React Flow customizado `typed` (`ui/TypedEdge.tsx`), com traçado por tipo (`EDGE_STYLE`): `data` contínuo, `runs-on` tracejado, `logs` pontilhado, além da cor e do ícone na etiqueta. `ui/EdgeLegend.tsx` mostra a legenda no canto inferior esquerdo quando há blocos. O inspetor de aresta e o "Conectar a…" ficam para a parte 2.
+- Canvas: as arestas usam o tipo React Flow customizado `typed` (`ui/TypedEdge.tsx`), com traçado por tipo (`EDGE_STYLE`): `data` contínuo, `runs-on` tracejado, `logs` pontilhado, além da cor e do ícone na etiqueta. `ui/EdgeLegend.tsx` mostra a legenda no canto inferior esquerdo quando há blocos.
+
+### Inspetor de aresta e "Conectar a…" (#46, parte 2)
+
+- `buildEdgeForm(def, edge)` (`model/blockForm.ts`): campos de uso da aresta a partir das chaves do tipo em `edges.json`, reutilizando o `usageField` do bloco (mesma validação e faixa). Nenhum campo é escrito à mão por tipo.
+- `edgeCostNote(doc, edge)` (`model/edgeKinds.ts`): nota "custa ou não" derivada de `edgeCharges`, exportada pelo `index` de `pricing`; não consulta preço. Devolve `{ costs, text }` com texto fixo da interface (nada digitado pelo usuário entra). Aresta fora do contrato fica fora da estimativa; `runs-on` não custa (o custo está no EC2); mesma zona ou ponta sem zona não custa.
+- `connectTargets(doc, sourceId)`: destinos de "Conectar a…" que o contrato permite a partir do bloco, incluindo a Internet e excluindo os já ligados (sem duplicata). Cada item traz `kinds` permitidos e o `kind` inferido por `inferKind`.
+- UI: `ui/EdgeInspector.tsx` (tipo, uso da aresta e nota de custo) e `ui/ConnectTo.tsx` (cria a aresta sem arrastar, WCAG 2.5.7; o tipo só é escolhido quando há mais de um permitido), ambos montados por `InspectorPanel`.
 
 Para acrescentar um bloco:
 

@@ -2,14 +2,19 @@ import { EmptyState } from '../../../shared/ui';
 import { blockDefinition } from '../../pricing';
 import { useDesignStore } from '../hooks/useDesignStore';
 import { BlockInspector } from './BlockInspector';
+import { EdgeInspector } from './EdgeInspector';
 import styles from './InspectorPanel.module.css';
 
 /** Aba "Bloco" da coluna direita: o formulário do bloco selecionado na store. */
 export function InspectorPanel() {
-  const selection = useDesignStore((s) => s.selection);
   const block = useDesignStore((s) =>
     s.selection?.kind === 'block'
       ? s.document.blocks.find((b) => b.id === s.selection?.id)
+      : undefined,
+  );
+  const edge = useDesignStore((s) =>
+    s.selection?.kind === 'edge'
+      ? s.document.edges.find((e) => e.id === s.selection?.id)
       : undefined,
   );
   const definition = block ? blockDefinition(block.type) : undefined;
@@ -30,15 +35,7 @@ export function InspectorPanel() {
       />
     );
   }
-  if (selection?.kind === 'edge') {
-    return (
-      <EmptyState
-        title="Aresta selecionada"
-        description="A edição de aresta não está disponível aqui. Selecione um bloco para editar seus valores."
-        action={<span className={styles.hint}>Clique em um bloco no canvas.</span>}
-      />
-    );
-  }
+  if (edge) return <EdgeInspector key={edge.id} edge={edge} />;
   return (
     <EmptyState
       title="Nenhum bloco selecionado"

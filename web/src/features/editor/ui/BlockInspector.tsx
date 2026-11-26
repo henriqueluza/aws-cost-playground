@@ -12,6 +12,7 @@ import {
 import { attributeLabel, optionLabel } from './blockLabels';
 import { labelErrorMessage } from './inspectorMessages';
 import styles from './InspectorPanel.module.css';
+import { ConnectTo } from './ConnectTo';
 import { UsageItem } from './UsageItem';
 
 type Props = { block: Block; definition: BlockDefinition };
@@ -107,6 +108,7 @@ export function BlockInspector({ block, definition }: Props) {
       ) : (
         <p className={styles.note}>Este bloco não tem custo próprio nem valores de uso.</p>
       )}
+      <ConnectTo blockId={block.id} />
     </div>
   );
 }
