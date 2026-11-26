@@ -34,8 +34,8 @@ function Block({ block }: { block: LegalBlock }) {
     case 'ul':
       return (
         <ul>
-          {block.items.map((item) => (
-            <li key={item}>
+          {block.items.map((item, i) => (
+            <li key={i}>
               <Text value={item} />
             </li>
           ))}
@@ -44,8 +44,8 @@ function Block({ block }: { block: LegalBlock }) {
     case 'dl':
       return (
         <dl className={styles.defs}>
-          {block.items.map((item) => (
-            <div key={item.term}>
+          {block.items.map((item, i) => (
+            <div key={i}>
               <dt>{item.term}</dt>
               <dd>
                 <Text value={item.text} />

@@ -39,6 +39,7 @@
 }
 .toc a {
   display: inline-block;
+  min-height: 44px;
   padding: var(--space-2) 0;
 }
 .sheet {
