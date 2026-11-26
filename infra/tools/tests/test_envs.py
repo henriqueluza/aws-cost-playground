@@ -34,7 +34,7 @@ SHARED = {
 }
 AUTHOR_VARS = ["zone_name", "alarm_email", "package_bucket", "package_key"]
 MODULES = {f"../../modules/{m}" for m in "alarms auth database dns functions http-api site".split()}
-DEPLOY_OUTPUTS = {"site_bucket_name", "site_distribution_id", "function_names", "site_config"}
+DEPLOY_OUTPUTS = {"site_bucket_name", "site_distribution_id", "function_names", "site_config", "site_url"}
 RUNBOOK_OUTPUTS = {"api_id", "function_role_names", "llm_api_key_parameter_name", "alarm_topic_arn"}
 
 
