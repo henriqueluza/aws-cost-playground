@@ -34,7 +34,9 @@ const charge = (sku: string, quantity: string, kind: 'fixed' | 'variable') => ({
 });
 /** Linhas (`sku cobrança quantidade valor`) e total em USD do bloco, na franquia que resta. */
 function rate(rater: Rater, block: BlockPriceInput) {
-  const lines = rater.rate(priceDynamoDb(block).map((c) => ({ ...c, service: 'dynamodb' }))) ?? [];
+  const lines = rater.rate(priceDynamoDb(block).map((c) => ({ ...c, service: 'dynamodb' })));
+  // `undefined` é SKU fora do catálogo: falha aqui, em vez de virar total zero.
+  if (lines === undefined) throw new Error('cobrança sem preço no catálogo do teste');
   const usd = (value: Decimal) => toFixed(value, 6);
   return {
     lines: lines.map((l) => `${l.sku} ${l.charge} ${usd(l.quantity)} ${usd(l.amount)}`),

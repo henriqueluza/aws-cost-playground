@@ -22,10 +22,10 @@ export const priceDynamoDb: BlockPricer = ({ attributes, usage }) => {
     throw new RangeError('aws.dynamodb: modo de capacidade fora do contrato');
   }
   const onDemand = capacityMode === 'on-demand';
-  const reads = onDemand ? usage.readRequestsPerMonth : usage.provisionedReadUnits;
-  const writes = onDemand ? usage.writeRequestsPerMonth : usage.provisionedWriteUnits;
+  const readQuantity = onDemand ? usage.readRequestsPerMonth : usage.provisionedReadUnits;
+  const writeQuantity = onDemand ? usage.writeRequestsPerMonth : usage.provisionedWriteUnits;
   const { storageGb } = usage;
-  if (reads === undefined || writes === undefined || storageGb === undefined) {
+  if (readQuantity === undefined || writeQuantity === undefined || storageGb === undefined) {
     throw new RangeError('aws.dynamodb: uso fora do contrato');
   }
   const storage: BlockCharge = {
@@ -35,20 +35,20 @@ export const priceDynamoDb: BlockPricer = ({ attributes, usage }) => {
   };
   if (onDemand) {
     return [
-      { sku: 'dynamodb-read-requests', quantity: decimal(reads), charge: 'variable' },
-      { sku: 'dynamodb-write-requests', quantity: decimal(writes), charge: 'variable' },
+      { sku: 'dynamodb-read-requests', quantity: decimal(readQuantity), charge: 'variable' },
+      { sku: 'dynamodb-write-requests', quantity: decimal(writeQuantity), charge: 'variable' },
       storage,
     ];
   }
   return [
     {
       sku: 'dynamodb-read-capacity',
-      quantity: mul(decimal(reads), HOURS_PER_MONTH),
+      quantity: mul(decimal(readQuantity), HOURS_PER_MONTH),
       charge: 'fixed',
     },
     {
       sku: 'dynamodb-write-capacity',
-      quantity: mul(decimal(writes), HOURS_PER_MONTH),
+      quantity: mul(decimal(writeQuantity), HOURS_PER_MONTH),
       charge: 'fixed',
     },
     storage,
