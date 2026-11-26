@@ -97,6 +97,7 @@ describe('requisição', () => {
   });
 
   it('não grava em armazenamento nem em cookie, com sucesso e com 401', async () => {
+    // Fakes das APIs de persistência usuais (Web Storage, IndexedDB, Cache Storage, cookie).
     // Leitura é livre (o MSW lê `localStorage`); toda escrita fica registrada.
     const writes: string[] = [];
     const record = (call: string) => () => void writes.push(call);
