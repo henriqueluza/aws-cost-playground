@@ -31,7 +31,7 @@ export function AccountPage() {
     quotaBody = (
       <div role="status" aria-busy="true">
         <span className={styles.srOnly}>Carregando suas estimativas…</span>
-        <span className={`${styles.bar} ${styles.barWide}`} aria-hidden="true" />
+        <div className={styles.bar} aria-hidden="true" />
       </div>
     );
   } else if (quota.isError) {
@@ -52,11 +52,10 @@ export function AccountPage() {
     quotaBody = (
       <>
         <p className={styles.figure}>
-          <span className={styles.big}>{quota.data.remaining}</span>
-          <span className={styles.of}> de {quota.data.limit}</span>
+          <b>{quota.data.remaining}</b> de {quota.data.limit}
         </p>
         <p className={styles.text}>{quotaSummary(quota.data.remaining, quota.data.limit)}.</p>
-        <p className={styles.meta}>
+        <p className={styles.muted}>
           Renova em{' '}
           <time dateTime={quota.data.resetsAt}>{formatResetsAt(quota.data.resetsAt)}</time>
         </p>
@@ -80,7 +79,7 @@ export function AccountPage() {
           </h2>
           <dl className={styles.facts}>
             <dt>E-mail</dt>
-            <dd className={styles.email}>{email ?? 'Não informado pelo provedor de login'}</dd>
+            <dd>{email ?? 'Não informado pelo provedor de login'}</dd>
           </dl>
         </section>
 

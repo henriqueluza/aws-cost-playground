@@ -72,11 +72,7 @@ function DeleteForm({ pending, failure, onCancel, onConfirm, onSignIn }: DeleteA
         spellCheck={false}
         disabled={pending}
       />
-      {failure !== null && (
-        <div className={styles.dialogNotice}>
-          <Notice tone="negative" message={deleteErrorMessage(failure)} />
-        </div>
-      )}
+      {failure !== null && <Notice tone="negative" message={deleteErrorMessage(failure)} />}
       {pending && (
         <p role="status" className={styles.text}>
           Excluindo a conta…

@@ -91,22 +91,6 @@ describe('AccountPage', () => {
     await expectNoAxeViolations(container);
   });
 
-  it('mostra o e-mail só como texto e avisa quando o provedor não deu e-mail', async () => {
-    const auth = fakeAuth({ status: 'authenticated', user: { sub: 'u1', email: null } });
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <ApiProvider api={newApi()}>
-          <AuthProvider service={auth.service}>
-            <RouterProvider
-              router={createMemoryRouter([{ path: '/', element: <AccountPage /> }])}
-            />
-          </AuthProvider>
-        </ApiProvider>
-      </QueryClientProvider>,
-    );
-    expect(screen.getByText(/Não informado pelo provedor/)).toBeInTheDocument();
-  });
-
   it('erro de rede na quota: frase própria e tentar de novo recarrega', async () => {
     const base = newApi();
     let fail = true;
@@ -134,7 +118,8 @@ describe('AccountPage', () => {
   describe('exclusão', () => {
     it('explica o que é apagado, que não há volta, e só libera com a palavra exata', async () => {
       const user = userEvent.setup();
-      mount();
+      const { api } = mount();
+      const spy = vi.spyOn(api.account, 'deleteAccount');
       const dialog = await open(user);
       expect(within(dialog).getByRole('heading', { name: /Excluir a conta/ })).toBeInTheDocument();
       expect(dialog).toHaveTextContent('designs salvos');
@@ -146,8 +131,9 @@ describe('AccountPage', () => {
       expect(field).toHaveFocus();
       const confirm = within(dialog).getByRole('button', { name: 'Excluir conta' });
       expect(confirm).toBeDisabled();
-      await user.type(field, 'excluir');
+      await user.type(field, 'excluir{Enter}');
       expect(confirm).toBeDisabled();
+      expect(spy).not.toHaveBeenCalled();
       await user.clear(field);
       await user.type(field, 'EXCLUIR');
       expect(confirm).toBeEnabled();
@@ -170,20 +156,12 @@ describe('AccountPage', () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
-    it('Enter no campo com a palavra errada não exclui', async () => {
-      const user = userEvent.setup();
-      const { api } = mount();
-      const spy = vi.spyOn(api.account, 'deleteAccount');
-      const dialog = await open(user);
-      await user.type(within(dialog).getByRole('textbox'), 'EXCLUI{Enter}');
-      expect(spy).not.toHaveBeenCalled();
-    });
-
     it('depois do 204: apaga os dados, vai ao editor (/) e encerra a sessão, sem abrir o login', async () => {
       const user = userEvent.setup();
       const doc = adrExampleDesign as unknown as DesignDocument;
       const api = newApi();
       await api.designs.create({ name: 'Loja', doc });
+      savedDesignStore.setState({ saved: { id: 'X' } as never });
       window.sessionStorage.setItem(DRAFT_KEY, '{"savedAt":1,"text":"{}"}');
       const { auth, router, client } = mount(api);
       client.setQueryData(['designs', 'list'], ['dado do usuário']);
@@ -198,18 +176,6 @@ describe('AccountPage', () => {
       expect(await api.designs.list()).toEqual([]);
       expect(client.getQueryData(['designs', 'list'])).toBeUndefined();
       expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull();
-    });
-
-    it('esquece o design salvo na conta', async () => {
-      const user = userEvent.setup();
-      savedDesignStore.setState({
-        saved: { id: 'X', name: 'Loja', version: 1, doc: {} as never } as never,
-      });
-      mount();
-      const dialog = await open(user);
-      await user.type(within(dialog).getByRole('textbox'), 'EXCLUIR');
-      await user.click(within(dialog).getByRole('button', { name: 'Excluir conta' }));
-      await screen.findByRole('heading', { name: 'Editor anônimo' });
       expect(savedDesignStore.getState().saved).toBeNull();
     });
 

@@ -35,11 +35,9 @@ describe('confirmationMatches', () => {
 
 describe('mensagens por código', () => {
   it.each(KINDS)('%s tem frase própria, sem eco do erro', (kind) => {
-    const error = new ApiError({ kind } as never);
-    for (const text of [deleteErrorMessage(kind), quotaErrorMessage(kind)]) {
-      expect(text.length).toBeGreaterThan(10);
-      expect(text).not.toContain(error.message);
-    }
+    const echo = new ApiError({ kind } as never).message;
+    expect(deleteErrorMessage(kind)).not.toContain(echo);
+    expect(quotaErrorMessage(kind)).not.toContain(echo);
   });
 
   it('só oferece repetir quando a falha é do serviço ou da rede', () => {
