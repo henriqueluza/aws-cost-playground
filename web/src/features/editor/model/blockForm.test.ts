@@ -101,6 +101,8 @@ describe('parseUsageInput', () => {
     ['1.5', real, 1.5],
     ['0', real, 0],
     ['730,25', real, 730.25],
+    ['0,125', real, 0.125],
+    ['0.125', real, 0.125],
   ])('aceita %j', (text, field, value) => {
     expect(parseUsageInput(text, field)).toEqual({ ok: true, value });
   });
@@ -120,6 +122,9 @@ describe('parseUsageInput', () => {
     ['1,2,3', real, 'format'],
     ['1.000', int, 'thousands'],
     ['1.000,5', real, 'thousands'],
+    ['1,000', int, 'thousands'],
+    ['1,000,000', int, 'thousands'],
+    ['1,000.5', real, 'thousands'],
     ['1,5', int, 'fraction'],
     ['0', int, 'range'],
     ['1001', int, 'range'],

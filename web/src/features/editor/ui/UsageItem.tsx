@@ -51,7 +51,9 @@ export function UsageItem({ field, estimated, onChange, onReset }: Props) {
         <span className={styles.origin}>
           <span className={styles.mark} aria-hidden="true" />
           <span className={styles.srOnly}>Origem do valor de {label}: </span>
-          {ORIGIN_TEXT[field.origin]}
+          {error
+            ? `valor não aplicado, em uso: ${formatUsageInput(field.value)} ${unitLabel(field.unit) ?? field.unit}`
+            : ORIGIN_TEXT[field.origin]}
         </span>
         {field.origin === 'manual' ? (
           <Button

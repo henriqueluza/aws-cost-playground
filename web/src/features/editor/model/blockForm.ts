@@ -92,14 +92,16 @@ export type UsageInputResult =
   | { readonly ok: false; readonly error: UsageInputError };
 
 const DECIMAL = /^\d+(?:[.,]\d+)?$/;
-const THOUSANDS = /^\d{1,3}(?:\.\d{3})+(?:,\d+)?$/;
+// Parece milhar em pt-BR ("1.000") ou em inglês ("1,000"): ambíguo, então é recusado. "0,125" não entra.
+const THOUSANDS = /^[1-9]\d{0,2}(?:\.\d{3})+(?:,\d+)?$|^[1-9]\d{0,2}(?:,\d{3})+(?:\.\d+)?$/;
 
 /**
  * Lê o texto digitado num campo de uso. Regra de entrada (documentada em `docs/handoff/48.md`):
  * - espaços nas pontas são ignorados; vazio é recusado (para voltar ao estimado há o botão);
  * - só algarismos e UM separador decimal, vírgula (pt-BR) ou ponto: "1,5" e "1.5" valem 1,5;
- * - ponto de milhar ("1.000", "1.000,5") é recusado, porque "1.000" seria lido como 1 por quem
- *   digita em formato inglês: o erro pede para digitar sem separador de milhar;
+ * - separador de milhar ("1.000", "1,000", "1.000,5") é recusado, porque "1.000" seria lido como
+ *   1 por quem digita em formato inglês (e "1,000" como 1 em pt-BR): o erro pede para digitar
+ *   sem separador de milhar. "0,125" e "0.125" valem 0,125;
  * - notação científica ("1e9"), sinal ("-1", "+1"), "Infinity", "NaN" e letras são recusados;
  * - número inteiro quando `integer`; depois `min` e `max` do contrato, e finito.
  */

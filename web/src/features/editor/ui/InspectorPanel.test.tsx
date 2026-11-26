@@ -97,6 +97,7 @@ describe('InspectorPanel', () => {
     expect(field.getAttribute('aria-describedby')).toContain(alert.id);
     expect(block().overrides.avgDurationMs).toBe(80);
     expect(block().overrides).toEqual(before);
+    expect(screen.getByText(/valor não aplicado, em uso: 80 ms/)).toBeInTheDocument();
   });
 
   it.each(['1e9', '-5', '', '1.000', '12,5', 'abc'])('texto %j não chega à store', async (text) => {

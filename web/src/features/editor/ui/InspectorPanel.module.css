@@ -50,7 +50,7 @@
   align-items: center;
   justify-content: space-between;
   column-gap: var(--space-2);
-  min-height: var(--lh-small);
+  min-height: var(--hit-min); /* o botão de voltar não faz a linha saltar ao aparecer */
   font-size: var(--fs-small);
   line-height: var(--lh-small);
   color: var(--muted);
@@ -63,7 +63,7 @@
 }
 
 .mark {
-  visibility: hidden; /* reserva o lugar: o texto de origem alinha nos três estados */
+  display: none;
   flex: none;
   box-sizing: border-box;
   width: var(--mark-origin);
@@ -71,11 +71,11 @@
   border-radius: 50%;
 }
 .item[data-origin='manual'] .mark {
-  visibility: visible;
+  display: inline-block;
   background-color: var(--text);
 }
 .item[data-origin='llm'] .mark {
-  visibility: visible;
+  display: inline-block;
   border: 1.5px solid var(--muted);
 }
 
@@ -94,6 +94,10 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.item:has([role='alert']) .meta {
+  margin-top: var(--space-1); /* o erro e a origem não se leem como uma frase só */
 }
 
 .meta button {
