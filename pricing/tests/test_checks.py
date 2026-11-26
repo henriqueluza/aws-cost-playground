@@ -66,6 +66,7 @@ def test_variation_reports_without_blocking() -> None:
     )
     after = [
         price("new", "1"),
+        price("x<img src=y>", "1"),
         price("same", "1", "2"),
         price("up", "1", "1.31"),
         price("down", "0.69"),
@@ -75,6 +76,7 @@ def test_variation_reports_without_blocking() -> None:
     ]
     assert variation(before, after) == [
         "SKU novo: new",
+        "SKU novo fora do formato",
         "SKU removido: gone",
         "variação maior que 30%: down faixa 0",
         "variação maior que 30%: free faixa 1",
@@ -87,6 +89,7 @@ def test_variation_reports_without_blocking() -> None:
 def test_regression_blocks_broken_answers() -> None:
     before = previous(price("a", "1", "2"), price("b", "0"), price("c", "1"), price("d", "1"))
     assert regression(before, [price("a", "1", "0"), price("b", "0")]) == ["preço zerado: a"]
-    assert regression(before, [price("b", "0")]) == [
-        "mais da metade dos SKUs do arquivo anterior sumiu"
-    ]
+    gone = "mais da metade dos SKUs do arquivo anterior sumiu"
+    assert regression(before, [price("b", "0")]) == [gone]
+    assert regression(before, [price(sku, "1") for sku in "wxyz"]) == [gone]
+    assert regression(before, [price(sku, "1") for sku in "abyz"]) == []

@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 from decimal import Decimal
 
 from app.model import Price, ServiceSpec
-from app.schema import validate_price_file
+from app.schema import is_sku, validate_price_file
 
 MAX_FILE_BYTES = 500_000
 MAX_VARIATION = Decimal("0.30")
@@ -32,6 +32,7 @@ def _previous(content: bytes | None) -> Mapping[str, tuple[Decimal, ...]] | None
 
 
 def _current(prices: Sequence[Price]) -> Mapping[str, tuple[Decimal, ...]]:
+    """Preços novos, já aprovados por `blocking` e pelo schema (decimais válidos)."""
     return {p.sku: tuple(Decimal(t.unit_price) for t in p.tiers) for p in prices}
 
 
@@ -57,7 +58,7 @@ def regression(previous: bytes | None, prices: Sequence[Price]) -> list[str]:
         return []
     after = _current(prices)
     errors: list[str] = []
-    if len(after) * 2 < len(before):
+    if len(before.keys() - after.keys()) * 2 > len(before):
         errors.append("mais da metade dos SKUs do arquivo anterior sumiu")
     for sku in sorted(before.keys() & after.keys()):
         if any(old > 0 and new == 0 for old, new in zip(before[sku], after[sku], strict=False)):
@@ -71,7 +72,8 @@ def variation(previous: bytes | None, prices: Sequence[Price]) -> list[str]:
     if before is None:
         return [NO_COMPARISON]
     after = _current(prices)
-    report = [f"SKU novo: {sku}" for sku in sorted(after.keys() - before.keys())]
+    added = sorted(after.keys() - before.keys())
+    report = [f"SKU novo: {sku}" if is_sku(sku) else "SKU novo fora do formato" for sku in added]
     report.extend(f"SKU removido: {sku}" for sku in sorted(before.keys() - after.keys()))
     for sku in sorted(before.keys() & after.keys()):
         if len(before[sku]) != len(after[sku]):

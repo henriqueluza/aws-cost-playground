@@ -51,6 +51,7 @@ MANIFEST: dict[str, Any] = {
 }
 BAD_DECIMALS = [
     "0.0000000000001",
+    "0.0000166666665",
     "1e-7",
     "2E3",
     "1234567890123456",
@@ -150,6 +151,8 @@ def test_rejects_bad_quantity(value: object) -> None:
         (tiers_of(*ascending(MAX_TIERS + 1)), "tiers: de 1 a 16 faixas"),
         (price_with(tiers={"upTo": None}), "tiers: de 1 a 16 faixas"),
         (price_with(tiers=["1"]), "tiers[0]: não é objeto"),
+        ({**FILE, "prices": [without(DURATION, "tiers")]}, "tiers: de 1 a 16 faixas"),
+        (price_with(tiers=[{"unitPrice": "1"}]), "tiers[0].upTo: ausente"),
         (tiers_of("10", "5", None), "tiers[1].upTo: faixas fora de ordem crescente"),
         (tiers_of("10", "10", None), "tiers[1].upTo: faixas fora de ordem crescente"),
         (tiers_of("0", None), "tiers[0].upTo: faixas fora de ordem crescente"),

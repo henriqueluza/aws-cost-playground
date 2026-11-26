@@ -28,6 +28,11 @@ def _matches(pattern: re.Pattern[str], value: object) -> bool:
     return isinstance(value, str) and pattern.fullmatch(value) is not None
 
 
+def is_sku(value: object) -> bool:
+    """SKU no formato do catálogo; só o que passa aqui pode aparecer em mensagem."""
+    return _matches(_SKU, value)
+
+
 def _text(value: object, min_len: int, max_len: int) -> bool:
     """Tamanho em unidades UTF-16, como o `.max()` do zod."""
     if not isinstance(value, str):
@@ -63,7 +68,9 @@ def _tier_errors(tiers: object, at: str) -> list[str]:
             errors.append(f"{here}.unitPrice: decimal fora do formato")
         up_to = tier.get("upTo")
         is_last = index == len(tiers) - 1
-        if up_to is None:
+        if "upTo" not in tier:
+            errors.append(f"{here}.upTo: ausente")
+        elif up_to is None:
             if not is_last:
                 errors.append(f"{here}.upTo: só a última faixa é aberta")
         elif not _matches(_DECIMAL, up_to):
