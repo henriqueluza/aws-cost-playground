@@ -139,6 +139,21 @@ def test_queries_are_narrow(region: str) -> None:
     assert queries(region) == SERVICE.queries(region) == tuple(expected)
 
 
+def test_closed_set_follows_the_block_contract() -> None:
+    contract = SEED.parents[2] / "contracts" / "blocks.json"
+    blocks = json.loads(contract.read_bytes())["blocks"]
+    rds = next(b for b in blocks if b["type"] == "aws.rds")
+    engines, classes, deployments = (
+        next(a["options"] for a in rds["attributes"] if a["key"] == key)
+        for key in ("engine", "instanceClass", "deployment")
+    )
+    assert SERVICE.expected_skus == {
+        f"rds-{e}-{suffix}"
+        for e in engines
+        for suffix in ("backup", *(f"{x}-{d}" for d in deployments for x in ("gp3", *classes)))
+    }
+
+
 @pytest.mark.parametrize("region", REGIONS)
 def test_each_query_matches_exactly_one_product(region: str) -> None:
     # Sobre as duas fixtures juntas: nem ruído nem produto da outra região passam no filtro.
