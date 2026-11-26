@@ -8,6 +8,7 @@
 }
 
 .cell {
+  min-width: 0; /* a barra (svg) encolhe com a coluna em vez de alargá-la */
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -133,6 +134,8 @@
 }
 
 .scroll {
+  position: relative; /* contém o texto só de leitor de tela, que senão alarga a página */
+  min-width: 0; /* filho de flex: sem isto a tabela de 640px alarga a folha em tela estreita */
   overflow-x: auto;
 }
 
@@ -223,4 +226,19 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.convention {
+  margin-inline-start: auto;
+}
+
+@media (max-width: 639px) {
+  .strip {
+    grid-template-columns: 1fr;
+  }
+
+  .cell + .cell {
+    border-inline-start: 0;
+    border-block-start: var(--border-width) solid var(--rule);
+  }
 }
