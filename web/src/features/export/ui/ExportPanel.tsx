@@ -23,7 +23,7 @@ export function ExportPanel() {
   return (
     <Panel title="Exportar">
       <Notice tone="neutral" message={DISCLAIMER} />
-      <Button variant="primary" onClick={onExport}>
+      <Button onClick={onExport}>
         Exportar Terraform
       </Button>
       {failed && <Notice tone="negative" message={FAILURE} />}
