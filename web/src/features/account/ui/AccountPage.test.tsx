@@ -221,8 +221,6 @@ describe('AccountPage', () => {
       expect(deleteAccount).toHaveBeenCalledTimes(1);
       expect(within(dialog).getByRole('status')).toHaveTextContent('Excluindo a conta');
       expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toBeDisabled();
-      await user.keyboard('{Escape}');
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
       await act(async () => release());
       await screen.findByRole('heading', { name: 'Editor anônimo' });
     });

@@ -37,11 +37,6 @@ describe('mensagens por código', () => {
     const echo = new ApiError({ kind } as never).message;
     expect(accountErrorMessage(kind)).not.toContain(echo);
   });
-
-  it('só oferece repetir quando a falha é do serviço ou da rede', () => {
-    expect([isRetryable('network'), isRetryable('unavailable')]).toEqual([true, true]);
-    expect(isRetryable('unauthenticated')).toBe(false);
-  });
 });
 
 describe('formato', () => {

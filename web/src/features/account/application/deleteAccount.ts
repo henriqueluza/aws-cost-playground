@@ -25,7 +25,7 @@ export async function deleteAccount(deps: DeleteAccountDeps): Promise<void> {
     try {
       await step();
     } catch {
-      // A conta já foi excluída; um passo local que falha não a desfaz nem pode ser mostrado como erro.
+      // Já excluída: um passo local que falha não vira erro de exclusão.
     }
   };
   await attempt(deps.discardDraft);
