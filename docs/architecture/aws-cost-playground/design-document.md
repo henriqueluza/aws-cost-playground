@@ -38,7 +38,7 @@ O PRD (F5) pede um template com os 20 blocos, descrição de carga de exemplo e 
 - `ecs` -> `rds`, `cache`, `queue` e `secrets` (`data`); `ecs` runs-on `ec2`; `ec2` -> `nat`; `lambda` -> `table` e `auth`.
 - `ec2`, `rds`, `trail`, `pipeline`, `stack` e `iam` -> `cloudwatch` (`logs`).
 
-Totais mensais do template com as sementes de preço de 2026-11-25: us-east-1 US$ 127,98; sa-east-1 US$ 227,76. Ficam travados em `referenceTemplateCost.test.ts`, então uma atualização do catálogo muda o teste junto.
+Totais mensais do template com as sementes de preço de 2026-11-25: us-east-1 US$ 131,28; sa-east-1 US$ 231,06. Não são fixados em teste: mudam quando o catálogo muda; `referenceTemplateCost.test.ts` exige só total diferente de zero e nenhum item sem preço.
 
 ## Estado "não salvo" no editor
 
