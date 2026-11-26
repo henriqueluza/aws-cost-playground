@@ -235,6 +235,17 @@ describe('createInMemoryApi: update', () => {
     await rejectsWith(designs.update(d.id, { expectedVersion: 1, doc: LARGE_DOC }), 'too-large');
   });
 
+  it('grava o doc do parse, sem chaves extras, e mede sizeBytes sobre ele', async () => {
+    const { designs } = setup();
+    const d = await designs.create({ name: 'a', doc: SMALL_DOC });
+    const input = { expectedVersion: 1, doc: { ...LARGE_DOC, extra: 3 }, extra: 4 };
+    const updated = await designs.update(d.id, input);
+    expect(updated).not.toHaveProperty('extra');
+    expect(updated.doc).toEqual(LARGE_DOC);
+    expect(updated.sizeBytes).toBe(bytes(LARGE_DOC));
+    expect(await designs.get(d.id)).toEqual(updated);
+  });
+
   it('não guarda referência ao input nem ao retorno', async () => {
     const { designs } = setup();
     const d = await designs.create({ name: 'a', doc: SMALL_DOC });
