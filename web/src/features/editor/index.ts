@@ -1,6 +1,9 @@
 export { EditorPage } from './ui/EditorPage';
+export { keepDesignForLogin } from './hooks/designDraftSync';
 export { useDesignStore } from './hooks/useDesignStore';
-export type { DesignActions, DesignStoreState } from './application/designStore';
+export { designStore } from './hooks/designStore';
+export { EMPTY_STATE } from './model/editorState';
+export type { DesignActions, DesignStoreState } from './hooks/designStore';
 export type {
   ActionErrorCode,
   BlockPatch,
@@ -11,3 +14,10 @@ export type {
   Result,
   Selection,
 } from './model/editorState';
+export {
+  BLOCK_DRAG_MIME,
+  dropBlock,
+  isBlockDrag,
+  newBlockFor,
+  readDraggedBlockType,
+} from './model/palette';

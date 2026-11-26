@@ -5,10 +5,12 @@ import {
   type Block,
   type DesignDocument,
   type Edge,
+  type EdgeKind,
   type Overrides,
   type Region,
   type Usage,
 } from '../../../shared/lib/design';
+import { allowedKinds, endpointType, retargetUsage } from './edgeKinds';
 import type { ActionErrorCode, BlockPatch, ElementRef, Result } from './editorState';
 
 type WithId = { readonly id: string };
@@ -92,6 +94,29 @@ export function connect(doc: DesignDocument, edge: Edge): Result<DesignDocument>
 export function removeEdge(doc: DesignDocument, id: string): Result<DesignDocument> {
   if (!hasId(doc.edges, id)) return fail('unknown-edge');
   return commit({ ...doc, edges: doc.edges.filter((edge) => edge.id !== id) });
+}
+
+/**
+ * Troca o tipo da aresta por um que o contrato permite para o par de blocos. O uso e o override
+ * seguem a regra de `retargetUsage` (só o que o novo tipo tem, dentro da faixa dele).
+ */
+export function setEdgeKind(
+  doc: DesignDocument,
+  id: string,
+  kind: EdgeKind,
+): Result<DesignDocument> {
+  const edges = replaceById(doc.edges, id, (edge) => ({
+    ...edge,
+    kind,
+    ...retargetUsage(edge, kind),
+  }));
+  const edge = doc.edges.find((e) => e.id === id);
+  if (!edges || !edge) return fail('unknown-edge');
+  const source = endpointType(doc, edge.source);
+  const target = endpointType(doc, edge.target);
+  const permitted = source !== undefined && target !== undefined && allowedKinds(source, target);
+  if (!permitted || !permitted.includes(kind)) return fail('kind-not-allowed');
+  return commit({ ...doc, edges });
 }
 
 /** Troca `usage` inteiro e não toca em `overrides`: o override sobrevive à re-estimativa (ADR-0001). */

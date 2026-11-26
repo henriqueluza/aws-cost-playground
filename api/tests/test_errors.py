@@ -1,10 +1,13 @@
 import json
 import logging
+from typing import Annotated
 
 import pytest
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import AfterValidator, BaseModel
+from pydantic_core import PydanticCustomError
 
+from app.errors import TOO_LARGE_ERROR
 from app.logs import configure_logging
 from tests.conftest import invoke, make_event
 
@@ -16,6 +19,21 @@ class Item(BaseModel):
     qty: int
 
 
+def _too_large(value: str) -> str:
+    if len(value) > 3:
+        raise PydanticCustomError(TOO_LARGE_ERROR, "too large")
+    return value
+
+
+class Many(BaseModel):
+    values: dict[str, int]
+
+
+class Doc(BaseModel):
+    text: Annotated[str, AfterValidator(_too_large)]
+    qty: int
+
+
 @pytest.fixture
 def probe(app: FastAPI) -> FastAPI:
     @app.get("/forbidden")
@@ -24,6 +42,12 @@ def probe(app: FastAPI) -> FastAPI:
 
     @app.post("/items")
     def items(item: Item) -> None: ...
+
+    @app.post("/many")
+    def many(body: Many) -> None: ...
+
+    @app.post("/docs")
+    def docs(doc: Doc) -> None: ...
 
     @app.get("/boom")
     def boom() -> None:
@@ -50,6 +74,28 @@ def test_validation_error_never_echoes_input(probe: FastAPI) -> None:
         ["body", "qty"],
     )
     assert LEAK not in str(body)
+
+
+@pytest.mark.parametrize(
+    ("payload", "status"),
+    [('{"text": "toolong", "qty": "x"}', 413), ('{"text": "ok", "qty": "x"}', 422)],
+)
+def test_doc_too_large_is_413_without_errors(probe: FastAPI, payload: str, status: int) -> None:
+    event = make_event("/docs", method="POST", body=payload)
+    event["headers"]["content-type"] = "application/json"
+    code, headers, body = invoke(probe, event)
+    assert (code, headers["content-type"], body["status"]) == (status, PROBLEM, status)
+    assert ("errors" in body) is (status == 422)
+    assert "toolong" not in str(body)
+
+
+def test_validation_errors_are_capped_and_loc_truncated(probe: FastAPI) -> None:
+    values = {f"{i:03d}" + "k" * 200: "x" for i in range(50)}
+    event = make_event("/many", method="POST", body=json.dumps({"values": values}))
+    event["headers"]["content-type"] = "application/json"
+    status, _, body = invoke(probe, event)
+    assert (status, len(body["errors"])) == (422, 20)
+    assert all(len(str(part)) <= 40 for e in body["errors"] for part in e["loc"])
 
 
 def test_unhandled_error_is_500_and_logs_no_message(

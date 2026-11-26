@@ -26,7 +26,7 @@ const blockTables = [
   'aws.sqs; SQS; integration; queueType=standard|fifo:standard; requestsPerMonth[requests]1000000/0/100000000000/int',
   'aws.dynamodb; DynamoDB; database; capacityMode=on-demand|provisioned:on-demand; readRequestsPerMonth[requests]1000000/0/100000000000/int writeRequestsPerMonth[requests]500000/0/100000000000/int storageGb[GB]5/0/1000000/dec provisionedReadUnits[RCU]5/0/100000/int provisionedWriteUnits[WCU]5/0/100000/int',
   'aws.ec2; EC2; compute; instanceType=t3.micro|t3.small|t3.medium|t3.large|t4g.micro|t4g.small|t4g.medium|m5.large|m5.xlarge|c5.large|r5.large:t3.small az=a|b|c:; instanceCount[instances]1/1/1000/int hoursPerMonth[hours]730/0/744/dec rootVolumeGb[GB]30/8/16384/int',
-  'aws.rds; RDS; database; engine=postgres|mysql:postgres instanceClass=db.t3.micro|db.t3.small|db.t3.medium|db.t4g.micro|db.t4g.small|db.t4g.medium|db.m5.large|db.r5.large:db.t3.micro deployment=single-az|multi-az:single-az az=a|b|c:; storageGb[GB]20/20/65536/int backupStorageGb[GB]20/0/1000000/dec',
+  'aws.rds; RDS; database; engine=postgres|mysql:postgres instanceClass=db.t3.micro|db.t3.small|db.t3.medium|db.t4g.micro|db.t4g.small|db.t4g.medium|db.m5.large|db.r5.large:db.t3.micro deployment=single-az|multi-az:single-az az=a|b|c:; storageGb[GB]20/20/65536/int backupStorageGb[GB]0/0/1000000/dec',
   'aws.elasticache; ElastiCache; database; engine=redis|memcached:redis nodeType=cache.t3.micro|cache.t3.small|cache.t3.medium|cache.t4g.micro|cache.t4g.small|cache.t4g.medium|cache.m5.large|cache.r5.large:cache.t3.micro az=a|b|c:; nodeCount[nodes]1/1/500/int',
   'aws.cloudfront; CloudFront; networking; ; requestsPerMonth[requests]1000000/0/100000000000/int',
   'aws.alb; ALB; networking; ; newConnectionsPerSecond[connections/s]10/0/1000000/dec activeConnectionsPerMinute[connections/min]1000/0/100000000/dec processedGbPerMonth[GB]100/0/100000000/dec ruleEvaluationsPerSecond[evaluations/s]0/0/10000000/dec',
@@ -114,9 +114,9 @@ describe('contracts/blocks.json', () => {
     }
   });
 
-  it('todo bloco tem função de preço provisória, sem cobranças', () => {
+  it('todo bloco do contrato tem função de preço', () => {
     for (const block of BLOCKS) {
-      expect(blockPricer(block.type)?.({ attributes: {}, usage: {} }), block.type).toEqual([]);
+      expect(blockPricer(block.type), block.type).toBeTypeOf('function');
     }
   });
 

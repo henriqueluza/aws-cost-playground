@@ -39,7 +39,7 @@ A aresta `data` parte de quem chama e chega em quem é chamado (CloudFront para 
 
 As outras arestas `data` (mesma zona, ou serviços sem zona) não custam e não entram na calculadora. O volume delas serve à estimativa de carga e ao export.
 
-Para não contar duas vezes, os blocos NAT Gateway e CloudWatch têm `processedGbPerMonth` e `logsIngestedGbPerMonth` em zero: o volume vem só das arestas. O valor a digitar é a soma das arestas, já feita nas tabelas.
+Para não contar duas vezes, os blocos NAT Gateway e CloudWatch têm `processedGbPerMonth` e `logsIngestedGbPerMonth` em zero: o volume vem só das arestas. O valor a digitar é a soma das arestas, já feita nas tabelas. No motor, o custo aparece na aresta, com o mesmo SKU do bloco, e a aresta `logs` cobra só a ingestão; as regras estão em [Custos de aresta](architecture/aws-cost-playground/cost-estimate.md#custos-de-aresta).
 
 ## 1. `api-serverless`
 
@@ -202,7 +202,7 @@ A calculadora pede estes campos e `contracts/blocks.json` não os tem. Use o val
 
 Dois pontos do contrato dependem das Issues de preço e foram deixados fora do alcance da dúvida:
 
-- **Backup do RDS:** `backupStorageGb` é 0. A #34 decide se a chave é o backup total ou só o que passa do incluído; com zero, as duas leituras dão o mesmo valor.
+- **Backup do RDS:** `backupStorageGb` é 0. A #34 decidiu que a chave é só o backup além do incluído, o campo "Additional backup storage" da calculadora, cobrado inteiro por GB-mês. Com zero, o cenário não muda.
 - **Recuperação do Standard-IA:** `blk_archive` tem `getRequestsPerMonth` em 0, porque o contrato não tem GB recuperado.
 
 ## Franquias em jogo

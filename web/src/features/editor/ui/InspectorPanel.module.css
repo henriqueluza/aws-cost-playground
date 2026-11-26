@@ -1,0 +1,136 @@
+/* DESIGN.md: Inspetor e marcas de origem. Só tokens. */
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5); /* 24px entre grupos; dentro do grupo, 12px */
+  padding: 0 var(--space-1) var(--space-4) 0;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-semibold);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.section {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Origem "padrão": valor em --muted (DESIGN.md); com o foco, volta à tinta. */
+.item[data-origin='default'] input {
+  color: var(--muted);
+}
+.item[data-origin='default'] input:focus {
+  color: var(--text);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: var(--space-2);
+  min-height: var(--hit-min); /* o botão de voltar não faz a linha saltar ao aparecer */
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+}
+
+.origin {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.mark {
+  display: none;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--mark-origin);
+  height: var(--mark-origin);
+  border-radius: 50%;
+}
+.item[data-origin='manual'] .mark {
+  display: inline-block;
+  background-color: var(--text);
+}
+.item[data-origin='llm'] .mark {
+  display: inline-block;
+  border: 1.5px solid var(--muted);
+}
+
+.note,
+.hint {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.item:has([role='alert']) .meta {
+  margin-top: var(--space-1); /* o erro e a origem não se leem como uma frase só */
+}
+
+.meta button {
+  height: var(--hit-min);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+/* Pontas da aresta: "De" e "Para", com o nome do serviço e o rótulo do usuário (texto). */
+.ends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.end {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.end dt {
+  flex: none;
+  width: var(--space-6);
+  color: var(--muted);
+}
+.end dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.endLabel {
+  color: var(--muted);
+}

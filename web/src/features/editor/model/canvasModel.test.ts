@@ -1,0 +1,197 @@
+import { describe, expect, it } from 'vitest';
+import { designDocumentSchema } from '../../../shared/lib/design';
+import { decimal } from '../../../shared/lib/money';
+import { adrExampleDesign } from '../../../test/designFixtures';
+import {
+  checkConnection,
+  canvasCategory,
+  defaultLayout,
+  formatUsd,
+  selectionMessage,
+  toCanvasEdges,
+  toCanvasNodes,
+  type BlockNodeData,
+} from './canvasModel';
+
+const doc = designDocumentSchema.parse(adrExampleDesign);
+const costs = new Map([['blk_fn_api', { text: 'US$ 5,73', zero: false }]]);
+
+describe('toCanvasNodes', () => {
+  const nodes = toCanvasNodes(doc, {}, null, costs);
+
+  it('põe o client primeiro, fixo e não removível', () => {
+    expect(nodes[0]).toMatchObject({ id: 'client', type: 'client', deletable: false });
+    expect(nodes[0]?.selectable).toBe(false);
+  });
+
+  it('dá a cada bloco categoria, custo e nome acessível com tipo, rótulo e custo', () => {
+    const lambda = nodes[1];
+    expect(lambda?.data).toMatchObject({
+      category: 'compute',
+      cost: 'US$ 5,73',
+      service: 'Lambda',
+    });
+    expect(lambda?.ariaLabel).toBe('Lambda, API handler, Computação, US$ 5,73 por mês');
+    expect(lambda?.data).toMatchObject({ summary: expect.stringMatching(/^Lambda · \S/) });
+    const s3 = nodes[2];
+    expect((s3?.data as BlockNodeData).cost).toBe('—');
+    expect(s3?.ariaLabel).toContain('custo ainda sem valor');
+  });
+
+  it('usa a posição do layout e, sem ela, a grade padrão', () => {
+    const placed = toCanvasNodes(doc, { blk_assets: { x: 7, y: 9 } }, null, costs);
+    expect(placed[2]?.position).toEqual({ x: 7, y: 9 });
+    expect(placed[1]?.position).toEqual(defaultLayout(doc).blk_fn_api);
+  });
+
+  it('põe o fluxo da esquerda para a direita, com o client na última coluna', () => {
+    const chain = {
+      ...doc,
+      blocks: ['blk_a', 'blk_b', 'blk_c'].map((id) => ({ ...doc.blocks[0]!, id })),
+      edges: [
+        { ...doc.edges[0]!, id: 'edg_1', source: 'blk_a', target: 'blk_b' },
+        { ...doc.edges[0]!, id: 'edg_2', source: 'blk_b', target: 'blk_c' },
+        { ...doc.edges[0]!, id: 'edg_3', source: 'blk_a', target: 'blk_c' },
+        { ...doc.edges[0]!, id: 'edg_5', source: 'blk_c', target: 'client' },
+      ],
+    };
+    const at = defaultLayout(chain);
+    expect([at.blk_a?.x, at.blk_b?.x, at.blk_c?.x, at.client?.x]).toEqual([0, 248, 496, 744]);
+  });
+
+  it('termina com um ciclo no design', () => {
+    const [a, b] = ['blk_a', 'blk_b'];
+    const edge = (id: string, source: string, target: string) => ({
+      ...doc.edges[0]!,
+      id,
+      source,
+      target,
+    });
+    const blocks = [a, b].map((id) => ({ ...doc.blocks[0]!, id: id! }));
+    const loop = { ...doc, blocks, edges: [edge('edg_1', a!, b!), edge('edg_2', b!, a!)] };
+    expect(Object.keys(defaultLayout(loop))).toEqual([a, b, 'client']);
+  });
+
+  it('marca só o bloco selecionado', () => {
+    const picked = toCanvasNodes(doc, {}, { kind: 'block', id: 'blk_assets' }, costs);
+    expect(picked.map((n) => n.selected)).toEqual([false, false, true]);
+  });
+
+  it('guarda a marcação do rótulo como texto, sem interpretá-la', () => {
+    const evil = '<img src=x onerror=alert(1)>';
+    const [, block] = toCanvasNodes(
+      { ...doc, blocks: [{ ...doc.blocks[0]!, label: evil }] },
+      {},
+      null,
+      costs,
+    );
+    expect((block?.data as BlockNodeData).label).toBe(evil);
+  });
+
+  it('cai no nome do serviço quando o rótulo é vazio e avisa que o custo do ECS está no EC2', () => {
+    const ecs = { ...doc.blocks[0]!, id: 'blk_ecs', type: 'aws.ecs', label: ' ', attributes: {} };
+    const [, node] = toCanvasNodes({ ...doc, blocks: [ecs], edges: [] }, {}, null, new Map());
+    expect(node?.data).toMatchObject({ label: 'ECS', costNote: 'custo no EC2' });
+  });
+});
+
+describe('toCanvasEdges', () => {
+  it('descreve a aresta e marca a selecionada', () => {
+    const [edge] = toCanvasEdges(doc, { kind: 'edge', id: 'edg_1' });
+    expect(edge).toMatchObject({ source: 'blk_assets', target: 'client', selected: true });
+    expect(edge?.ariaLabel).toBe('Dados: S3 para Internet');
+    expect(edge?.markerEnd).toMatchObject({ type: 'arrowclosed' });
+  });
+});
+
+describe('formatUsd e categoria', () => {
+  it('formata em dólar com separadores brasileiros', () => {
+    expect(formatUsd(decimal('1234567.891'))).toBe('US$ 1.234.567,89');
+    expect(formatUsd(decimal(0))).toBe('US$ 0,00');
+  });
+
+  it('agrupa os 20 tipos nas cinco categorias do desenho', () => {
+    expect(canvasCategory('aws.sqs')).toBe('data');
+    expect(canvasCategory('aws.codepipeline')).toBe('ops');
+    expect(canvasCategory('aws.alb')).toBe('network');
+    expect(canvasCategory('aws.desconhecido')).toBeNull();
+  });
+});
+
+describe('checkConnection', () => {
+  const blocks = [
+    { ...doc.blocks[0]!, id: 'blk_a', type: 'aws.lambda' },
+    { ...doc.blocks[0]!, id: 'blk_b', type: 'aws.dynamodb' },
+    { ...doc.blocks[0]!, id: 'blk_c', type: 'aws.iam' },
+    { ...doc.blocks[0]!, id: 'blk_cdn', type: 'aws.cloudfront' },
+  ];
+  const d = { ...doc, blocks, edges: [] };
+
+  it('aceita o par do contrato e devolve o tipo da aresta', () => {
+    expect(checkConnection(d, 'blk_a', 'blk_b')).toEqual({ ok: true, kind: 'data' });
+    expect(checkConnection(d, 'blk_cdn', 'client')).toEqual({ ok: true, kind: 'data' });
+  });
+
+  it('ECS para EC2 infere runs-on (o par também aceita data)', () => {
+    const host = [
+      { ...doc.blocks[0]!, id: 'blk_ecs', type: 'aws.ecs', attributes: {} },
+      { ...doc.blocks[0]!, id: 'blk_ec2', type: 'aws.ec2', attributes: {} },
+    ];
+    expect(checkConnection({ ...d, blocks: host }, 'blk_ecs', 'blk_ec2')).toEqual({
+      ok: true,
+      kind: 'runs-on',
+    });
+  });
+
+  it.each([
+    ['blk_c', 'blk_a', 'not-allowed', 'IAM não se conecta com Lambda'],
+    ['blk_a', 'client', 'not-allowed', 'Lambda não se conecta com a internet'],
+    ['blk_a', 'blk_a', 'same-node', 'ele mesmo'],
+    ['client', 'blk_a', 'unknown', 'internet'],
+    ['blk_x', 'blk_a', 'unknown', 'ausente'],
+  ])('recusa %s → %s com explicação', (from, to, reason, text) => {
+    const result = checkConnection(d, from, to);
+    expect(result).toMatchObject({ ok: false, reason });
+    expect(result.ok ? '' : result.message).toContain(text);
+  });
+
+  it('recusa a aresta repetida', () => {
+    const edge = { ...doc.edges[0]!, id: 'edg_9', source: 'blk_a', target: 'blk_b' };
+    const result = checkConnection({ ...d, edges: [edge] }, 'blk_a', 'blk_b');
+    expect(result).toMatchObject({ ok: false, reason: 'duplicate' });
+  });
+});
+
+describe('selectionMessage', () => {
+  const d = doc;
+  it('diz o serviço do contrato, nunca o rótulo do usuário', () => {
+    const evil = {
+      ...d,
+      blocks: [{ ...d.blocks[0]!, label: '<img src=x onerror=alert(1)>' }, d.blocks[1]!],
+    };
+    expect(selectionMessage(evil, { kind: 'block', id: d.blocks[0]!.id })).toBe(
+      'Lambda selecionado',
+    );
+  });
+  it('aresta: origem e destino pelo nome do serviço; sem seleção ou id inexistente: null', () => {
+    expect(selectionMessage(d, { kind: 'edge', id: 'edg_1' })).toBe(
+      'Conexão selecionada: S3 para Internet',
+    );
+    expect(selectionMessage(d, null)).toBeNull();
+    expect(selectionMessage(d, { kind: 'block', id: 'nada' })).toBeNull();
+  });
+});
+
+describe('toCanvasEdges: tipo da aresta', () => {
+  it('cada aresta usa o componente tipado e leva o tipo do design no dado e no nome acessível', () => {
+    const edges = (['data', 'runs-on', 'logs'] as const).map((kind, i) => ({
+      ...doc.edges[0]!,
+      id: `edg_k${i}`,
+      kind,
+    }));
+    const out = toCanvasEdges({ ...doc, edges }, null);
+    expect(out.map((e) => e.type)).toEqual(['typed', 'typed', 'typed']);
+    expect(out.map((e) => e.data.kind)).toEqual(['data', 'runs-on', 'logs']);
+    expect(out.map((e) => e.ariaLabel.split(':')[0])).toEqual(['Dados', 'Executa em', 'Logs']);
+  });
+});

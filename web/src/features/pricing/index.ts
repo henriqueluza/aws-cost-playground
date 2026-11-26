@@ -19,10 +19,14 @@ export {
   type ChargeKind,
   type CostEstimate,
   type CostLine,
+  type CostNote,
   type CostStatus,
+  type CostWarning,
+  type CostWarningCode,
   type EdgeCost,
 } from './model/engine';
-export { PricingPanel } from './ui/PricingPanel';
+export { PricingPanel, type CostSelection, type PricingPanelProps } from './ui/PricingPanel';
+export { edgeCharges, EDGE_SKUS } from './model/edgeCharges';
 export { catalogServices } from './application/catalogServices';
 export { createCatalogSession, type LoadCatalog } from './application/catalogSession';
 export { priceCatalogKey, usePriceCatalog, type PriceCatalogState } from './hooks/usePriceCatalog';

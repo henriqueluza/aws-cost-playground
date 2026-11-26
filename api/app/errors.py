@@ -11,6 +11,19 @@ from starlette.exceptions import HTTPException
 from app.logs import get_request_id
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
+TOO_LARGE_ERROR = "doc_too_large"
+"""`type` do erro de validação que vira 413 em vez de 422 (documento do design grande demais)."""
+MAX_REPORTED_ERRORS = 20
+MAX_LOC_PART_LENGTH = 40
+"""Teto da lista `errors` do 422: entrada adversarial não multiplica o tamanho da resposta."""
+
+
+class ProblemError(HTTPException):
+    """HTTPException com campos de extensão do problem details (ex.: `scope` no 429 de quota)."""
+
+    def __init__(self, status_code: int, extra: dict[str, object]) -> None:
+        super().__init__(status_code)
+        self.extra = extra
 
 
 def _build(
@@ -29,10 +42,20 @@ def _build(
 async def _handle(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, HTTPException):
         detail = exc.detail if isinstance(exc.detail, str) else None
-        return _build(exc.status_code, detail, exc.headers, {})
+        extra = exc.extra if isinstance(exc, ProblemError) else {}
+        return _build(exc.status_code, detail, exc.headers, extra)
     if isinstance(exc, RequestValidationError):
+        if any(e["type"] == TOO_LARGE_ERROR for e in exc.errors()):
+            return _build(413, "Design document too large", None, {})
         # Só `loc` e `msg`: `input`, `ctx` e `url` ecoam o corpo enviado pelo usuário.
-        errors = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
+        # O `loc` pode trazer uma chave enviada pelo usuário: cada parte é truncada.
+        errors = [
+            {
+                "loc": [p[:MAX_LOC_PART_LENGTH] if isinstance(p, str) else p for p in e["loc"]],
+                "msg": e["msg"],
+            }
+            for e in exc.errors()[:MAX_REPORTED_ERRORS]
+        ]
         return _build(422, "Request validation failed", None, {"errors": errors})
     # Sem a mensagem da exceção, que pode trazer dado do usuário. O Starlette relança a exceção
     # depois desta resposta e o RequestLogMiddleware a registra em `app.error`.

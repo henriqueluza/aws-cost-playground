@@ -55,6 +55,11 @@ run "compoe_sem_ciclo_com_nomes_de_staging" {
   }
 
   assert {
+    condition     = output.site_url == "https://staging.exemplo.com"
+    error_message = "O smoke test do deploy usa site_url: https://<host>, sem barra final."
+  }
+
+  assert {
     condition     = output.site_config.apiBaseUrl == "https://api.staging.exemplo.com"
     error_message = "O /config.json de staging deve apontar para api.staging.<domínio>."
   }
