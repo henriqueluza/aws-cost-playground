@@ -58,7 +58,8 @@ describe('useCostView', () => {
     if (result.current.status !== 'ready') throw new Error('esperava ready');
     expect(result.current.updating).toBe(false);
     expect(result.current.rows.blocks.map((r) => r.id)).toEqual(['blk_fn_api', 'blk_assets']);
-    expect(result.current.rows.unavailable).toBe(1);
+    // Uploads (S3) e a aresta Uploads → Internet não têm SKU no catálogo só com Lambda.
+    expect(result.current.rows.unavailable).toBe(2);
   });
 
   it('memoiza pela identidade do design e do catálogo', () => {

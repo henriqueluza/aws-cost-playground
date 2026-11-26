@@ -32,7 +32,7 @@ const abs = (value: Decimal): Decimal => (compare(value, ZERO) < 0 ? (-value as 
 
 export function formatUsd(value: Decimal): string {
   if (compare(value, ZERO) !== 0 && compare(abs(value), ONE_CENT) < 0) {
-    return `< US$ 0,01`;
+    return compare(value, ZERO) < 0 ? `> ${MINUS}US$ 0,01` : '< US$ 0,01';
   }
   const { sign, body } = localize(toFixed(value, 2));
   return `${sign}US$ ${body}`;

@@ -15,7 +15,7 @@ describe('formatUsd', () => {
     ['0.0004', '< US$ 0,01'],
     ['0.009', '< US$ 0,01'],
     ['-3.1', '−US$ 3,10'],
-    ['-0.0004', '< US$ 0,01'],
+    ['-0.0004', '> \u2212US$ 0,01'],
   ])('%s vira %s', (input, expected) => {
     expect(formatUsd(decimal(input))).toBe(expected);
   });

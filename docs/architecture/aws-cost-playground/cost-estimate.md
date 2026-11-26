@@ -105,6 +105,22 @@ Exemplo: S3 → `client` com 12.388 GB em us-east-1. Cobra-se 12.388 - 100 = 12.
 
 `catalogServices(design)` inclui o serviço de cada cobrança de aresta, para o `usePriceCatalog` carregar `data-transfer` (e `cloudfront`, `nat-gateway`, `cloudwatch`) mesmo quando nenhum bloco o pede.
 
+## Apresentação no painel
+
+Camada de `pricing/application` e `pricing/hooks`, sem UI e sem `number` em dinheiro.
+
+**Formatação (`formatUsd.ts`)**, pt-BR, feita sobre `toFixed` (sem `Intl`, sem ponto flutuante):
+- `formatUsd`: 2 casas, milhar com ponto, vírgula decimal: `US$ 1.234,56`. Positivo menor que um centavo vira `< US$ 0,01` (negativo, `> −US$ 0,01`); zero é `US$ 0,00`. Sinal negativo é U+2212 (`−`).
+- `formatUnitPrice`: exato, de 2 a 12 casas, sem zeros extras além das 2 primeiras: `US$ 0,0000002`.
+- `formatQuantity`: milhar com ponto e até 12 casas, sem zeros à direita.
+
+**Linhas (`costRows.ts`)**:
+- Ordem: itens com preço > 0 por custo decrescente, depois custo zero, depois `unavailable`. Empate pela ordem do design. A comparação usa `compare` de `money.ts`, nunca `number`.
+- Nome da aresta: `origem → destino`; o nó `client` aparece como `Internet`.
+- Barra de proporção: `number` só para a largura do desenho, nunca para valor exibido.
+
+**`useCostView` (`hooks/useCostView.ts`)**: memoiza por identidade de design e de catálogo. Com `updating`, mantém o último resultado. Medido: recálculo de 100 blocos leva cerca de 1 a 3 ms, por isso não há `useDeferredValue` nem Worker.
+
 ## Testes
 
 `createEstimator(blocks: BlockPricing)` monta o motor sobre um registro de blocos e existe para testá-lo com funções de preço de teste. `estimate` é o `createEstimator` ligado ao registro real (`blockRegistry.ts`). `createEstimator` não é exportado pelo `index.ts`.
