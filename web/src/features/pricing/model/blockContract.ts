@@ -174,11 +174,6 @@ export type EdgeKindDefinition = z.infer<typeof edgeKindSchema>;
 export interface BlockPriceInput {
   readonly attributes: Block['attributes'];
   readonly usage: UsageValues;
-  /**
-   * GB por mês que chegam ao bloco pelas arestas `logs` (soma de `gbPerMonth`), não negativo.
-   * Ausente vale zero. O motor preenche a partir das arestas (#42); só `aws.cloudwatch` lê.
-   */
-  readonly incomingLogsGbPerMonth?: Decimal;
 }
 
 /** Quantidade mensal de um SKU do catálogo. O motor aplica faixas, franquia e mínimo. */

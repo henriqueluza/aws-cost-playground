@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decimal, sum, toFixed, type Decimal } from '../../../../shared/lib/money';
+import { decimal, sum, toFixed } from '../../../../shared/lib/money';
 import { catalogOf } from '../../../../test/catalogFixtures';
 import type { BlockPriceInput } from '../blockContract';
 import { createRater, type Rater } from '../rating';
@@ -35,11 +35,10 @@ const DEFAULTS: Usage = {
   customMetrics: 10,
   alarms: 10,
 };
-/** Bloco sem atributos; `incoming` é o volume das arestas `logs` e, se omitido, a chave não existe. */
-const input = (usage: Partial<Usage>, incoming?: Decimal): BlockPriceInput => ({
+/** Bloco sem atributos; o que não for informado vale zero. */
+const input = (usage: Partial<Usage>): BlockPriceInput => ({
   attributes: {},
   usage: { ...NO_USAGE, ...usage },
-  ...(incoming === undefined ? {} : { incomingLogsGbPerMonth: incoming }),
 });
 /** As quatro cobranças, sempre nesta ordem: ingestão, armazenamento, métricas e alarmes. */
 const charges = (ingested: string, stored: string, metrics: string, alarms: string) => [
@@ -48,9 +47,17 @@ const charges = (ingested: string, stored: string, metrics: string, alarms: stri
   { sku: 'cloudwatch-custom-metrics', quantity: decimal(metrics), charge: 'fixed' },
   { sku: 'cloudwatch-alarms', quantity: decimal(alarms), charge: 'fixed' },
 ];
-/** Linhas (`sku cobrança quantidade valor`) e total em USD do bloco, na franquia e faixa que restam. */
-function rate(rater: Rater, block: BlockPriceInput) {
-  const lines = rater.rate(priceCloudWatch(block).map((c) => ({ ...c, service: 'cloudwatch' })));
+/**
+ * Linhas (`sku cobrança quantidade valor`) e total em USD, na franquia e faixa que restam.
+ * `edgeLogsGb` é o que uma aresta `logs` cobra (#42): o mesmo SKU de ingestão, no mesmo rater.
+ */
+function rate(rater: Rater, block: BlockPriceInput, edgeLogsGb?: string) {
+  const edge = { sku: 'cloudwatch-logs-ingestion', charge: 'variable' as const };
+  const charges = [
+    ...priceCloudWatch(block),
+    ...(edgeLogsGb === undefined ? [] : [{ ...edge, quantity: decimal(edgeLogsGb) }]),
+  ];
+  const lines = rater.rate(charges.map((c) => ({ ...c, service: 'cloudwatch' })));
   // `undefined` é SKU fora do catálogo: falha aqui, em vez de virar total zero.
   if (lines === undefined) throw new Error('cobrança sem preço no catálogo do teste');
   return {
@@ -65,34 +72,17 @@ const zeroLine = (sku: string, kind: 'fixed' | 'variable') => `cloudwatch-${sku}
 describe('priceCloudWatch', () => {
   it.each([
     // Uso zero ainda emite as quatro cobranças.
-    ['uso zero', NO_USAGE, undefined, charges('0', '0', '0', '0')],
-    ['padrões do contrato', DEFAULTS, undefined, charges('5', '5', '10', '10')],
-    // A ingestão soma o valor do bloco e o das arestas `logs`: 3 + 4,5 = 7,5.
-    [
-      'arestas somam à ingestão',
-      { logsIngestedGbPerMonth: 3 },
-      decimal('4.5'),
-      charges('7.5', '0', '0', '0'),
-    ],
-    ['só arestas', {}, decimal('2'), charges('2', '0', '0', '0')],
-    ['arestas com zero', { logsIngestedGbPerMonth: 2 }, decimal('0'), charges('2', '0', '0', '0')],
-    // Soma em Decimal: em ponto flutuante, 0,1 + 0,2 daria 0,30000000000000004.
-    ['soma exata', { logsIngestedGbPerMonth: 0.1 }, decimal('0.2'), charges('0.3', '0', '0', '0')],
-    // No máximo do contrato, 1e7 + 1e-12 em ponto flutuante perderia a parte fracionária.
-    [
-      'soma exata no máximo',
-      { logsIngestedGbPerMonth: 1e7 },
-      decimal('0.000000000001'),
-      charges('10000000.000000000001', '0', '0', '0'),
-    ],
+    ['uso zero', NO_USAGE, charges('0', '0', '0', '0')],
+    ['padrões do contrato', DEFAULTS, charges('5', '5', '10', '10')],
+    // Fração em Decimal, sem erro de ponto flutuante.
+    ['fração', { logsIngestedGbPerMonth: 0.1, logsStoredGb: 0.2 }, charges('0.1', '0.2', '0', '0')],
     [
       'cada chave na sua cobrança',
       { logsIngestedGbPerMonth: 1, logsStoredGb: 2.5, customMetrics: 3, alarms: 4 },
-      undefined,
       charges('1', '2.5', '3', '4'),
     ],
-  ])('cobra ingestão, armazenamento, métricas e alarmes: %s', (_, usage, incoming, expected) => {
-    expect(priceCloudWatch(input(usage, incoming))).toStrictEqual(expected);
+  ])('cobra ingestão, armazenamento, métricas e alarmes: %s', (_, usage, expected) => {
+    expect(priceCloudWatch(input(usage))).toStrictEqual(expected);
   });
 
   it('nos padrões do contrato tudo cabe na franquia e as quatro linhas aparecem zeradas', () => {
@@ -107,12 +97,9 @@ describe('priceCloudWatch', () => {
     });
   });
 
-  it('desconta as franquias de logs e de alarmes, com o volume das arestas na ingestão', () => {
-    // (3 + 4,5 − 5) × 0,50 = 1,25; (105 − 5) × 0,03 = 3,00; (25 − 10) × 0,10 = 1,50.
-    const block = input(
-      { logsIngestedGbPerMonth: 3, logsStoredGb: 105, alarms: 25 },
-      decimal('4.5'),
-    );
+  it('desconta as franquias de logs e de alarmes', () => {
+    // (7,5 − 5) × 0,50 = 1,25; (105 − 5) × 0,03 = 3,00; (25 − 10) × 0,10 = 1,50. Total 5,75.
+    const block = input({ logsIngestedGbPerMonth: 7.5, logsStoredGb: 105, alarms: 25 });
     expect(rate(createRater(catalog), block)).toStrictEqual({
       lines: [
         'cloudwatch-logs-ingestion variable 2.50 1.25',
@@ -125,15 +112,16 @@ describe('priceCloudWatch', () => {
   });
 
   it.each([
-    // Limites das franquias: 5 GB de ingestão (só das arestas), 5 GB guardados e 10 alarmes.
-    [{}, decimal('5'), '0.00'],
-    [{}, decimal('5.5'), '0.25'],
-    [{ logsStoredGb: 5 }, undefined, '0.00'],
-    [{ logsStoredGb: 6 }, undefined, '0.03'],
-    [{ alarms: 10 }, undefined, '0.00'],
-    [{ alarms: 11 }, undefined, '0.10'],
-  ])('franquia no limite: %o, arestas %s', (usage, incoming, total) => {
-    expect(rate(createRater(catalog), input(usage, incoming)).total).toBe(total);
+    // Limites das franquias: 5 GB ingeridos, 5 GB guardados e 10 alarmes, cada uma a sua.
+    [{ logsIngestedGbPerMonth: 5 }, '0.00'],
+    [{ logsIngestedGbPerMonth: 5.5 }, '0.25'],
+    [{ logsStoredGb: 5 }, '0.00'],
+    [{ logsStoredGb: 6 }, '0.03'],
+    [{ logsIngestedGbPerMonth: 5, logsStoredGb: 5 }, '0.00'],
+    [{ alarms: 10 }, '0.00'],
+    [{ alarms: 11 }, '0.10'],
+  ])('franquia no limite: %o', (usage, total) => {
+    expect(rate(createRater(catalog), input(usage)).total).toBe(total);
   });
 
   it.each([
@@ -167,12 +155,24 @@ describe('priceCloudWatch', () => {
     ]);
   });
 
-  it('dois blocos dividem a franquia de ingestão, com o volume das arestas', () => {
-    // A usa 3 de 5 GB; B recebe 3 GB pelas arestas e paga (3 − 2) × 0,50 = 0,50.
-    const rater = createRater(catalog);
-    expect(rate(rater, input({ logsIngestedGbPerMonth: 3 })).total).toBe('0.00');
-    expect(rate(rater, input({}, decimal('3'))).lines[0]).toBe(
-      'cloudwatch-logs-ingestion variable 1.00 0.50',
+  it('a aresta logs cobra o mesmo SKU e divide a franquia de ingestão com o bloco', () => {
+    // Cenário 1 de docs/scenarios.md: bloco com ingestão zero, 3 GB guardados, 20 métricas e 15
+    // alarmes; a aresta traz 20 GB. Bloco: 0 + 0 (3 < 5) + (20 − 10) × 0,30 + (15 − 10) × 0,10 =
+    // 3,50. Aresta: (20 − 5) × 0,50 = 7,50. Total 11,00.
+    const block = input({ logsStoredGb: 3, customMetrics: 20, alarms: 15 });
+    expect(rate(createRater(catalog), block, '20')).toStrictEqual({
+      lines: [
+        zeroLine('logs-ingestion', 'variable'),
+        zeroLine('logs-storage', 'variable'),
+        'cloudwatch-custom-metrics fixed 10.00 3.00',
+        'cloudwatch-alarms fixed 5.00 0.50',
+        'cloudwatch-logs-ingestion variable 15.00 7.50',
+      ],
+      total: '11.00',
+    });
+    // O bloco usa 3 dos 5 GB; a aresta de 4,5 GB paga (3 + 4,5 − 5) × 0,50 = 1,25.
+    expect(rate(createRater(catalog), input({ logsIngestedGbPerMonth: 3 }), '4.5').total).toBe(
+      '1.25',
     );
   });
 
@@ -181,11 +181,5 @@ describe('priceCloudWatch', () => {
     const call = () => priceCloudWatch({ attributes: {}, usage });
     expect(call).toThrow(RangeError);
     expect(call).toThrow('aws.cloudwatch: uso fora do contrato');
-  });
-
-  it.each(['-1', '-0.000000000001'])('lança RangeError com volume das arestas %s', (gb) => {
-    const call = () => priceCloudWatch(input(DEFAULTS, decimal(gb)));
-    expect(call).toThrow(RangeError);
-    expect(call).toThrow('aws.cloudwatch: volume das arestas logs fora do contrato');
   });
 });
