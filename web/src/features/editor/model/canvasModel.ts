@@ -70,6 +70,12 @@ export type CanvasEdge = {
   readonly target: string;
   readonly selected: boolean;
   readonly ariaLabel: string;
+  /** Seta no destino; o valor é o `MarkerType.ArrowClosed` do React Flow. */
+  readonly markerEnd: {
+    readonly type: 'arrowclosed';
+    readonly width: number;
+    readonly height: number;
+  };
   readonly data: { readonly kind: EdgeKind };
 };
 
@@ -185,6 +191,7 @@ export function toCanvasEdges(doc: DesignDocument, selection: Selection): Canvas
     target: edge.target,
     selected: selection?.kind === 'edge' && selection.id === edge.id,
     ariaLabel: `${KIND_LABELS[edge.kind]}: ${nameOf(edge.source)} para ${nameOf(edge.target)}`,
+    markerEnd: { type: 'arrowclosed', width: 16, height: 16 },
     data: { kind: edge.kind },
   }));
 }

@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import type { CanvasCategory } from '../model/canvasModel';
 
 /** Ícones próprios no estilo do Lucide (DESIGN.md); sem o pacote como dependência, e sem ícone da AWS. */
-export type IconName = CanvasCategory | 'globe';
+export type IconName = CanvasCategory | 'globe' | 'none';
 
 const SHAPES: Record<IconName, ReactElement> = {
   compute: (
@@ -33,6 +33,7 @@ const SHAPES: Record<IconName, ReactElement> = {
     </>
   ),
   ops: <path d="M14.5 8h-2.7l-2 5.5-3.6-11L4.2 8H1.5" />,
+  none: <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" />,
   globe: (
     <>
       <circle cx="8" cy="8" r="6.5" />
@@ -54,6 +55,7 @@ export function Icon({ name }: { name: IconName }): ReactElement {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      data-icon={name}
       focusable="false"
     >
       {SHAPES[name]}

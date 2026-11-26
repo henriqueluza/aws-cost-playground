@@ -2,7 +2,6 @@ import '@xyflow/react/dist/base.css';
 import {
   Background,
   BackgroundVariant,
-  MarkerType,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -19,7 +18,6 @@ type AppNode = BlockFlowNode | ClientFlowNode;
 
 const NODE_TYPES = { block: BlockNode, client: ClientNode };
 const FIT_OPTIONS = { padding: 0.2, maxZoom: 1 };
-const ARROW = { markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 } };
 
 /** O canvas: nós e arestas saem do design da store; ele não guarda estado do design. */
 export function CanvasPanel(): ReactElement {
@@ -65,7 +63,6 @@ function Canvas(): ReactElement {
         elementsSelectable={false}
         fitView
         fitViewOptions={FIT_OPTIONS}
-        defaultEdgeOptions={ARROW}
         defaultMarkerColor={null}
         minZoom={0.25}
         maxZoom={2}
