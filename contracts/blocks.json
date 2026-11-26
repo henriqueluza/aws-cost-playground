@@ -114,6 +114,76 @@
       "usage": [
         {"key": "processedGbPerMonth", "unit": "GB", "default": 100, "min": 0, "max": 100000000, "integer": false}
       ]
+    },
+    {
+      "type": "aws.waf", "name": "WAF", "category": "security", "level": "B",
+      "attributes": [],
+      "usage": [
+        {"key": "webAcls", "unit": "web ACLs", "default": 1, "min": 1, "max": 100, "integer": true},
+        {"key": "rules", "unit": "rules", "default": 5, "min": 0, "max": 10000, "integer": true},
+        {"key": "requestsPerMonth", "unit": "requests", "default": 1000000, "min": 0, "max": 100000000000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.cognito", "name": "Cognito", "category": "security", "level": "B",
+      "attributes": [
+        {"key": "tier", "options": ["lite", "essentials", "plus"], "default": "essentials"}
+      ],
+      "usage": [
+        {"key": "monthlyActiveUsers", "unit": "users", "default": 1000, "min": 0, "max": 100000000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.secrets-manager", "name": "Secrets Manager", "category": "security", "level": "B",
+      "attributes": [],
+      "usage": [
+        {"key": "secrets", "unit": "secrets", "default": 5, "min": 0, "max": 100000, "integer": true},
+        {"key": "apiCallsPerMonth", "unit": "requests", "default": 100000, "min": 0, "max": 100000000000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.cloudtrail", "name": "CloudTrail", "category": "management", "level": "B",
+      "attributes": [],
+      "usage": [
+        {"key": "trails", "unit": "trails", "default": 1, "min": 1, "max": 5, "integer": true},
+        {"key": "managementEventsPerMonth", "unit": "events", "default": 100000, "min": 0, "max": 100000000000, "integer": true},
+        {"key": "dataEventsPerMonth", "unit": "events", "default": 0, "min": 0, "max": 100000000000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.route53", "name": "Route 53", "category": "networking", "level": "B",
+      "attributes": [],
+      "usage": [
+        {"key": "hostedZones", "unit": "hosted zones", "default": 1, "min": 1, "max": 500, "integer": true},
+        {"key": "queriesPerMonth", "unit": "queries", "default": 1000000, "min": 0, "max": 100000000000, "integer": true}
+      ]
+    },
+    {
+      "type": "aws.codepipeline", "name": "CodePipeline", "category": "devtools", "level": "B",
+      "attributes": [
+        {"key": "pipelineType", "options": ["V1", "V2"], "default": "V2"}
+      ],
+      "usage": [
+        {"key": "activePipelines", "unit": "pipelines", "default": 1, "min": 0, "max": 1000, "integer": true},
+        {"key": "executionMinutesPerMonth", "unit": "minutes", "default": 500, "min": 0, "max": 10000000, "integer": false}
+      ]
+    },
+    {
+      "type": "aws.iam", "name": "IAM", "category": "security", "level": "C",
+      "attributes": [],
+      "usage": []
+    },
+    {
+      "type": "aws.cloudformation", "name": "CloudFormation", "category": "management", "level": "C",
+      "attributes": [],
+      "usage": []
+    },
+    {
+      "type": "aws.ecs", "name": "ECS", "category": "compute", "level": "C",
+      "attributes": [
+        {"key": "az", "options": ["a", "b", "c"]}
+      ],
+      "usage": []
     }
   ]
 }
