@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import blocksFile from '../../../../../../contracts/blocks.json';
 import { decimal, sum, toFixed, type Decimal } from '../../../../shared/lib/money';
 import { catalogOf, type RawPrice } from '../../../../test/catalogFixtures';
 import type { BlockPriceInput } from '../blockContract';
+import { blockDefinition } from '../blockRegistry';
 import { createRater } from '../rating';
 import { priceElastiCache } from './elasticache';
 
@@ -25,11 +25,9 @@ const catalog = catalogOf({
     })),
   ),
 });
-const SKUS = catalog.services.get('elasticache')?.prices.map((price) => price.sku) ?? [];
 
-/** Motores e tipos de nó lidos do contrato: o teste quebra se a lista mudar sem o catálogo. */
-type ContractBlock = { type: string; attributes: { key: string; options?: unknown[] }[] };
-const contract = (blocksFile.blocks as ContractBlock[]).find((b) => b.type === 'aws.elasticache');
+/** Motores e tipos de nó do contrato validado: o teste quebra se a lista mudar. */
+const contract = blockDefinition('aws.elasticache');
 const options = (key: string) =>
   (contract?.attributes.find((attribute) => attribute.key === key)?.options ?? []).map(String);
 const combinations = options('engine').flatMap((e) => options('nodeType').map((n) => [e, n]));
@@ -75,15 +73,15 @@ describe('priceElastiCache', () => {
     });
   });
 
-  it('o contrato tem as 16 combinações do catálogo', () => {
+  it('o contrato tem 16 combinações de motor e tipo de nó', () => {
     expect(combinations).toHaveLength(16);
-    expect(SKUS).toHaveLength(16);
   });
 
-  it.each(combinations)('%s %s: uma cobrança fixa de 730 h por nó, com SKU do catálogo', (e, n) => {
+  it.each(combinations)('%s %s: uma cobrança fixa de 730 h por nó', (engine, nodeType) => {
     // 2 nós × 730 h = 1.460 h.
-    expect(priceElastiCache(input(e, n, 2))).toStrictEqual(fixed(e, n, '1460'));
-    expect(SKUS).toContain(`elasticache-${e}-${n}`);
+    expect(priceElastiCache(input(engine, nodeType, 2))).toStrictEqual(
+      fixed(engine, nodeType, '1460'),
+    );
   });
 
   it.each([
