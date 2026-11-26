@@ -22,7 +22,13 @@ const ANY_IPV4 = '0.0.0.0/0';
 export const APP_PORT = 80;
 
 /** Tipos cujo gerador emite a rede. Cresce a cada gerador de bloco em VPC entregue. */
-const NETWORK_OWNERS: readonly BlockType[] = ['aws.ec2', 'aws.rds', 'aws.elasticache'];
+const NETWORK_OWNERS: readonly BlockType[] = [
+  'aws.alb',
+  'aws.ec2',
+  'aws.elasticache',
+  'aws.nat-gateway',
+  'aws.rds',
+];
 /** Tipos que escolhem zona pelo atributo `az` do contrato. */
 const ZONED: readonly BlockType[] = ['aws.ec2', 'aws.rds', 'aws.elasticache'];
 const ROLE_OF: Partial<Record<BlockType, NetworkRole>> = {
@@ -223,6 +229,9 @@ function networkNodes(input: GeneratorInput): HclNode[] {
       'pública e uma privada por zona usada (no mínimo duas) e um security group por papel.',
     ),
     hcl.comment('Sem bloco de NAT Gateway, as sub-redes privadas não têm saída para a internet.'),
+    hcl.comment(
+      'Custo: EC2, RDS, ElastiCache, ALB e NAT Gateway cobram por hora mesmo sem tráfego.',
+    ),
     resource('aws_vpc', 'main', [
       hcl.attr('cidr_block', hcl.string(VPC_CIDR)),
       hcl.attr('enable_dns_support', hcl.bool(true)),
