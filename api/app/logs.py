@@ -14,12 +14,11 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 ALLOWED_FIELDS: frozenset[str] = frozenset(
     {"method", "route", "status", "duration_ms", "error_type", "stack"}
 )
-
+UNMATCHED_ROUTE = "<unmatched>"
 
 _request_id: ContextVar[str] = ContextVar("request_id", default="-")
 _request_logger = logging.getLogger("app.request")
 _error_logger = logging.getLogger("app.error")
-UNMATCHED_ROUTE = "<unmatched>"
 
 
 def get_request_id() -> str:
