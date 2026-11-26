@@ -1,6 +1,9 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { PricingPanel, usePriceCatalog } from '../../pricing';
 import { WorkloadPanel } from '../../workload';
+import { useHistoryShortcuts } from '../hooks/historyShortcuts';
+import { useRestoreDesignDraft } from '../hooks/designDraftSync';
 import { useDesignStore } from '../hooks/useDesignStore';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { catalogStamp } from '../model/estimateNotice';
@@ -10,10 +13,19 @@ import styles from './EditorPage.module.css';
 import { DownloadDesignButton } from './DesignFileActions';
 import { EstimateNotice } from './EstimateNotice';
 import { InspectorPanel } from './InspectorPanel';
+import { LiveAnnouncer } from './LiveAnnouncer';
 import { PalettePanel } from './PalettePanel';
 import { RailTabs } from './RailTabs';
 
-export function EditorPage() {
+/** Atalhos de histórico só existem com o canvas na tela. */
+function HistoryShortcuts(): null {
+  useHistoryShortcuts();
+  return null;
+}
+
+/** `actions`: botões de outras features para a barra superior (o app os injeta). */
+export function EditorPage({ actions }: { actions?: ReactNode } = {}) {
+  useRestoreDesignDraft();
   const wide = useMediaQuery('(min-width: 1024px)', true);
   const design = useDesignStore((s) => s.document);
   const selection = useDesignStore((s) => s.selection);
@@ -51,8 +63,10 @@ export function EditorPage() {
 
   return (
     <div className={styles.shell}>
+      <HistoryShortcuts />
+      <LiveAnnouncer />
       <header className={styles.topbar}>
-        <ActionBar />
+        <ActionBar>{actions}</ActionBar>
       </header>
       <aside aria-label="Paleta" className={styles.palette}>
         <PalettePanel />

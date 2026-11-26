@@ -22,17 +22,22 @@ function LabelField({ block }: { block: Block }) {
   const [draft, setDraft] = useState<string | null>(null);
   const text = draft ?? block.label;
   const problem = validateLabel(text);
+  // Um passo de histórico por confirmação (Enter ou sair do campo), não por tecla.
+  const commit = () => {
+    if (draft !== null && draft !== block.label && validateLabel(draft) === null) {
+      editBlock(block.id, { label: draft });
+    }
+    setDraft(null); // a store é a verdade: o texto inválido não fica no campo
+  };
   return (
     <TextField
       label="Nome do bloco"
       value={text}
       autoComplete="off"
       error={problem ? labelErrorMessage(problem) : undefined}
-      onChange={(e) => {
-        setDraft(e.target.value);
-        if (validateLabel(e.target.value) === null) editBlock(block.id, { label: e.target.value });
-      }}
-      onBlur={() => setDraft(null)} // a store é a verdade: o texto inválido não fica no campo
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => e.key === 'Enter' && commit()}
+      onBlur={commit}
     />
   );
 }

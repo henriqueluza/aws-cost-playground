@@ -381,7 +381,7 @@ Os componentes ainda não existem. Esta seção fixa a anatomia e os estados que
 - **Foco (teclado):** anel `--focus` de 2px a `--focus-offset-node` do bloco, fora da borda de seleção. Os 3px entre o anel e o bloco ficam sempre em `--surface`, então um bloco selecionado e focado mostra duas linhas de tinta separadas por uma faixa da folha. A Issue do editor confere isso na tela renderizada, com zoom de 200%.
 - **Em arraste:** `--shadow-float`, sem mudar de escala.
 - **Custo zero (IAM, CloudFormation, ECS):** a cota mostra `US$ 0,00` em `--muted`. No ECS vem `custo no EC2` como meta.
-- **Teclado:** Tab percorre os blocos na ordem de leitura; setas movem 8px (Shift + setas, 40px); Enter abre o inspetor; Delete apaga; Ctrl/Cmd+Z desfaz e Shift+Ctrl/Cmd+Z refaz. Seleção múltipla, foco em aresta e os demais atalhos ficam para a Issue do editor, que deve cumprir a WCAG 2.1.1.
+- **Teclado:** Tab percorre os blocos na ordem do design (a do documento, que não muda quando um bloco é movido); setas movem 8px, uma célula da grade (Shift + setas, 32px, quatro células: o passo do React Flow, sempre sobre a grade); Enter ou Espaço seleciona o bloco e o inspetor mostra o que está selecionado; Esc limpa a seleção; Delete apaga; Ctrl/Cmd+Z desfaz e Shift+Ctrl/Cmd+Z refaz. Seleção múltipla, foco em aresta e os demais atalhos ficam para a Issue do editor, que deve cumprir a WCAG 2.1.1.
 
 ### Arestas e cotas
 - A cota de aresta é uma etiqueta no meio do traço: mono 12px/500, fundo `--surface`, borda `--border`, `--radius-chip`, padding de 2px por 6px.

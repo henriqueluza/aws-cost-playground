@@ -4,6 +4,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import apiServerless from '../../../../../contracts/scenarios/api-serverless.json';
+import appClassico from '../../../../../contracts/scenarios/app-classico.json';
+import pipelineDeFilas from '../../../../../contracts/scenarios/pipeline-de-filas.json';
+import { adrExampleDesign } from '../../../test/designFixtures';
+import { exportDesign } from '../application/exportDesign';
 import { hcl, renderHcl } from '../model/hcl';
 import { INJECTION_PAYLOADS } from './injectionPayloads';
 
@@ -14,6 +19,9 @@ import { INJECTION_PAYLOADS } from './injectionPayloads';
  * do export inteiro, com o provider da AWS, é o job da #68.
  */
 const enabled = process.env.EXPORT_TERRAFORM_CHECK === '1';
+/** Com `EXPORT_TERRAFORM_AWS=1` também valida o export dos cenários com o provider da AWS (baixa o plugin). */
+const withAws = enabled && process.env.EXPORT_TERRAFORM_AWS === '1';
+const SCENARIOS = { apiServerless, appClassico, pipelineDeFilas };
 
 describe.skipIf(!enabled)('conferência com o binário terraform', { timeout: 120_000 }, () => {
   it('as cargas de injeção viram HCL bem formado e voltam com o mesmo valor', () => {
@@ -43,6 +51,16 @@ describe.skipIf(!enabled)('conferência com o binário terraform', { timeout: 12
         renderHcl([hcl.block('locals', [], [hcl.attr('keys', keys)])]),
       );
 
+      // O export inteiro, com as cargas nos rótulos: o `fmt` lê a sintaxe sem precisar do provider.
+      const blocks = payloads.map((payload, i) => ({
+        ...adrExampleDesign.blocks[1],
+        id: `blk_${i}`,
+        label: payload.slice(0, 80),
+      }));
+      const exported = exportDesign({ ...adrExampleDesign, blocks, edges: [] });
+      if (!exported.ok) throw new Error(exported.error);
+      terraform(['fmt', '-check', '-'], exported.files[0]?.content);
+
       terraform(['fmt', '-check', 'main.tf']);
       terraform(['init', '-backend=false', '-input=false']);
       expect(terraform(['validate', '-no-color'])).toContain('Success');
@@ -65,4 +83,23 @@ describe.skipIf(!enabled)('conferência com o binário terraform', { timeout: 12
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it.skipIf(!withAws).each(Object.entries(SCENARIOS))(
+    'o export do cenário %s passa no validate com o provider da AWS',
+    (_name, scenario) => {
+      const dir = mkdtempSync(join(tmpdir(), 'acp-export-aws-'));
+      const terraform = (args: string[]) =>
+        execFileSync('terraform', args, { cwd: dir, encoding: 'utf8' });
+      try {
+        const exported = exportDesign(scenario);
+        if (!exported.ok) throw new Error(exported.error);
+        writeFileSync(join(dir, 'main.tf'), exported.files[0]?.content ?? '');
+        terraform(['fmt', '-check', 'main.tf']);
+        terraform(['init', '-backend=false', '-input=false']);
+        expect(terraform(['validate', '-no-color'])).toContain('Success');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
 });

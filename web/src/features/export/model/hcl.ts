@@ -11,7 +11,12 @@ export type HclValue =
   | { readonly kind: 'bool'; readonly value: boolean }
   | { readonly kind: 'list'; readonly items: readonly HclValue[] }
   | { readonly kind: 'map'; readonly entries: readonly (readonly [string, HclValue])[] }
-  | { readonly kind: 'ref'; readonly path: readonly (string | number)[] };
+  | { readonly kind: 'ref'; readonly path: readonly (string | number)[] }
+  | { readonly kind: 'call'; readonly name: HclFunction; readonly args: readonly HclValue[] };
+
+/** Funções do Terraform que o construtor sabe chamar. Lista fechada: nome de função nunca vem de dado. */
+export const HCL_FUNCTIONS = ['format'] as const;
+export type HclFunction = (typeof HCL_FUNCTIONS)[number];
 
 export type HclNode =
   | { readonly kind: 'attribute'; readonly name: string; readonly value: HclValue }
@@ -41,6 +46,8 @@ export const hcl = {
   }),
   /** Referência `a.b[0].c` ou palavra-chave de tipo (`string`). Cada parte é identificador ou índice. */
   ref: (...path: (string | number)[]): HclValue => ({ kind: 'ref', path }),
+  /** Chamada `nome(arg, ...)` de uma função de `HCL_FUNCTIONS`; cada argumento é um valor do construtor. */
+  call: (name: HclFunction, args: readonly HclValue[]): HclValue => ({ kind: 'call', name, args }),
   attr: (name: string, value: HclValue): HclNode => ({ kind: 'attribute', name, value }),
   block: (type: string, labels: readonly string[], body: readonly HclNode[]): HclNode => ({
     kind: 'block',
@@ -135,6 +142,9 @@ function renderValue(value: HclValue, indent: string): string {
       return value.value ? 'true' : 'false';
     case 'ref':
       return renderRef(value.path);
+    case 'call':
+      if (!HCL_FUNCTIONS.includes(value.name)) throw new HclError('Função de HCL desconhecida.');
+      return `${value.name}(${value.args.map((arg) => renderValue(arg, indent)).join(', ')})`;
     case 'list':
       // Lista numa linha só; um objeto dentro dela continua em várias linhas, no mesmo recuo.
       return `[${value.items.map((item) => renderValue(item, indent)).join(', ')}]`;
@@ -147,6 +157,9 @@ function renderValue(value: HclValue, indent: string): string {
       );
       return `{\n${lines.join('\n')}\n${indent}}`;
     }
+    default:
+      // Dado que burlou os tipos (um `as`, um JSON): recusa em vez de escrever `undefined`.
+      throw new HclError('Valor de HCL desconhecido.');
   }
 }
 

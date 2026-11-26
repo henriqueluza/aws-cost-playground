@@ -64,6 +64,13 @@ def event(method: str, path: str, body: Any = None, *, auth: bool = True, raw: s
     return make_event(path, method=method, claims=claims, headers=headers, body=payload)
 
 
+@pytest.fixture(autouse=True)
+def _dynamo(table: Any) -> None:
+    """As rotas de designs já implementadas gravam e leem no DynamoDB simulado."""
+
+
+# Rotas já implementadas e o que respondem a um pedido válido com a tabela vazia.
+IMPLEMENTED = {("GET", "/designs"): 200, ("POST", "/designs"): 201, ("GET", f"/designs/{DID}"): 404}
 # (método, path, corpo válido, corpo malformado-mas-JSON, status de sucesso declarado)
 ROUTES = [
     ("GET", "/designs", None, None, 200),
@@ -79,6 +86,8 @@ ROUTES = [
 IDS = [f"{m} {p}" for m, p, *_ in ROUTES]
 PROBLEM = "application/problem+json"
 NOT_IMPLEMENTED = {"type": "about:blank", "title": "Not Implemented", "status": 501}
+TESTED_ELSEWHERE = {("DELETE", "/me"), ("GET", "/quota")}
+"""Rotas que já saíram do 501 e dependem de mocks próprios; testadas no arquivo do módulo."""
 
 
 def test_conjunto_exato_de_rotas_e_status_de_sucesso(app: FastAPI) -> None:
@@ -94,7 +103,7 @@ def test_conjunto_exato_de_rotas_e_status_de_sucesso(app: FastAPI) -> None:
 
 @pytest.mark.parametrize(("method", "path", "valid", "invalid", "_ok"), ROUTES, ids=IDS)
 def test_ordem_401_422_501(app, method, path, valid, invalid, _ok) -> None:  # type: ignore[no-untyped-def]
-    """Sem identidade é 401 com qualquer corpo; com identidade, 422 antes do 501."""
+    """Sem identidade é 401 com qualquer corpo; com identidade, 422 antes do handler."""
     forged = {"x-user-id": SUB, "authorization": "Bearer x"}
     for body, raw in (
         (valid, None),
@@ -114,7 +123,12 @@ def test_ordem_401_422_501(app, method, path, valid, invalid, _ok) -> None:  # t
             status, headers, problem = invoke(app, event(method, path, raw=raw))
             assert (status, headers["content-type"]) == (422, PROBLEM)
             assert all(set(error) == {"loc", "msg"} for error in problem["errors"])
+    if (method, path) in TESTED_ELSEWHERE:
+        return
     status, headers, problem = invoke(app, event(method, path, valid))
+    if (method, path) in IMPLEMENTED:
+        assert status == IMPLEMENTED[(method, path)]
+        return
     assert (status, headers["content-type"]) == (501, PROBLEM)
     assert problem == {**NOT_IMPLEMENTED, "requestId": "req-test-1"}  # sem `detail` interno
 
@@ -207,17 +221,17 @@ def test_design_com_101_blocos_responde_422(app: FastAPI) -> None:
 
 
 @pytest.mark.parametrize(
-    ("method", "path", "wrap"),
+    ("method", "path", "wrap", "accepted"),
     [
-        ("POST", "/designs", lambda d: {"name": "n", "doc": d}),
-        ("PATCH", f"/designs/{DID}", lambda d: {"expectedVersion": 1, "doc": d}),
+        ("POST", "/designs", lambda d: {"name": "n", "doc": d}, 201),
+        ("PATCH", f"/designs/{DID}", lambda d: {"expectedVersion": 1, "doc": d}, 501),
     ],
     ids=["POST", "PATCH"],
 )
-def test_limite_de_350000_bytes_do_doc(app, method, path, wrap) -> None:  # type: ignore[no-untyped-def]
+def test_limite_de_350000_bytes_do_doc(app, method, path, wrap, accepted) -> None:  # type: ignore[no-untyped-def]
     at_limit = doc_of_size(MAX_DOC_BYTES)
     assert doc_size_bytes(DesignDocument.model_validate(at_limit)) == MAX_DOC_BYTES
-    assert invoke(app, event(method, path, wrap(at_limit)))[0] == 501
+    assert invoke(app, event(method, path, wrap(at_limit)))[0] == accepted
 
     over = doc_of_size(MAX_DOC_BYTES + 1)
     assert doc_size_bytes(DesignDocument.model_validate(over)) == MAX_DOC_BYTES + 1
