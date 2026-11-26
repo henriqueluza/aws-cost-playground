@@ -73,7 +73,7 @@ export type CanvasEdge = {
   readonly data: { readonly kind: EdgeKind };
 };
 
-const CELL = { x: 288, y: 144 };
+const CELL = { x: 248, y: 144 };
 
 /**
  * Posição de quem não tem entrada no layout: uma coluna por profundidade (o maior caminho desde

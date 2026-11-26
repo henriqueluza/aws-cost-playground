@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { expectNoAxeViolations } from '../../../test/axe';
 import { designDocumentSchema } from '../../../shared/lib/design';
@@ -41,6 +41,18 @@ describe('CanvasPanel', () => {
     const node = await screen.findByLabelText(new RegExp('^Lambda,'));
     expect(node).toHaveTextContent(EVIL);
     expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('reage à store: mostra o custo no nó e o bloco que entra', async () => {
+    const { container } = renderCanvas();
+    expect(await screen.findByLabelText(/^S3,/)).toHaveTextContent('—');
+    expect(container.querySelectorAll('.react-flow__node svg')).toHaveLength(3);
+    const { document } = designStore.getState();
+    const extra = { ...document.blocks[0]!, id: 'blk_extra', label: 'Outra' };
+    act(() =>
+      designStore.setState({ document: { ...document, blocks: [...document.blocks, extra] } }),
+    );
+    expect(await screen.findByLabelText(/^Lambda, Outra,/)).toBeInTheDocument();
   });
 
   it('com o design vazio, orienta e mantém só o client', async () => {

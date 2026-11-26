@@ -53,7 +53,7 @@ describe('toCanvasNodes', () => {
       ],
     };
     const at = defaultLayout(chain);
-    expect([at.blk_a?.x, at.blk_b?.x, at.blk_c?.x, at.client?.x]).toEqual([0, 288, 576, 864]);
+    expect([at.blk_a?.x, at.blk_b?.x, at.blk_c?.x, at.client?.x]).toEqual([0, 248, 496, 744]);
   });
 
   it('termina com um ciclo no design', () => {

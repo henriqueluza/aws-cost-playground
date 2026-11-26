@@ -62,7 +62,6 @@
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-card);
   font-family: var(--font);
-  cursor: grab;
 }
 
 .head {
