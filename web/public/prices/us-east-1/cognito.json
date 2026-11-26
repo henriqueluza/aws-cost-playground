@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "service": "cognito",
+  "region": "us-east-1",
+  "currency": "USD",
+  "prices": []
+}

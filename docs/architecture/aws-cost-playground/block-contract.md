@@ -69,7 +69,7 @@ Raiz: `{ "schemaVersion": 1, "kinds": [...] }`. Cada tipo de aresta (`data`, `ru
 
 `edgeKindsFor` devolve lista vazia quando origem ou destino é um tipo fora do contrato. Com `aws.ecs` em `blocks.json`, `edgeKindsFor('aws.ecs', 'aws.ec2')` devolve `['data', 'runs-on']`.
 
-`BLOCK_PRICERS` é `Readonly<Record<BlockType, BlockPricer>>`, completo: o compilador recusa bloco do PRD sem função de preço. As funções dos 20 blocos são provisórias e devolvem `[]`; as regras reais chegam nas Issues de preço (#30 a #41).
+`BLOCK_PRICERS` é `Readonly<Record<BlockType, BlockPricer>>`, completo: o compilador recusa bloco do PRD sem função de preço. A função começa provisória (devolve `[]`) e a Issue de preço do bloco (#30 a #41) a troca pela regra real, descrita no TSDoc de `blocks/<bloco>.ts`.
 
 Para acrescentar um bloco:
 
@@ -185,13 +185,21 @@ Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInp
 
 | Tipo              | Campo                      | Significado                                                           |
 | ----------------- | -------------------------- | --------------------------------------------------------------------- |
-| `BlockPriceInput` | `attributes`               | Atributos do bloco (`Block['attributes']`), já validados              |
-| `BlockPriceInput` | `usage`                    | Uso efetivo (`UsageValues`), já validado                              |
+| `BlockPriceInput` | `attributes`               | Atributos do bloco, só os do contrato (abaixo)                        |
+| `BlockPriceInput` | `usage`                    | Uso efetivo, só as chaves do contrato (abaixo)                        |
 | `BlockCharge`     | `sku`                      | SKU do catálogo (`Price.sku`)                                         |
-| `BlockCharge`     | `quantity`                 | Quantidade mensal do SKU (`Decimal`)                                  |
+| `BlockCharge`     | `quantity`                 | Quantidade bruta do mês (`Decimal`), não negativa: sem franquia, mínimo nem faixas |
 | `BlockCharge`     | `charge`                   | `fixed` ou `variable` (`ChargeKind`, de [cost-estimate.md](cost-estimate.md)) |
+| `BlockCharge`     | `service` (opcional)       | Serviço do catálogo que tem o SKU. Sem ele vale o tipo do bloco sem `aws.` (`aws.nat-gateway` vira `nat-gateway`) |
 
-**Provisório:** o motor (#26) aplica faixas, franquia gratuita e mínimo do catálogo às `BlockCharge` e monta as `CostLine`. Ele pode estender `BlockPriceInput` (por exemplo, com o catálogo ou o contexto da aresta); a função de cada bloco não muda por isso.
+`BlockPriceInput` chega conforme o contrato do tipo (`blockPriceInput`, em `blockInput.ts`):
+
+- **Uso:** o efetivo (override vence). Só as chaves do contrato; chave ausente recebe o padrão; valor fora da faixa é limitado a `min`/`max`; chave `integer` com fração é arredondada para cima.
+- **Atributos:** só os do contrato; ausente recebe o padrão, se houver (`az` ausente fica ausente). Valor fora das opções não chega à função: o bloco sai `unavailable`.
+
+O motor (#26) aplica mínimo, franquia e faixas às `BlockCharge` e monta as `CostLine`, como descrito em [cost-estimate.md](cost-estimate.md#algoritmo). Função provisória devolve `[]`; as regras de cada bloco (SKUs, quantidade, o que fica de fora) ficam no TSDoc do arquivo do bloco.
+
+`web/src/features/pricing/model/blockSeedCatalog.test.ts` confere, para todo bloco, região e combinação de atributos, que todo SKU emitido existe na semente da região (`web/public/prices/<region>/`). A Issue de um bloco não precisa editá-lo: basta a função e a semente.
 
 ## Convenções
 
@@ -199,3 +207,4 @@ Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInp
 - **Uma linha por atributo e por chave de uso.** Os JSON são formatados à mão: o Prettier do `web/` não alcança `contracts/`.
 - **Unidade e `name` em inglês.** O contrato não tem rótulo de UI: os rótulos em pt-BR dos blocos, atributos e chaves de uso são da UI (#48).
 - **Sem valor em dólar.** O preço vem só do catálogo; o contrato só diz o que o bloco aceita.
+- **Cenários de referência:** os designs de `contracts/scenarios/` são conferidos contra este contrato por teste. Mudar `blocks.json` ou `edges.json` pode exigir atualizar os cenários; veja [scenarios.md](../../scenarios.md).

@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "service": "lambda",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "lambda-duration-arm64",
+      "description": "Duração (arm64)",
+      "unit": "GB-second",
+      "tiers": [
+        {
+          "upTo": "7500000000",
+          "unitPrice": "0.0000133334"
+        },
+        {
+          "upTo": "18750000000",
+          "unitPrice": "0.0000120001"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.0000106667"
+        }
+      ],
+      "freeTier": {
+        "quantity": "400000",
+        "pool": "lambda-duration"
+      }
+    },
+    {
+      "sku": "lambda-duration-x86",
+      "description": "Duração (x86)",
+      "unit": "GB-second",
+      "tiers": [
+        {
+          "upTo": "6000000000",
+          "unitPrice": "0.0000166667"
+        },
+        {
+          "upTo": "15000000000",
+          "unitPrice": "0.000015"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.0000133334"
+        }
+      ],
+      "freeTier": {
+        "quantity": "400000",
+        "pool": "lambda-duration"
+      }
+    },
+    {
+      "sku": "lambda-requests-arm64",
+      "description": "Requisições (arm64)",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0000002"
+        }
+      ],
+      "freeTier": {
+        "quantity": "1000000",
+        "pool": "lambda-requests"
+      }
+    },
+    {
+      "sku": "lambda-requests-x86",
+      "description": "Requisições (x86)",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0000002"
+        }
+      ],
+      "freeTier": {
+        "quantity": "1000000",
+        "pool": "lambda-requests"
+      }
+    }
+  ]
+}

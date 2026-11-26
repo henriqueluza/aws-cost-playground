@@ -167,7 +167,10 @@ export type UsageKeyDefinition = z.infer<typeof usageKeySchema>;
 export type BlockDefinition = z.infer<typeof blockDefinitionSchema>;
 export type EdgeKindDefinition = z.infer<typeof edgeKindSchema>;
 
-/** O que a função de preço de um bloco recebe: atributos e uso efetivo, já validados. */
+/**
+ * O que a função de preço de um bloco recebe, já conforme o contrato do tipo (`blockPriceInput`):
+ * toda chave de uso presente e dentro da faixa; atributos dentro das opções.
+ */
 export interface BlockPriceInput {
   readonly attributes: Block['attributes'];
   readonly usage: UsageValues;
@@ -177,8 +180,11 @@ export interface BlockPriceInput {
 export interface BlockCharge {
   /** SKU do catálogo (`Price.sku`). */
   readonly sku: string;
+  /** Quantidade bruta do mês, na unidade do SKU e não negativa: sem franquia, mínimo nem faixas. */
   readonly quantity: Decimal;
   readonly charge: ChargeKind;
+  /** Serviço do catálogo que tem o SKU. Sem ele, vale o do bloco: o tipo sem `aws.`. */
+  readonly service?: string;
 }
 
 /** Função de preço de um bloco: pura, sem I/O; devolve o que cobrar, sem o valor em dólar. */

@@ -73,11 +73,11 @@ infra/{modules,envs/{staging,production},bootstrap}/
 docs/
 ```
 
-Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `model/`, com `api/` como adapter. `features/pricing/{application,model}` é TypeScript puro: não importa React, React Flow nem `fetch`.
+Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `model/`, com `api/` como adapter. `features/pricing/{application,model}` é TypeScript puro: não importa React, React Flow nem `fetch`. Store Zustand (inclusive `zustand/vanilla`) fica em `hooks/`: guarda o estado de tela (layout, seleção) e delega toda mudança de documento às ações puras de `model/`/`application/`.
 
 ### Teste de arquitetura
 
-- `web/`: `eslint-plugin-boundaries` (feature só importa outra pelo `index.ts`) mais `no-restricted-imports` proibindo `react`, `@xyflow/*` e `shared/lib/http` dentro de `**/application/**` e `**/model/**`.
+- `web/`: `eslint-plugin-boundaries` (feature só importa outra pelo `index.ts`) mais `no-restricted-imports` proibindo `react`, `react-dom`, `@xyflow/*`, `@tanstack/*`, `zustand` e módulos `http` (`shared/lib/http`) nas camadas TypeScript puro: `**/application/**`, `**/model/**`, `shared/lib/design/**`, `shared/lib/api/**` e `shared/lib/money.ts`.
 - `api/`: `import-linter` com um contrato `forbidden`: módulos `router` não importam `boto3` nem `anthropic`. É a garantia mínima do nível `simple` (regra fora do controller, acesso a dados atrás de função nomeada).
 
 ### Comandos de qualidade
@@ -301,6 +301,7 @@ Nos três a infra fica abaixo do teto de US$ 20. O que escala com uso é a LLM, 
 **Riscos aceitos pelo autor no Gate 1:**
 
 - Sem WAF (custo fixo). O cadastro aberto pode ser usado para disparar e-mails de verificação a terceiros; o limite diário de envio do remetente padrão do Cognito contém o volume.
+- Cadastro aberto em produção com o remetente padrão do Cognito (aceito pelo autor em 25/11/2026, #139). Dois efeitos conhecidos: a cota é de 50 e-mails por dia por conta AWS, não ajustável e dividida com o staging, e qualquer pessoa pode esgotá-la pelo `client_id` público, o que suspende verificação e recuperação de senha até as 09:00 UTC; e o `SignUp` revela se um e-mail já tem conta. Saídas, se o volume crescer: fechar o cadastro (uma linha em `infra/envs/production/terraform.tfvars`) ou adotar o SES, que cria custo e exige ADR novo.
 - Staging e produção na mesma conta AWS, separados por papéis e nomes, não por conta.
 
 ## Alternativas consideradas
@@ -338,7 +339,7 @@ Mantido pelo autor. O motor de preço é TypeScript puro com testes de cenário,
 | SQS + worker Lambda | Fora do MVP. O API Gateway HTTP API corta a integração em 30 s; se a medição na Issue do proxy mostrar p95 acima de 20 s, a fila com polling entra por ADR novo, com aviso ao autor |
 | Preços | Por PR aberto pelo workflow semanal, não por publicação direta no S3 |
 | Uso por aresta | A LLM devolve `gbPerMonth` por aresta; egress do API Gateway fora do MVP |
-| Riscos aceitos | Sem WAF; staging e produção na mesma conta |
+| Riscos aceitos | Sem WAF; staging e produção na mesma conta; cadastro aberto com o remetente padrão do Cognito |
 | Configuração de custo na AWS | Manual, pelo autor (ver "Guardrails de custo") |
 | Adapter ASGI → Lambda | Mangum ou AWS Lambda Web Adapter, decidido na Issue do esqueleto com checagem de manutenção e de supply chain. Decidido em #7: Mangum, ver `api/README.md` |
 
