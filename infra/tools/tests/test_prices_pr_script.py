@@ -37,8 +37,12 @@ class ForbiddenCommandTest(unittest.TestCase):
 FAKE_GH = """#!/bin/sh
 echo "$*" >> "$GH_LOG"
 case "$1 $2" in
-  "pr list") [ -f "$GH_STATE" ] && cat "$GH_STATE"; exit 0 ;;
-  "pr create") echo 7 > "$GH_STATE"; echo "https://example.invalid/pull/7"; exit 0 ;;
+  "pr list")
+    if [ -n "${GH_LIST_OUTPUT-}" ]; then echo "$GH_LIST_OUTPUT"; exit 0; fi
+    [ -f "$GH_STATE" ] && cat "$GH_STATE"; exit 0 ;;
+  "pr create")
+    [ -n "${GH_FAIL_CREATE-}" ] && exit 1
+    echo 7 > "$GH_STATE"; echo "https://example.invalid/pull/7"; exit 0 ;;
   "pr close") rm -f "$GH_STATE"; exit 0 ;;
   "pr edit") exit 0 ;;
 esac
@@ -115,11 +119,14 @@ class PublishScriptTest(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
 
-    def publish(self, *args: str) -> subprocess.CompletedProcess[str]:
+    def publish(
+        self, *args: str, extra: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
         call = args if args else (str(self.body),)
         proc = subprocess.run(
             ["bash", "scripts/prices-pr.sh", *call],
-            cwd=self.clone, env=self.env, capture_output=True, text=True, check=False,
+            cwd=self.clone, env={**self.env, **(extra or {})},
+            capture_output=True, text=True, check=False,
         )  # fmt: skip
         self.assertEqual(self.remote_sha("refs/heads/main"), self.main_sha, "main do origin mudou")
         return proc
@@ -202,6 +209,10 @@ class PublishScriptTest(unittest.TestCase):
         self.assertEqual(len(close), 1)
         self.assertIn("7", close[0].split())
         self.assertIn("--comment", close[0])
+        self.assertIn(
+            "Fechado automaticamente: o catálogo gerado nesta execução é igual ao de main.",
+            close[0],
+        )
 
     def test_equal_to_main_without_pr_is_no_change(self) -> None:
         self.ok("sem mudança")
@@ -223,6 +234,62 @@ class PublishScriptTest(unittest.TestCase):
             self.assertIn(part, listing[0])
         self.assertRegex(listing[0], r"--json \S*isCrossRepository")
         self.assertIn("select(.isCrossRepository | not)", listing[0])
+
+    def assert_failed_without_publishing(self, proc: subprocess.CompletedProcess[str]) -> None:
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(proc.stdout.strip(), "")
+        for verb in ("pr edit", "pr create", "pr close"):
+            self.assertEqual([c for c in self.gh_calls() if c.startswith(verb)], [], verb)
+
+    def test_remote_tip_moving_between_fetch_and_push_fails_without_touching_the_pr(self) -> None:
+        self.write(LAMBDA, '{"price": 2}\n')
+        self.ok("pr criado")
+        tip = self.tip()
+        other = self.git(
+            self.origin, "commit-tree", f"{tip}^{{tree}}", "-p", tip, "-m", "concorrente"
+        )
+        hook = self.clone / ".git" / "hooks" / "pre-push"
+        hook.parent.mkdir(exist_ok=True)
+        hook.write_text(
+            f"#!/bin/sh\ngit --git-dir='{self.origin}' update-ref {BRANCH_REF} {other}\n"
+        )
+        hook.chmod(0o755)
+        self.log.write_text("")
+        self.write(LAMBDA, '{"price": 3}\n')
+        proc = self.publish()
+        self.assert_failed_without_publishing(proc)
+        self.assertEqual(self.tip(), other)
+
+    def test_non_numeric_pr_list_answer_fails_without_touching_the_pr(self) -> None:
+        for changed in (False, True):  # igual a main, e com mudança
+            with self.subTest(changed=changed):
+                self.log.write_text("")
+                if changed:
+                    self.write(LAMBDA, '{"price": 2}\n')
+                proc = self.publish(extra={"GH_LIST_OUTPUT": "abc"})
+                if changed:
+                    # o push já ocorreu antes de achar o PR; só PR não pode ser tocado
+                    self.assertNotEqual(proc.returncode, 0)
+                    self.assertEqual(proc.stdout.strip(), "")
+                    self.assertEqual([c for c in self.gh_calls() if c.startswith("pr ")][1:], [])
+                else:
+                    self.assert_failed_without_publishing(proc)
+
+    def test_failing_pr_create_explains_the_repository_setting(self) -> None:
+        self.write(LAMBDA, '{"price": 2}\n')
+        proc = self.publish(extra={"GH_FAIL_CREATE": "1"})
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertNotIn("pr criado", proc.stdout)
+        self.assertIn("permite que o GitHub Actions crie PR", proc.stderr)
+
+    def test_head_other_than_origin_main_fails_without_publishing(self) -> None:
+        self.write("README.md", "commit local a mais\n")
+        self.git(self.clone, "commit", "-am", "local")
+        self.write(LAMBDA, '{"price": 2}\n')
+        proc = self.publish()
+        self.assert_failed_without_publishing(proc)
+        self.assertIn("HEAD não é origin/main", proc.stderr)
+        self.assertEqual(self.tip(), "")
 
     def test_without_argument_exits_2(self) -> None:
         self.write(LAMBDA, '{"price": 2}\n')

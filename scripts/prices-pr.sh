@@ -17,7 +17,7 @@ readonly PRICES=web/public/prices
 readonly MANIFEST=web/public/prices/manifest.json
 readonly TITLE='chore(prices): atualização semanal do catálogo'
 readonly EXCLUDE_MANIFEST=":(exclude)$MANIFEST"
-readonly CLOSE_COMMENT='Fechado automaticamente: o catálogo voltou a ser igual ao de main.'
+readonly CLOSE_COMMENT='Fechado automaticamente: o catálogo gerado nesta execução é igual ao de main.'
 readonly BOT_NAME='github-actions[bot]'
 readonly BOT_EMAIL='41898282+github-actions[bot]@users.noreply.github.com'
 
@@ -35,6 +35,9 @@ readonly BODY=$1
 [ "$BRANCH" != "$BASE" ] || die "BRANCH igual a BASE ($BASE): abortado"
 prefix=$(git rev-parse --show-prefix)
 [ -z "$prefix" ] || die "rode a partir da raiz do repositório"
+head=$(git rev-parse --verify 'HEAD^{commit}')
+base_ref=$(git rev-parse --verify --quiet "refs/remotes/origin/$BASE^{commit}") || base_ref=
+[ "$head" = "$base_ref" ] || die "HEAD não é origin/$BASE: rode a partir do checkout de $BASE"
 
 # Define PR com o número do PR aberto da branch, ou vazio se não houver.
 # --head filtra só pelo nome: PR de fork com a mesma branch nunca é editado nem fechado.
@@ -47,7 +50,8 @@ find_open_pr() {
 }
 
 create_pr() {
-  gh pr create --base "$BASE" --head "$BRANCH" --title "$TITLE" --body-file "$BODY" >&2
+  gh pr create --base "$BASE" --head "$BRANCH" --title "$TITLE" --body-file "$BODY" >&2 ||
+    die "gh pr create falhou; confira se o repositório permite que o GitHub Actions crie PR (Settings > Actions > General)"
   printf 'pr criado\n'
 }
 
@@ -62,15 +66,17 @@ index_differs_from() {
   esac
 }
 
+# Uso: commit_tree <tree> <mensagem> -p <pai> [-p <pai>]
 commit_tree() {
+  local tree_sha=$1 message=$2
+  shift 2
   GIT_AUTHOR_NAME=$BOT_NAME GIT_AUTHOR_EMAIL=$BOT_EMAIL \
     GIT_COMMITTER_NAME=$BOT_NAME GIT_COMMITTER_EMAIL=$BOT_EMAIL \
-    git commit-tree "$tree" "$@" -m "$msg"
+    git commit-tree "$tree_sha" "$@" -m "$message"
 }
 
 # Arquivos novos não rastreados contam: compara o índice, não a árvore de trabalho.
 git add -A -- "$PRICES"
-head=$(git rev-parse --verify 'HEAD^{commit}')
 
 # (a) Igual a main: o PR aberto, se houver, perde o sentido.
 if ! index_differs_from "$head"; then
@@ -111,9 +117,9 @@ esac
 tree=$(git write-tree)
 msg="chore(prices): catálogo da Price List de $(date -u +%F)"
 if [ -n "$tip" ] && [ "$tip" != "$head" ]; then
-  commit=$(commit_tree -p "$head" -p "$tip")
+  commit=$(commit_tree "$tree" "$msg" -p "$head" -p "$tip")
 else
-  commit=$(commit_tree -p "$head")
+  commit=$(commit_tree "$tree" "$msg" -p "$head")
 fi
 git push origin "$commit:refs/heads/$BRANCH" >&2
 
