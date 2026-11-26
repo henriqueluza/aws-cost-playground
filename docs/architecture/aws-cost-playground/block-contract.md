@@ -69,7 +69,7 @@ Raiz: `{ "schemaVersion": 1, "kinds": [...] }`. Cada tipo de aresta (`data`, `ru
 
 `edgeKindsFor` devolve lista vazia quando origem ou destino é um tipo fora do contrato. Com `aws.ecs` em `blocks.json`, `edgeKindsFor('aws.ecs', 'aws.ec2')` devolve `['data', 'runs-on']`.
 
-`BLOCK_PRICERS` é `Readonly<Record<BlockType, BlockPricer>>`, completo: o compilador recusa bloco do PRD sem função de preço. A função começa provisória (devolve `[]`) e a Issue de preço do bloco (#30 a #41) a troca pela regra real, descrita no TSDoc de `blocks/<bloco>.ts`.
+`BLOCK_PRICERS` é `Readonly<Record<BlockType, BlockPricer>>`, completo: o compilador recusa bloco do PRD sem função de preço. A função começa provisória (devolve `[]`) e a Issue de preço do bloco (#30 a #41) a troca pela regra real, descrita no TSDoc de `blocks/<bloco>.ts`. Os blocos de nível C usam `zeroCostPricer` no arquivo do bloco; o significado de custo zero está em [cost-estimate.md](cost-estimate.md#casos-especiais).
 
 Para acrescentar um bloco:
 
@@ -138,7 +138,7 @@ Valores copiados de `contracts/blocks.json`. Atributo sem `default` é opcional.
 
 Valores copiados de `contracts/blocks.json`, no mesmo formato. Atributo sem `default` é opcional. Blocos de B e C sem atributo (`aws.waf`, `aws.secrets-manager`, `aws.cloudtrail`, `aws.route53`, `aws.iam`, `aws.cloudformation`) não aparecem na tabela de atributos.
 
-- Os três de nível C (`aws.iam`, `aws.cloudformation`, `aws.ecs`) custam zero e não têm chave de uso.
+- Os três de nível C (`aws.iam`, `aws.cloudformation`, `aws.ecs`) custam zero (via `zeroCostPricer`, veja [cost-estimate.md](cost-estimate.md#casos-especiais)) e não têm chave de uso.
 - `aws.ecs` leva só o atributo opcional `az` (`a`, `b`, `c`, sem padrão). O custo dele vem do EC2 ligado pela aresta `runs-on`.
 - Em `aws.codepipeline`, as chaves `activePipelines` e `executionMinutesPerMonth` convivem no bloco. Qual delas cada tipo de pipeline usa é definido pela função de preço (#40), não por este contrato.
 - Em `aws.cloudtrail`, `trails` é o número de trilhas: a cobrança dos eventos de gerenciamento "além da primeira trilha" (#40) sai dele.
