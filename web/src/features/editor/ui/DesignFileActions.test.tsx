@@ -10,6 +10,7 @@ import { adrExampleDesign } from '../../../test/designFixtures';
 import { designStore } from '../hooks/designStore';
 import { DESIGN_FILE_NAME, parseDesignFile } from '../model/designFile';
 import { EMPTY_STATE } from '../model/editorState';
+import { hasUnsavedChanges } from '../model/unsaved';
 import { ActionBar } from './ActionBar';
 
 const contracts = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../contracts');
@@ -30,7 +31,10 @@ const renderBar = () =>
 let blobs: Blob[];
 let revoked: string[];
 let clicked: { download: string; href: string }[];
+/** Store vazia e limpa: o `baseline` acompanha o documento, como depois de um design aberto. */
+const CLEAN_EMPTY = { ...EMPTY_STATE, baseline: EMPTY_STATE.document };
 beforeEach(() => {
+  designStore.setState(CLEAN_EMPTY);
   blobs = [];
   revoked = [];
   clicked = [];
@@ -50,7 +54,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  designStore.setState(EMPTY_STATE);
+  designStore.setState(CLEAN_EMPTY);
 });
 
 describe('Abrir arquivo', () => {
@@ -69,7 +73,15 @@ describe('Abrir arquivo', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('com conteúdo, pede confirmação; cancelar não altera nada', async () => {
+  it('com conteúdo já carregado e sem alteração (o template, por exemplo), abre direto', async () => {
+    designStore.setState({ ...EMPTY_STATE, document: adr, baseline: adr });
+    renderBar();
+    await upload(json(scenario));
+    await waitFor(() => expect(designStore.getState().document).not.toBe(adr));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('com alteração não salva, pede confirmação; cancelar não altera nada', async () => {
     designStore.setState({ ...EMPTY_STATE, document: adr });
     const user = userEvent.setup();
     renderBar();
@@ -167,12 +179,20 @@ describe('Baixar JSON', () => {
     expect(document.querySelector('a[download]')).toBeNull();
   });
 
+  it('baixar zera o aviso de alteração não salva', async () => {
+    designStore.setState({ ...CLEAN_EMPTY, document: adr });
+    renderBar();
+    await userEvent.click(screen.getByRole('button', { name: 'Baixar JSON' }));
+    const { document: doc, baseline } = designStore.getState();
+    expect(hasUnsavedChanges(doc, baseline)).toBe(false);
+  });
+
   it('ida e volta: o que foi baixado abre como o mesmo design', async () => {
     designStore.setState({ ...EMPTY_STATE, document: adr });
     renderBar();
     await userEvent.click(screen.getByRole('button', { name: 'Baixar JSON' }));
     const text = (await blobs[0]?.text()) ?? '';
-    designStore.setState(EMPTY_STATE);
+    designStore.setState(CLEAN_EMPTY);
     await upload(json(text));
     await waitFor(() => expect(designStore.getState().document).toEqual(adr));
   });

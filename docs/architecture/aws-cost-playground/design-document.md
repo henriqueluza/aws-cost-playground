@@ -28,6 +28,22 @@ O documento do design é o JSON que o anônimo baixa e o logado salva. A API (#1
 
 **Limites:** 100 blocos, 400 arestas, `workload.description` até 2.000 caracteres, `label` até 80, string de atributo até 64, até 32 chaves em cada `attributes`, `usage.values` e `overrides`.
 
+## Template inicial
+
+O PRD (F5) pede um template com os 20 blocos, descrição de carga de exemplo e uso padrão. Ele mora em `contracts/templates/reference.json`, é um documento de design comum (passa pelo mesmo schema, `usage.source: "default"`) e é o design com que o editor abre e o que "Novo design" restaura. As posições no canvas não fazem parte do documento: vêm de `web/src/features/editor/model/template/referenceTemplate.ts`.
+
+**A topologia não vem do PRD.** O PRD não define as arestas; elas foram desenhadas pelo autor a partir da F5 e do discovery (arquitetura padrão de produção, com NAT). Por isso mudar uma aresta é decisão de produto, não correção de contrato:
+
+- `cdn` -> `client`, `waf`, `s3` e `alb` (`data`); `route53` -> `alb`; `alb` -> `ecs` e `lambda`.
+- `ecs` -> `rds`, `cache`, `queue` e `secrets` (`data`); `ecs` runs-on `ec2`; `ec2` -> `nat`; `lambda` -> `table` e `auth`.
+- `ec2`, `rds`, `trail`, `pipeline`, `stack` e `iam` -> `cloudwatch` (`logs`).
+
+Totais mensais do template com as sementes de preço de 2026-11-25: us-east-1 US$ 131,28; sa-east-1 US$ 231,06. Não são fixados em teste: mudam quando o catálogo muda; `referenceTemplateCost.test.ts` exige só total diferente de zero e nenhum item sem preço.
+
+## Estado "não salvo" no editor
+
+A store guarda `baseline`, o último documento carregado (`loadDesign`, `replaceDocument`), baixado (`markSaved`, só depois de "Baixar JSON" bem-sucedido) ou o template. Há alteração não salva quando `document` difere do `baseline` por igualdade estrutural (`model/unsaved.ts`); posição de bloco e seleção não contam, porque não estão no documento. "Novo design" (`newDesign`) pede confirmação só nesse caso.
+
 ## Evolução
 
 - `schemaVersion` muda quando o formato muda de modo incompatível.
