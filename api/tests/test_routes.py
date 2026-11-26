@@ -250,6 +250,22 @@ def test_corpo_acima_do_teto_responde_413_antes_de_validar(app: FastAPI) -> None
     assert "errors" not in problem
 
 
+@pytest.mark.parametrize(("method", "path"), [("POST", "/designs"), ("PATCH", f"/designs/{DID}")])
+def test_corpo_acima_do_teto_sem_identidade_responde_401(
+    app: FastAPI, method: str, path: str
+) -> None:
+    """401 antes do 413: sem identidade, a resposta não revela o limite do corpo."""
+    oversized = "{" + " " * MAX_BODY_BYTES
+    assert invoke(app, event(method, path, raw=oversized))[0] == 413
+    assert invoke(app, event(method, path, auth=False, raw=oversized))[0] == 401
+
+
+def test_estimativa_no_limite_e_aceita(app: FastAPI) -> None:
+    blocks = [BLOCK | {"id": f"blk_{i}"} for i in range(100)]
+    body = valid_estimate() | {"description": "d" * 2000, "blocks": blocks}
+    assert invoke(app, event("POST", "/estimates", body))[0] == 501
+
+
 @pytest.mark.parametrize(
     "raw",
     ['{"name": "n", "doc": ' + "9" * 5000 + "}", "[" * 200_000 + "]" * 200_000],

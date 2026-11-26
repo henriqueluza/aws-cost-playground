@@ -90,7 +90,7 @@ Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo
 - Quando as rotas forem implementadas, 409 será `design-limit` em create/duplicate e `version-conflict` no update.
 - As rotas de designs ainda não estão no API Gateway (`infra/envs/*/main.tf`): é outra Issue.
 
-Ordem das respostas: 401 (sem `sub`) → 413 (corpo cru acima de 1 MiB, ou `doc` acima de 350.000 bytes) → 400 (JSON que o parser recusa, como inteiro com mais de 4.300 dígitos ou aninhamento extremo) / 422 (validação) → 501. A `ProtectedRoute` garante que 401 e 413 saiam antes de o corpo ser lido e validado.
+Ordem das respostas: 401 (sem `sub`) → 413 (corpo cru acima de 1 MiB, ou `doc` acima de 350.000 bytes) → 400 (JSON que o parser recusa, como inteiro com mais de 4.300 dígitos ou aninhamento extremo) / 422 (validação) → 501. A `ProtectedRoute` garante que o 401 saia sem olhar o corpo e que o 413 do corpo cru saia antes de o JSON ser decodificado. O limite de 350.000 bytes do `doc` é medido depois do parse completo do documento (sem as chaves desconhecidas) e tem precedência sobre o 422: se algum erro de validação for `doc_too_large`, a resposta é 413 mesmo que haja outros campos inválidos.
 
 ## Identidade
 

@@ -1,4 +1,4 @@
-"""Rota protegida: identidade e teto do corpo conferidos antes de o FastAPI ler o corpo."""
+"""Rota protegida: identidade e teto do corpo conferidos antes de o FastAPI decodificar o corpo."""
 
 from collections.abc import Callable, Coroutine
 from typing import Any
@@ -15,8 +15,10 @@ MAX_BODY_BYTES = 1_048_576
 class ProtectedRoute(APIRoute):
     """Responde 401 sem `sub` e 413 com corpo acima do teto, antes de qualquer validação.
 
-    O FastAPI lê e decodifica o corpo antes de resolver as dependências; sem esta classe, um
-    corpo malformado ou enorme seria processado (e responderia 422) para quem não se autenticou.
+    O FastAPI decodifica o corpo antes de resolver as dependências; sem esta classe, um corpo
+    malformado ou enorme seria decodificado e validado (422) para quem não se autenticou. A
+    identidade é conferida sem tocar no corpo; o teto mede os bytes já recebidos (a Lambda
+    entrega o corpo inteiro no evento) e barra a decodificação do JSON e a validação.
     """
 
     def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
