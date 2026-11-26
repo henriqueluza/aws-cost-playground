@@ -20,7 +20,13 @@ const LLM = {
   edges: [],
 };
 
-function setup(opts: { signedIn?: boolean; estimate?: Api['estimates']['estimateUsage'] } = {}) {
+function setup(
+  opts: {
+    signedIn?: boolean;
+    estimate?: Api['estimates']['estimateUsage'];
+    quota?: Awaited<ReturnType<Api['quota']['get']>>;
+  } = {},
+) {
   const base = createInMemoryApi({
     maxDesigns: 5,
     maxDocBytes: 350_000,
@@ -31,7 +37,7 @@ function setup(opts: { signedIn?: boolean; estimate?: Api['estimates']['estimate
   const api: Api = {
     ...base,
     estimates: { estimateUsage: vi.fn(opts.estimate ?? base.estimates.estimateUsage) },
-    quota: { get: vi.fn(base.quota.get) },
+    quota: { get: vi.fn(opts.quota ? () => Promise.resolve(opts.quota!) : base.quota.get) },
   };
   const auth = fakeAuth(
     opts.signedIn === false
@@ -235,5 +241,46 @@ describe('WorkloadPanel: erros', () => {
     expect(
       within(invite.closest('div')!.parentElement!).getByRole('button', { name: 'Entrar' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('WorkloadPanel: quota e trava', () => {
+  const day = 24 * 3_600_000;
+  const future = () => new Date(Date.now() + day).toISOString();
+  const past = () => new Date(Date.now() - day).toISOString();
+
+  it('0 de 20 com a hora de voltar no futuro trava o botão e mostra a frase', async () => {
+    const { api } = setup({ quota: { limit: 20, remaining: 0, resetsAt: future() } });
+    expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
+    expect((await screen.findAllByText(/Você usou as estimativas de hoje/)).length).toBeGreaterThan(
+      0,
+    );
+    expect(button()).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(button());
+    expect(api.estimates.estimateUsage).not.toHaveBeenCalled();
+  });
+
+  it('0 de 20 com a hora de voltar já passada solta a trava', async () => {
+    const { api } = setup({ quota: { limit: 20, remaining: 0, resetsAt: past() } });
+    expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
+    expect(screen.queryByText(/Você usou as estimativas de hoje/)).toBeNull();
+    expect(button()).toHaveAttribute('aria-disabled', 'false');
+    await userEvent.click(button());
+    await waitFor(() => expect(api.estimates.estimateUsage).toHaveBeenCalledTimes(1));
+  });
+
+  it('resposta sem valor aproveitável mostra a frase e não zera a marca de desatualizada', async () => {
+    let empty = false;
+    setup({ estimate: () => Promise.resolve(empty ? { blocks: [], edges: [] } : LLM) });
+    await userEvent.click(button());
+    await screen.findByText(/Estimativa aplicada/);
+    fireEvent.change(screen.getByLabelText('Descrição da carga'), {
+      target: { value: 'Mais tráfego' },
+    });
+    expect(screen.getByText('Estimativa desatualizada')).toBeInTheDocument();
+    empty = true;
+    await userEvent.click(button());
+    expect(await screen.findByText(/não trouxe valores utilizáveis/)).toBeInTheDocument();
+    expect(screen.getByText('Estimativa desatualizada')).toBeInTheDocument();
   });
 });
