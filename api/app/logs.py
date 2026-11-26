@@ -14,6 +14,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 ALLOWED_FIELDS: frozenset[str] = frozenset(
     {"method", "route", "status", "duration_ms", "error_type", "stack", "stage", "deleted_items"}
     | {"scope", "count", "limit", "sub"}  # eventos de quota (`app.quota`)
+    # evento da estimativa (`app.estimate`): só contagens, tokens e o código do resultado
+    | {"result", "input_tokens", "output_tokens", "block_count", "edge_count"}
 )
 UNMATCHED_ROUTE = "<unmatched>"
 

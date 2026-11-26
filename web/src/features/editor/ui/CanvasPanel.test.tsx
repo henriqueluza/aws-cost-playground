@@ -52,6 +52,23 @@ describe('CanvasPanel', () => {
     expect(screen.getByLabelText(/^Internet/)).toBeInTheDocument();
   });
 
+  it('legenda dos tipos de conexão em texto, com o traçado de cada um', async () => {
+    const { container } = renderCanvas();
+    const legend = await screen.findByRole('group', { name: 'Legenda das conexões' });
+    expect(within(legend).getByText('Dados')).toBeInTheDocument();
+    expect(legend).toHaveTextContent('Executa em, tracejado');
+    expect(legend).toHaveTextContent('Logs, pontilhado');
+    expect(legend).toHaveTextContent('Dados, traço contínuo');
+    expect(legend.querySelectorAll('svg path').length).toBe(6); // 3 amostras + 3 ícones, sem cor como único sinal
+    await expectNoAxeViolations(container);
+  });
+
+  it('sem blocos não há legenda', () => {
+    const { container } = renderCanvas();
+    act(() => designStore.setState({ document: { ...adrExampleDesign, blocks: [], edges: [] } }));
+    expect(container.querySelector('[aria-label="Legenda das conexões"]')).toBeNull();
+  });
+
   it('mostra o rótulo com marcação como texto, nunca como HTML', async () => {
     const { container } = renderCanvas(EVIL);
     const node = await screen.findByLabelText(new RegExp('^Lambda,'));

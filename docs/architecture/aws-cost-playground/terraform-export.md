@@ -74,7 +74,7 @@ Nenhum bloco some: sem gerador real, de tipo desconhecido ou com atributo fora d
 
 `model/generators/network.ts` emite VPC, sub-redes, rotas e security groups uma vez por design.
 
-- **Mecanismo:** cada gerador de bloco em VPC devolve `withNetwork(input, nodes)`. A rede entra só na saída do primeiro bloco, na ordem do id, cujo tipo está em `NETWORK_OWNERS` (hoje `aws.ec2`); os demais só a referenciam. Os nomes são fixos (`aws_vpc.main`, `aws_subnet.public_a`, `aws_security_group.app` etc.), então a referência não depende de quem emitiu. `NETWORK_OWNERS` cresce a cada gerador em VPC entregue.
+- **Mecanismo:** cada gerador de bloco em VPC devolve `withNetwork(input, nodes)`. A rede entra só na saída do primeiro bloco, na ordem do id, cujo tipo está em `NETWORK_OWNERS` (hoje `aws.ec2`, `aws.rds` e `aws.elasticache`); os demais só a referenciam. Os nomes são fixos (`aws_vpc.main`, `aws_subnet.public_a`, `aws_security_group.app` etc.), então a referência não depende de quem emitiu. `NETWORK_OWNERS` cresce a cada gerador em VPC entregue.
 - **Zonas:** o atributo `az` do bloco (EC2, RDS, ElastiCache); sem ele, `a`. O design usa as zonas dos blocos, completadas até duas (ALB e grupos de sub-redes do RDS e do ElastiCache exigem pelo menos duas). O nome da zona sai de `format("%s%s", var.aws_region, "a")`, via `hcl.call`.
 - **CIDRs:** VPC `10.0.0.0/16`; sub-rede pública `10.0.<n>.0/24` e privada `10.0.<10+n>.0/24`, com `n` = 0, 1, 2 para as zonas a, b, c. Sub-redes não dão IP público no lançamento. Há uma tabela de rotas pública (rota `0.0.0.0/0` no internet gateway) e uma privada por zona, sem rota de saída: sem bloco de NAT Gateway, as sub-redes privadas não saem para a internet. O security group padrão da VPC fica sem regras.
 - **Security groups:** um por papel (`alb`, `app`, `db`, `cache`), só para os papéis presentes no design. Regras são recursos `aws_vpc_security_group_{ingress,egress}_rule`, sempre TCP numa porta. Os pares `alb-app`, `app-db` e `app-cache` só abrem se houver aresta `data` entre blocos desses papéis. Só quando o design não tem nenhuma aresta `data` entre blocos com papel vale a cadeia inteira. Outro par nunca é aberto: uma aresta do ALB direto para o banco não cria regra. As descrições de grupo e de regra são só ASCII, porque a API do EC2 recusa acento.
@@ -86,6 +86,19 @@ Nenhum bloco some: sem gerador real, de tipo desconhecido ou com atributo fora d
 | Saída do `app` | `0.0.0.0/0` | 443 |
 | Entrada no `db` e saída do `app` | um do outro | 5432 (postgres) ou 3306 (mysql), conforme os motores do design |
 | Entrada no `cache` e saída do `app` | um do outro | 6379 (redis) ou 11211 (memcached), conforme os motores do design |
+
+## Blocos em VPC
+
+Todos usam `withNetwork`, ficam em sub-rede privada e usam o security group do seu papel (`app`, `db`, `cache`).
+
+- **EC2** (`ec2.ts`): `aws_instance` com `count` = `instanceCount`, sem IP público e sem par de chaves (sem SSH aberto), IMDSv2 obrigatório e volume raiz gp3 criptografado. A AMI (Amazon Linux 2023) vem de um `data "aws_ami"`, emitido uma vez por arquitetura (`t4g.*` usa arm64; o resto, x86_64).
+- **RDS** (`rds.ts`): `aws_db_subnet_group` e `aws_db_instance`, sem acesso público, `storage_encrypted`, `deletion_protection`, snapshot final, backup de 7 dias e gp3 com o tamanho do design. Instância única usa a zona do bloco; com Multi-AZ, `availability_zone` não é escrito (o RDS escolhe).
+  - **Senha:** `manage_master_user_password = true`, usuário mestre `dbadmin`. O RDS gera a senha e a guarda no Secrets Manager; o arquivo não tem senha nem variável de senha. Esse segredo custa cerca de US$ 0,40 por mês na conta de quem aplica e o painel de custo do produto não o mostra; um comentário no arquivo avisa.
+- **ElastiCache** (`elasticache.ts`): `aws_elasticache_subnet_group` mais o recurso do motor, com o grupo de sub-redes privadas do design.
+  - **Redis:** `aws_elasticache_replication_group`, com criptografia em repouso e em trânsito, sem token de autenticação (seria segredo no arquivo; o acesso é limitado pelo security group `cache`). Até 6 nós: `num_cache_clusters`, um nó por zona a partir da zona do bloco, e failover automático com 2 nós ou mais. Acima de 6: modo cluster (`num_node_groups`, versão 7.1 e o grupo de parâmetros `default.redis7.cluster.on`), um nó por shard e sem réplica, com comentário pedindo conferência.
+  - **Memcached:** `aws_elasticache_cluster`, só com criptografia em trânsito (o motor não tem a em repouso; o arquivo diz isso). Mais de 1 nó usa `az_mode = "cross-az"`. Acima de 40 nós, um comentário avisa do limite da AWS; o bloco não é recusado.
+- **Identificadores na AWS:** `ordinalId(input, prefixo)` devolve o prefixo fixo mais a posição do bloco entre os do mesmo tipo, na ordem do id (`db-1`, `cache-2`). Não saem do rótulo, porque o limite de 40 caracteres do ElastiCache cortaria o sufixo que torna o nome único. O snapshot final do RDS é `<id>-final`. Acrescentar ou tirar um bloco do mesmo tipo muda o número dos seguintes: quem já aplicou um export deve ler o plano antes de aplicar um export novo.
+- **Versão do motor:** não é fixada; vale o padrão da AWS na hora de aplicar.
 
 ## Convenções para os geradores (#65, #66 e #67)
 

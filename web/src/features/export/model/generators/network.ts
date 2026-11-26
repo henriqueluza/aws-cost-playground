@@ -22,7 +22,7 @@ const ANY_IPV4 = '0.0.0.0/0';
 export const APP_PORT = 80;
 
 /** Tipos cujo gerador emite a rede. Cresce a cada gerador de bloco em VPC entregue. */
-const NETWORK_OWNERS: readonly BlockType[] = ['aws.ec2'];
+const NETWORK_OWNERS: readonly BlockType[] = ['aws.ec2', 'aws.rds', 'aws.elasticache'];
 /** Tipos que escolhem zona pelo atributo `az` do contrato. */
 const ZONED: readonly BlockType[] = ['aws.ec2', 'aws.rds', 'aws.elasticache'];
 const ROLE_OF: Partial<Record<BlockType, NetworkRole>> = {
@@ -70,11 +70,20 @@ export const securityGroupId = (role: NetworkRole): HclValue =>
   hcl.ref('aws_security_group', role, 'id');
 export const VPC_ID = hcl.ref('aws_vpc', 'main', 'id');
 
+/**
+ * Identificador de recurso na AWS (letras minúsculas, dígitos e hífen): o prefixo fixo mais a
+ * posição do bloco entre os do mesmo tipo. Não usa o rótulo: cabe em qualquer limite e não colide.
+ */
+export function ordinalId(input: GeneratorInput, prefix: string): string {
+  const peers = input.blocks.filter((block) => block.type === input.block.type);
+  return `${prefix}-${peers.findIndex((block) => block.id === input.block.id) + 1}`;
+}
+
 const resource = (type: string, name: string, body: readonly HclNode[]): HclNode =>
   hcl.block('resource', [type, name], body);
 
 /** Nome real da zona: a região do provider mais a letra, sem interpolação escrita à mão. */
-const zoneName = (az: AzLetter): HclValue =>
+export const zoneName = (az: AzLetter): HclValue =>
   hcl.call('format', [hcl.string('%s%s'), hcl.ref('var', 'aws_region'), hcl.string(az)]);
 
 function subnetNodes(az: AzLetter): HclNode[] {

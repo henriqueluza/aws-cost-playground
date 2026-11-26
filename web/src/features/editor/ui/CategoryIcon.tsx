@@ -2,7 +2,17 @@ import type { ReactElement } from 'react';
 import type { CanvasCategory } from '../model/canvasModel';
 
 /** Ícones próprios no estilo do Lucide (DESIGN.md); sem o pacote como dependência, e sem ícone da AWS. */
-export type IconName = CanvasCategory | 'globe' | 'plus' | 'minus' | 'fit' | 'undo' | 'redo';
+export type IconName =
+  | CanvasCategory
+  | 'globe'
+  | 'plus'
+  | 'minus'
+  | 'fit'
+  | 'undo'
+  | 'redo'
+  | 'edge-data'
+  | 'edge-runs-on'
+  | 'edge-logs';
 
 const SHAPES: Record<IconName, ReactElement> = {
   compute: (
@@ -38,6 +48,16 @@ const SHAPES: Record<IconName, ReactElement> = {
   fit: <path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5" />,
   undo: <path d="M5.5 3 3 5.5 5.5 8M3 5.5h6.5a3.5 3.5 0 0 1 0 7H6" />,
   redo: <path d="M10.5 3 13 5.5 10.5 8M13 5.5H6.5a3.5 3.5 0 0 0 0 7H10" />,
+  // Os três do tipo de aresta: setas em duas mãos (dados), pilha sob uma caixa (executa em), linhas de texto (logs).
+  'edge-data': <path d="M2 5.5h11M10.5 3 13 5.5 10.5 8M14 10.5H3M5.5 8 3 10.5 5.5 13" />,
+  'edge-runs-on': (
+    <>
+      <rect x="2.5" y="2" width="11" height="4" rx="1" />
+      <rect x="2.5" y="10" width="11" height="4" rx="1" />
+      <path d="M8 6v4M6 8.2 8 10l2-1.8" />
+    </>
+  ),
+  'edge-logs': <path d="M3 3.5h10M3 6.5h10M3 9.5h6.5M3 12.5h8" />,
   globe: (
     <>
       <circle cx="8" cy="8" r="6.5" />
