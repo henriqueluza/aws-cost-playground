@@ -82,6 +82,7 @@ INVALID: dict[str, Mutation] = {
     "padrão de atributo null": lambda b, e: _arch(b).update(default=None),
     "opção repetida": lambda b, e: _arch(b)["options"].append("arm64"),
     "opções de tipos diferentes": lambda b, e: _arch(b)["options"].append(1),
+    "opção 10**400": lambda b, e: _lambda(b)["attributes"][1]["options"].append(10**400),
     "client fora de data": lambda b, e: e["kinds"][1]["pairs"][0]["targets"].append("client"),
     "kind faltando": lambda b, e: e["kinds"].pop(),
     "kind repetido": lambda b, e: e["kinds"].append(e["kinds"][0]),

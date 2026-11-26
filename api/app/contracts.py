@@ -24,6 +24,7 @@ from app.design_document import (
     ContractModel,
     EdgeKind,
     FieldKey,
+    JsNumber,
     NotNull,
     SchemaVersion,
     UsageNumber,
@@ -62,7 +63,7 @@ _SEARCH_DIRS = tuple(parent / "contracts" for parent in Path(__file__).resolve()
 
 Text = Annotated[str, StringConstraints(min_length=1, max_length=MAX_TEXT_LENGTH)]
 OptionText = Annotated[str, StringConstraints(min_length=1, max_length=MAX_OPTION_LENGTH)]
-OptionValue = OptionText | int | Annotated[float, Field(allow_inf_nan=False)]
+OptionValue = OptionText | JsNumber
 
 
 class AttributeDefinition(ContractModel):
