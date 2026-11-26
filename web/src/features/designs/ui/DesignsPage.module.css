@@ -106,8 +106,15 @@
   white-space: nowrap;
 }
 
-.table td.open {
+.table td.openCell {
   text-align: end;
+}
+
+.open {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 /* Carregando: o layout final, com cada valor trocado por uma barra plana do tamanho real. */

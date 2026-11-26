@@ -180,4 +180,47 @@ describe('SaveControls', () => {
     await user.click(screen.getByRole('link', { name: 'Meus designs' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/designs'));
   });
+
+  describe('conflito de versão', () => {
+    const conflict = async () => {
+      const api = newApi();
+      load(doc);
+      const user = userEvent.setup();
+      renderWithApp(api, <SaveControls />);
+      await user.click(screen.getByRole('button', { name: 'Salvar' }));
+      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Salvar' }));
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Salvo'));
+      const id = savedDesignStore.getState().saved!.id;
+      await api.designs.update(id, { expectedVersion: 1, name: 'Outro lugar' }); // outra aba
+      act(() => void designStore.getState().setRegion('sa-east-1'));
+      await user.click(screen.getByRole('button', { name: 'Salvar' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Nada foi sobrescrito');
+      return { api, user, id };
+    };
+
+    it('avisa e oferece recarregar ou salvar como cópia, sem sobrescrever', async () => {
+      const { api, id } = await conflict();
+      expect(screen.getByRole('button', { name: /Recarregar versão salva/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Salvar como cópia' })).toBeInTheDocument();
+      expect((await api.designs.get(id)).doc.region).toBe(doc.region);
+    });
+
+    it('salva como cópia: cria outro design e deixa o original intacto', async () => {
+      const { api, user, id } = await conflict();
+      await user.click(screen.getByRole('button', { name: 'Salvar como cópia' }));
+      await waitFor(() => expect(savedDesignStore.getState().saved?.id).not.toBe(id));
+      const list = await api.designs.list();
+      expect(list).toHaveLength(2);
+      expect(list.find((d) => d.id === id)).toMatchObject({ name: 'Outro lugar', version: 2 });
+      expect(list.find((d) => d.id !== id)?.region).toBe('sa-east-1');
+    });
+
+    it('recarrega a versão salva e descarta a edição local', async () => {
+      const { user, id } = await conflict();
+      await user.click(screen.getByRole('button', { name: /Recarregar versão salva/ }));
+      await waitFor(() => expect(savedDesignStore.getState().saved?.version).toBe(2));
+      expect(savedDesignStore.getState().saved).toMatchObject({ id, name: 'Outro lugar' });
+      expect(designStore.getState().document.region).toBe(doc.region);
+    });
+  });
 });

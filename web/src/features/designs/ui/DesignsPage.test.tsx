@@ -149,4 +149,66 @@ describe('DesignsPage', () => {
     expect(screen.queryByRole('table')).toBeNull();
     await expectNoAxeViolations(container);
   });
+
+  describe('gerenciar', () => {
+    it('renomeia a partir da lista', async () => {
+      const api = newApi();
+      await seed(api, 'Loja v1');
+      const user = userEvent.setup();
+      renderWithApp(api, <DesignsPage />);
+      await user.click(await screen.findByRole('button', { name: 'Renomear Loja v1' }));
+      const dialog = screen.getByRole('dialog');
+      const field = within(dialog).getByLabelText('Nome do design');
+      await user.clear(field);
+      await user.type(field, 'Loja v2');
+      await user.click(within(dialog).getByRole('button', { name: 'Renomear' }));
+      expect(await screen.findByRole('button', { name: 'Abrir Loja v2' })).toBeInTheDocument();
+      expect((await api.designs.list())[0]!.name).toBe('Loja v2');
+    });
+
+    it('duplica com outro nome', async () => {
+      const api = newApi();
+      await seed(api, 'Loja v1');
+      const user = userEvent.setup();
+      renderWithApp(api, <DesignsPage />);
+      await user.click(await screen.findByRole('button', { name: 'Duplicar Loja v1' }));
+      await user.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Duplicar' }),
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Abrir Loja v1 (cópia)' }),
+      ).toBeInTheDocument();
+    });
+
+    it('mostra mensagem clara ao duplicar no limite', async () => {
+      const api = newApi(); // limite 2
+      await seed(api, 'A', 'B');
+      const user = userEvent.setup();
+      renderWithApp(api, <DesignsPage />);
+      await user.click(await screen.findByRole('button', { name: 'Duplicar A' }));
+      await user.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Duplicar' }),
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent('limite de 50 designs');
+      expect(await api.designs.list()).toHaveLength(2);
+    });
+
+    it('só apaga depois da confirmação', async () => {
+      const api = newApi();
+      await seed(api, 'Loja v1');
+      const user = userEvent.setup();
+      renderWithApp(api, <DesignsPage />);
+      await user.click(await screen.findByRole('button', { name: 'Apagar Loja v1' }));
+      await user.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar' }),
+      );
+      expect(await api.designs.list()).toHaveLength(1);
+      await user.click(screen.getByRole('button', { name: 'Apagar Loja v1' }));
+      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apagar' }));
+      expect(
+        await screen.findByRole('heading', { name: 'Nenhum design salvo' }),
+      ).toBeInTheDocument();
+      expect(await api.designs.list()).toHaveLength(0);
+    });
+  });
 });
