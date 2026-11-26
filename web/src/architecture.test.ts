@@ -49,6 +49,8 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
   const pureLayers = [
     './features/pricing/application/x.ts',
     './features/pricing/model/x.ts',
+    './features/editor/application/x.ts',
+    './features/editor/model/x.ts',
     designLib,
     apiLib,
     moneyLib,
@@ -88,6 +90,12 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     const code =
       "import { useQuery } from '@tanstack/react-query';\nimport { useMemo } from 'react';\nimport { httpPriceFiles } from '../api/httpPriceFiles';\nimport { catalogServices } from '../application/catalogServices';\nexport const deps = [useQuery, useMemo, httpPriceFiles, catalogServices];\n";
     expect(await errorRules(code, './features/pricing/hooks/x.ts')).toEqual([]);
+  });
+
+  it('permite a editor/hooks montar a store Zustand sobre as ações puras de model/', async () => {
+    const code =
+      "import { createStore } from 'zustand/vanilla';\nimport { useStore } from 'zustand';\nimport * as act from '../model/designActions';\nexport const deps = [createStore, useStore, act];\n";
+    expect(await errorRules(code, './features/editor/hooks/x.ts')).toEqual([]);
   });
 
   it('proíbe outra feature de importar o adaptador de pricing/api direto', async () => {

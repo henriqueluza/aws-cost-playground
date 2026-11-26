@@ -73,7 +73,7 @@ infra/{modules,envs/{staging,production},bootstrap}/
 docs/
 ```
 
-Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `model/`, com `api/` como adapter. `features/pricing/{application,model}` é TypeScript puro: não importa React, React Flow nem `fetch`.
+Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `model/`, com `api/` como adapter. `features/pricing/{application,model}` é TypeScript puro: não importa React, React Flow nem `fetch`. Store Zustand (inclusive `zustand/vanilla`) fica em `hooks/` e só liga as ações puras de `model/`/`application/` ao estado.
 
 ### Teste de arquitetura
 
