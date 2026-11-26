@@ -41,7 +41,7 @@ Em 26/11/2026 o código de `main` ainda não deixa o primeiro deploy passar. Con
 
 | Issue | O que falta | Trava o passo |
 |---|---|---|
-| #167 e #169 | Permissões de escrita dos papéis `acp-ci-apply-<env>`. Hoje eles só leem e gravam o próprio estado (`infra/bootstrap/README.md`, "Papéis `apply`") | 6 |
+| #338 | Decisão do autor sobre as ações de escrita dos papéis `acp-ci-apply-<env>` que não se delimitam por ambiente. Sem ela o deploy deve parar no stage do HTTP API e no domínio do Cognito (`infra/bootstrap/README.md`, "Recursos com ARN por ID") | 6 |
 | #209 | Bucket de artefatos das funções no bootstrap. É a origem de `TF_VAR_PACKAGE_BUCKET` (`infra/README.md`, "Variáveis dos ambientes") | 4 e 6 |
 | #307 (e #210, mesmo assunto) | Runtime das Lambdas: `python3.13` em `infra/modules/functions/main.tf`, contra o pacote montado para Python 3.14 (`api/.python-version`) | 6 |
 | #125 | Papel `prices` do bootstrap (já em `main`; reaplique o bootstrap se ainda não o aplicou) | 8, só para o workflow |
@@ -130,8 +130,11 @@ Antes do bootstrap, de [guardrails de custo](guardrails-de-custo.md) só vale a 
 2. Gere o plano.
 
    ```bash
+   export TF_VAR_zone_name="<DOMINIO>"
    terraform -chdir=infra/bootstrap plan -out=bootstrap.tfplan
    ```
+
+   O bootstrap lê a zona pública do passo 2 para delimitar os registros DNS de cada papel `apply` (`infra/bootstrap/by_id.tf`): o domínio vai em minúsculas e sem ponto final, igual à variável `TF_VAR_ZONE_NAME` do passo 4. Se a conta já tiver o papel `AWSServiceRoleForAPIGateway`, importe-o antes (`infra/bootstrap/README.md`, "Como aplicar").
 
    Como conferir: o plano só cria recursos. Nenhum `delete` e nenhum `replace`. O estado é local (`infra/bootstrap/terraform.tfstate`, fora do git).
 
@@ -305,7 +308,7 @@ O parâmetro `/acp/<env>/anthropic-api-key` é criado à mão, fora do Terraform
 
 O deploy é o workflow `deploy-staging.yml`, disparado por `push` em `main`. O que cada passo dele faz está em `docs/infra.md`. O caminho recomendado é deixar o próprio pipeline fazer o primeiro apply: ele sobe o zip das funções para `functions/<sha>.zip` antes do Terraform. Um zip posto à mão nessa chave, com outro conteúdo, faz o deploy desse commit falhar fechado (`docs/infra.md`, passo `package`).
 
-1. Confira de novo a tabela "O que precisa estar em `main` antes". Com #167, #169, #209 ou #307 aberta, o deploy falha por permissão, por falta do bucket ou sobe uma função que não importa.
+1. Confira de novo a tabela "O que precisa estar em `main` antes". Com #338, #209 ou #307 aberta, o deploy falha por permissão, por falta do bucket ou sobe uma função que não importa.
 
 2. Dispare o deploy. O workflow não tem disparo manual: ele roda no próximo merge em `main`. Para não esperar um merge, reexecute a última execução, que terminou verde só com o aviso de deploy pulado.
 
