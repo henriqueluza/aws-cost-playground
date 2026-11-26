@@ -1,6 +1,7 @@
 import { CLIENT_NODE_ID, type DesignDocument, type EdgeKind } from '../../../shared/lib/design';
 import { toFixed, type Money } from '../../../shared/lib/money';
-import { blockDefinition, edgeKindsFor, type BlockCategory } from '../../pricing';
+import { blockDefinition, type BlockCategory } from '../../pricing';
+import { allowedKinds, endpointType, inferKind } from './edgeKinds';
 import type { Layout, Selection } from './editorState';
 
 /** As cinco categorias do desenho (DESIGN.md, "Categorias dos blocos"). */
@@ -66,6 +67,7 @@ export type CanvasNode = {
 };
 export type CanvasEdge = {
   readonly id: string;
+  readonly type: 'typed';
   readonly source: string;
   readonly target: string;
   readonly selected: boolean;
@@ -199,6 +201,7 @@ export function toCanvasEdges(doc: DesignDocument, selection: Selection): Canvas
     id === CLIENT_NODE_ID ? 'Internet' : serviceName(typeOf.get(id) ?? '');
   return doc.edges.map((edge) => ({
     id: edge.id,
+    type: 'typed',
     source: edge.source,
     target: edge.target,
     selected: selection?.kind === 'edge' && selection.id === edge.id,
@@ -214,16 +217,15 @@ export type ConnectionCheck =
   | { readonly ok: false; readonly reason: ConnectionRefusal; readonly message: string };
 
 /**
- * Julga uma conexão `source → target` pelo contrato (`edgeKindsFor`) e pelo design. O tipo da
- * aresta é o primeiro que o contrato aceita para o par; a escolha entre tipos é da #46.
+ * Julga uma conexão `source → target` pelo contrato e pelo design. O tipo da aresta é o inferido
+ * (`inferKind`: o mais específico que o contrato aceita para o par); depois dá para trocá-lo.
  */
 export function checkConnection(
   doc: DesignDocument,
   sourceId: string,
   targetId: string,
 ): ConnectionCheck {
-  const typeOf = (id: string) =>
-    id === CLIENT_NODE_ID ? CLIENT_NODE_ID : doc.blocks.find((b) => b.id === id)?.type;
+  const typeOf = (id: string) => endpointType(doc, id);
   const sourceType = sourceId === CLIENT_NODE_ID ? undefined : typeOf(sourceId);
   const targetType = typeOf(targetId);
   const refuse = (reason: ConnectionRefusal, message: string): ConnectionCheck => ({
@@ -235,10 +237,10 @@ export function checkConnection(
     return refuse('unknown', 'Essa conexão não pode partir da internet nem de um bloco ausente.');
   }
   if (sourceId === targetId) return refuse('same-node', 'Um bloco não se conecta a ele mesmo.');
-  const kinds = edgeKindsFor(sourceType, targetType);
+  const kinds = allowedKinds(sourceType, targetType);
   const from = serviceName(sourceType);
   const to = targetId === CLIENT_NODE_ID ? 'a internet' : serviceName(targetType);
-  const kind = kinds[0];
+  const kind = inferKind(kinds);
   if (kind === undefined) {
     return refuse(
       'not-allowed',

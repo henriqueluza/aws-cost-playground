@@ -15,6 +15,7 @@ from app.design_document import (
     EdgeId,
     EdgeKind,
     Region,
+    UsageSource,
     UsageValues,
 )
 from app.quotas.schemas import QuotaOut
@@ -41,13 +42,17 @@ class EstimateIn(ContractModel):
 
 
 class EstimateBlockOut(ContractModel):
+    """`source` é calculado na API (`llm` ou `default`); nunca é texto vindo da LLM."""
+
     id: BlockId
     values: UsageValues
+    source: UsageSource
 
 
 class EstimateEdgeOut(ContractModel):
     id: EdgeId
     values: UsageValues
+    source: UsageSource
 
 
 class EstimateOut(ContractModel):

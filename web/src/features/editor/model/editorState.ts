@@ -27,6 +27,7 @@ export type ActionErrorCode =
   | 'unknown-edge'
   | 'self-loop'
   | 'client-edge-kind'
+  | 'kind-not-allowed'
   | 'limit-exceeded'
   | 'invalid-position'
   | 'invalid-document';

@@ -2,8 +2,10 @@ import type { BlockType } from '../../../pricing';
 import type { BlockGenerator } from '../generator';
 import { dynamodb } from './dynamodb';
 import { ec2 } from './ec2';
+import { elasticache } from './elasticache';
 import { lambda } from './lambda';
 import { notSupportedYet } from './provisional';
+import { rds } from './rds';
 import { sqs } from './sqs';
 
 /**
@@ -16,8 +18,8 @@ export const BLOCK_GENERATORS: Readonly<Record<BlockType, BlockGenerator>> = {
   'aws.sqs': sqs,
   'aws.dynamodb': dynamodb,
   'aws.ec2': ec2,
-  'aws.rds': notSupportedYet,
-  'aws.elasticache': notSupportedYet,
+  'aws.rds': rds,
+  'aws.elasticache': elasticache,
   'aws.cloudfront': notSupportedYet,
   'aws.alb': notSupportedYet,
   'aws.cloudwatch': notSupportedYet,
