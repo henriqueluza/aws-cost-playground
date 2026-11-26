@@ -68,9 +68,55 @@ describe('ExportPanel', () => {
     current.document = { schemaVersion: 99 };
     render(<ExportPanel />);
     await clickExport();
-    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível exportar');
+    expect(screen.getByRole('alert')).toHaveTextContent('Este design tem erros');
     expect(URL.createObjectURL).not.toHaveBeenCalled();
     expect(downloads).toEqual([]);
+  });
+
+  it('o erro some depois de um export que deu certo', async () => {
+    current.document = { schemaVersion: 99 };
+    const { rerender } = render(<ExportPanel />);
+    await clickExport();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    current.document = adrExampleDesign;
+    rerender(<ExportPanel />);
+    await clickExport();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(downloads).toEqual(['main.tf']);
+  });
+
+  it('falha do navegador ao baixar mostra erro, revoga a URL e não deixa link no DOM', async () => {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
+      throw new Error('bloqueado');
+    });
+    render(<ExportPanel />);
+    await clickExport();
+    expect(screen.getByRole('alert')).toHaveTextContent('O navegador não baixou o arquivo');
+    expect(revoked).toEqual(['blob:test/1']);
+    expect(document.querySelector('a')).toBeNull();
+  });
+
+  it('o arquivo sai em UTF-8, byte a byte igual ao do exportDesign, e a URL não leva o rótulo', async () => {
+    const label = 'Ação 🚀 日本';
+    current.document = {
+      ...adrExampleDesign,
+      blocks: adrExampleDesign.blocks.map((b) => ({ ...b, label })),
+    };
+    const hrefs: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      hrefs.push(this.href);
+    });
+    render(<ExportPanel />);
+    await clickExport();
+    const expected = exportDesign(current.document);
+    if (!expected.ok) throw new Error('fixture inválida');
+    const bytes = new Uint8Array((await created[0]?.arrayBuffer()) ?? new ArrayBuffer(0));
+    expect(Array.from(bytes)).toEqual(
+      Array.from(new TextEncoder().encode(expected.files[0]?.content)),
+    );
+    expect(hrefs).toEqual(['blob:test/1']);
   });
 
   it('mostra sempre o aviso de ponto de partida e de estimativa', () => {
