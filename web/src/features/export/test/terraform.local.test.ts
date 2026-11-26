@@ -56,7 +56,9 @@ describe.skipIf(!enabled)('conferência com o binário terraform', { timeout: 12
         .map((item) => Buffer.from(item, 'base64').toString('utf8'));
       // Surrogate solto não existe em UTF-8: o gerador o troca por U+FFFD, como o TextEncoder.
       expect(decoded).toEqual(
-        payloads.map((p) => new TextDecoder().decode(new TextEncoder().encode(p))),
+        payloads.map((p) =>
+          new TextDecoder('utf-8', { ignoreBOM: true }).decode(new TextEncoder().encode(p)),
+        ),
       );
       expect(ask('length(local.keys)')).toBe(String(new Set(payloads).size));
     } finally {

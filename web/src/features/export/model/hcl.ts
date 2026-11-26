@@ -88,7 +88,10 @@ export function quoteHclString(value: string): string {
   return `"${escaped}"`;
 }
 
-/** Número em notação decimal, sem expoente: inteiro seguro como está, fração com até 6 casas. */
+/**
+ * Número em notação decimal, sem expoente: inteiro seguro como está, fração arredondada a 6 casas
+ * (o que for menor que isso sai `0`). Serve para quantidade e capacidade; o export não escreve preço.
+ */
 export function formatHclNumber(value: number): string {
   if (!Number.isFinite(value)) throw new HclError('Número não finito.');
   if (Number.isSafeInteger(value)) return String(value === 0 ? 0 : value);
@@ -116,7 +119,11 @@ function renderRef(path: readonly (string | number)[]): string {
   }, identifier(head));
 }
 
-const isMultiline = (value: HclValue) => value.kind === 'map' && value.entries.length > 0;
+/** Valor que ocupa mais de uma linha: objeto com entradas, ou lista que contém um. */
+const isMultiline = (value: HclValue): boolean =>
+  value.kind === 'map'
+    ? value.entries.length > 0
+    : value.kind === 'list' && value.items.some(isMultiline);
 
 function renderValue(value: HclValue, indent: string): string {
   switch (value.kind) {
@@ -151,16 +158,19 @@ function renderAssignments(
   const lines: string[] = [];
   let group: (readonly [string, HclValue])[] = [];
   const flush = () => {
-    const width = Math.max(0, ...group.map(([name]) => name.length));
-    for (const [name, value] of group) {
-      lines.push(`${indent}${name.padEnd(width)} = ${renderValue(value, indent)}`);
-    }
+    // Largura em pontos de código, não em unidades UTF-16: uma chave com emoji conta um por símbolo.
+    const widths = group.map(([name]) => [...name].length);
+    const width = Math.max(0, ...widths);
+    group.forEach(([name, value], i) => {
+      const padding = ' '.repeat(width - (widths[i] ?? 0));
+      lines.push(`${indent}${name}${padding} = ${renderValue(value, indent)}`);
+    });
     group = [];
   };
   for (const pair of pairs) {
     if (isMultiline(pair[1])) {
       flush();
-      if (lines.length > 0) lines.push('');
+      if (lines.length > 0 && lines.at(-1) !== '') lines.push('');
       lines.push(`${indent}${pair[0]} = ${renderValue(pair[1], indent)}`, '');
     } else {
       group.push(pair);
