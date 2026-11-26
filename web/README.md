@@ -72,7 +72,11 @@ Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de 
 - Todo erro sai como `ApiError`, só com `kind` e mensagem fixa (sem `cause`, sem texto do servidor).
 - O token vem de `getAccessToken`, chamado a cada requisição, e não é guardado nem logado; vai só para a origem de `baseUrl`.
 - O tempo limite é de 30 s e a resposta tem teto de 512 KiB. Mapa de status para `kind` e decisões em `docs/handoff/51.md`.
-- O adaptador `createHttpApi` (#184) e o provider `ApiProvider`/`useApi` (#185) vêm à parte e implementam as interfaces de `lib/api/`; até lá, nada consome o transporte.
+- `createHttpApi(transport): Api` (`lib/http/httpApi.ts`, #184, parte 2 da #51) implementa as interfaces de `lib/api/` sobre o transporte. O provider `ApiProvider`/`useApi` e a ligação no bootstrap ficam para a #185; até lá nenhuma tela o consome.
+- Rotas, iguais às do backend (`api/app/*/router.py`, #201): `designs.list` `GET /designs`; `get` `GET /designs/{id}`; `create` `POST /designs` (409 = `design-limit`); `update` `PATCH /designs/{id}` (409 = `version-conflict`); `duplicate` `POST /designs/{id}/duplicate` (409 = `design-limit`); `remove` `DELETE /designs/{id}`; `estimates.estimateUsage` `POST /estimates`; `quota.get` `GET /quota`; `account.deleteAccount` `DELETE /me`.
+- A entrada é validada com os schemas de `lib/api/ports.ts` antes de sair: inválida dá `invalid-request` sem chamada de rede, só os campos do contrato vão no corpo e nenhuma identidade é enviada. Id que não passa em `designIdSchema` não vira requisição: `get`, `update` e `duplicate` dão `not-found`; `remove` resolve.
+- A listagem aceita no máximo `MAX_DESIGNS` (50, ADR-0001).
+- A suíte de paridade em `httpApi.test.ts` roda os mesmos casos contra `createInMemoryApi` e `createHttpApi` (servidor MSW).
 
 ## Tokens e estilo base
 
