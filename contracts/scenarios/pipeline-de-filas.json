@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "region": "us-east-1",
+  "workload": {
+    "description": "Pipeline assíncrono de processamento em filas: 1 milhão de arquivos por mês chegam a um bucket S3 de 200 GB, uma função Lambda (x86_64, 1024 MB, 800 ms) divide cada arquivo em mensagens numa fila SQS standard com 150 milhões de requisições, um worker Lambda (arm64, 512 MB, 400 ms) consome em 5 milhões de lotes, grava numa tabela DynamoDB provisionada (20 RCU, 50 WCU, 100 GB), arquiva 1.000 GB em S3 Standard-IA e avisa por uma fila FIFO com 5 milhões de requisições."
+  },
+  "blocks": [
+    {
+      "id": "blk_landing", "type": "aws.s3", "label": "Bucket de entrada",
+      "attributes": {"storageClass": "STANDARD"},
+      "usage": {"source": "default", "values": {"storageGb": 200, "putRequestsPerMonth": 1000000, "getRequestsPerMonth": 1000000}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_splitter", "type": "aws.lambda", "label": "Divisor de arquivos",
+      "attributes": {"architecture": "x86_64", "memoryMb": 1024},
+      "usage": {"source": "default", "values": {"requestsPerMonth": 1000000, "avgDurationMs": 800}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_queue", "type": "aws.sqs", "label": "Fila de trabalho",
+      "attributes": {"queueType": "standard"},
+      "usage": {"source": "default", "values": {"requestsPerMonth": 150000000}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_worker", "type": "aws.lambda", "label": "Worker",
+      "attributes": {"architecture": "arm64", "memoryMb": 512},
+      "usage": {"source": "default", "values": {"requestsPerMonth": 5000000, "avgDurationMs": 400}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_results", "type": "aws.dynamodb", "label": "Resultados",
+      "attributes": {"capacityMode": "provisioned"},
+      "usage": {"source": "default", "values": {"readRequestsPerMonth": 0, "writeRequestsPerMonth": 0, "storageGb": 100, "provisionedReadUnits": 20, "provisionedWriteUnits": 50}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_archive", "type": "aws.s3", "label": "Arquivo morto",
+      "attributes": {"storageClass": "STANDARD_IA"},
+      "usage": {"source": "default", "values": {"storageGb": 1000, "putRequestsPerMonth": 500000, "getRequestsPerMonth": 0}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_notify", "type": "aws.sqs", "label": "Fila de avisos",
+      "attributes": {"queueType": "fifo"},
+      "usage": {"source": "default", "values": {"requestsPerMonth": 5000000}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_logs", "type": "aws.cloudwatch", "label": "Logs e métricas",
+      "attributes": {},
+      "usage": {"source": "default", "values": {"logsIngestedGbPerMonth": 0, "logsStoredGb": 6, "customMetrics": 20, "alarms": 15}},
+      "overrides": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edg_landing_splitter", "source": "blk_landing", "target": "blk_splitter", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 100}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_splitter_queue", "source": "blk_splitter", "target": "blk_queue", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 60}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_queue_worker", "source": "blk_queue", "target": "blk_worker", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 60}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_worker_results", "source": "blk_worker", "target": "blk_results", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 40}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_worker_archive", "source": "blk_worker", "target": "blk_archive", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 50}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_worker_notify", "source": "blk_worker", "target": "blk_notify", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 2}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_splitter_logs", "source": "blk_splitter", "target": "blk_logs", "kind": "logs",
+      "usage": {"source": "default", "values": {"gbPerMonth": 5}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_worker_logs", "source": "blk_worker", "target": "blk_logs", "kind": "logs",
+      "usage": {"source": "default", "values": {"gbPerMonth": 35}},
+      "overrides": {}
+    }
+  ],
+  "scenarios": []
+}
