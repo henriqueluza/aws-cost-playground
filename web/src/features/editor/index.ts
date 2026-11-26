@@ -1,5 +1,6 @@
 export { EditorPage } from './ui/EditorPage';
 export { keepDesignForLogin } from './hooks/designDraftSync';
+export { discardDesignDraft } from './model/designDraft';
 export { useDesignStore } from './hooks/useDesignStore';
 export { designStore } from './hooks/designStore';
 export { EMPTY_STATE } from './model/editorState';

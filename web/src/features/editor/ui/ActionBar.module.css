@@ -1,0 +1,28 @@
+/* Barra de ações da moldura (DESIGN.md, "A casca do editor"). O contêiner é o `.actions` do
+   EditorPage; aqui, a região e o diálogo de "Novo design". Só tokens. */
+/* Na barra de 48px o rótulo da região vai ao lado do controle, não acima (o rótulo segue visível). */
+.region > div {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.region label {
+  margin: 0;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dialogText {
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}

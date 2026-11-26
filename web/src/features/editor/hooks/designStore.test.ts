@@ -169,3 +169,49 @@ describe('designStore: cascata e substituição', () => {
     expect(() => designDocumentSchema.parse(s.getState().document)).not.toThrow();
   });
 });
+
+describe('designStore: template, alteração não salva e região', () => {
+  it('a store do app abre no template inicial, limpa', async () => {
+    const { designStore } = await import('./designStore');
+    const { document, baseline, layout: positions } = designStore.getState();
+    expect(document.blocks).toHaveLength(20);
+    expect(baseline).toBe(document);
+    expect(Object.keys(positions)).toHaveLength(21);
+  });
+
+  it('começa limpa e suja ao editar; newDesign volta ao template limpo', () => {
+    const s = setup();
+    expect(s.getState().baseline).toBe(doc);
+    s.getState().addBlock(newBlock, { x: 0, y: 0 });
+    expect(s.getState().baseline).toBe(doc);
+    expect(s.getState().document).not.toBe(doc);
+    s.getState().newDesign();
+    const { document, baseline, layout: positions, selection } = s.getState();
+    expect(document.blocks).toHaveLength(20);
+    expect(baseline).toBe(document);
+    expect(Object.keys(positions)).toContain('client');
+    expect(selection).toBeNull();
+  });
+
+  it('loadDesign e replaceDocument definem o novo ponto limpo; a ação recusada não', () => {
+    const s = setup();
+    expect(s.getState().loadDesign({ ...doc, region: 'sa-east-1' })).toEqual({
+      ok: true,
+      value: undefined,
+    });
+    expect(s.getState().baseline.region).toBe('sa-east-1');
+    expect(s.getState().loadDesign({ lixo: true }).ok).toBe(false);
+    expect(s.getState().baseline.region).toBe('sa-east-1');
+    s.getState().replaceDocument(doc);
+    expect(s.getState().baseline).toEqual(doc);
+  });
+
+  it('setRegion troca só a região do design', () => {
+    const s = setup();
+    expect(s.getState().setRegion('sa-east-1').ok).toBe(true);
+    expect(s.getState().document).toEqual({ ...doc, region: 'sa-east-1' });
+    expect(s.getState().layout).toBe(layout);
+    expect(s.getState().setRegion('eu-west-1' as never).ok).toBe(false);
+    expect(s.getState().document.region).toBe('sa-east-1');
+  });
+});

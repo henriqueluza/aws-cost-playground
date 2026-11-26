@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
+import { ExportPanel } from '../../export';
 import { PricingPanel, usePriceCatalog } from '../../pricing';
 import { WorkloadPanel } from '../../workload';
 import { useHistoryShortcuts } from '../hooks/historyShortcuts';
@@ -47,6 +48,7 @@ export function EditorPage({ actions }: { actions?: ReactNode } = {}) {
     },
     { id: 'block', label: 'Bloco', panel: <InspectorPanel /> },
     { id: 'load', label: 'Carga', panel: <WorkloadPanel /> },
+    { id: 'export', label: 'Exportar', panel: <ExportPanel /> },
   ];
 
   if (!wide) {

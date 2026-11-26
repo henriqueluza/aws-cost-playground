@@ -11,8 +11,12 @@ export type HclValue =
   | { readonly kind: 'bool'; readonly value: boolean }
   | { readonly kind: 'list'; readonly items: readonly HclValue[] }
   | { readonly kind: 'map'; readonly entries: readonly (readonly [string, HclValue])[] }
-  | { readonly kind: 'ref'; readonly path: readonly (string | number)[] }
+  | { readonly kind: 'ref'; readonly path: readonly HclRefPart[] }
   | { readonly kind: 'call'; readonly name: HclFunction; readonly args: readonly HclValue[] };
+
+/** Índice `[count.index]` de uma referência: a instância da vez num recurso com `count`. */
+export const COUNT_INDEX = { kind: 'count-index' } as const;
+export type HclRefPart = string | number | typeof COUNT_INDEX;
 
 /** Funções do Terraform que o construtor sabe chamar. Lista fechada: nome de função nunca vem de dado. */
 export const HCL_FUNCTIONS = ['format'] as const;
@@ -45,7 +49,8 @@ export const hcl = {
     entries: Object.entries(entries),
   }),
   /** Referência `a.b[0].c` ou palavra-chave de tipo (`string`). Cada parte é identificador ou índice. */
-  ref: (...path: (string | number)[]): HclValue => ({ kind: 'ref', path }),
+  ref: (...path: HclRefPart[]): HclValue => ({ kind: 'ref', path }),
+  countIndex: COUNT_INDEX,
   /** Chamada `nome(arg, ...)` de uma função de `HCL_FUNCTIONS`; cada argumento é um valor do construtor. */
   call: (name: HclFunction, args: readonly HclValue[]): HclValue => ({ kind: 'call', name, args }),
   attr: (name: string, value: HclValue): HclNode => ({ kind: 'attribute', name, value }),
@@ -116,11 +121,15 @@ export function commentText(text: string): string {
     .trimEnd();
 }
 
-function renderRef(path: readonly (string | number)[]): string {
+function renderRef(path: readonly HclRefPart[]): string {
   const [head, ...rest] = path;
   if (typeof head !== 'string') throw new HclError('Referência sem identificador inicial.');
   return rest.reduce<string>((text, part) => {
     if (typeof part === 'string') return `${text}.${identifier(part)}`;
+    if (typeof part === 'object') {
+      if (part?.kind !== COUNT_INDEX.kind) throw new HclError('Índice inválido.');
+      return `${text}[count.index]`;
+    }
     if (!Number.isSafeInteger(part) || part < 0) throw new HclError('Índice inválido.');
     return `${text}[${part}]`;
   }, identifier(head));
