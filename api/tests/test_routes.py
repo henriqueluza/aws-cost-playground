@@ -94,6 +94,8 @@ ROUTES = [
 IDS = [f"{m} {p}" for m, p, *_ in ROUTES]
 PROBLEM = "application/problem+json"
 NOT_IMPLEMENTED = {"type": "about:blank", "title": "Not Implemented", "status": 501}
+TESTED_ELSEWHERE = {("DELETE", "/me"), ("GET", "/quota")}
+"""Rotas que já saíram do 501 e dependem de mocks próprios; testadas no arquivo do módulo."""
 
 
 def test_conjunto_exato_de_rotas_e_status_de_sucesso(app: FastAPI) -> None:
@@ -129,8 +131,8 @@ def test_ordem_401_422_501(app, method, path, valid, invalid, _ok) -> None:  # t
             status, headers, problem = invoke(app, event(method, path, raw=raw))
             assert (status, headers["content-type"]) == (422, PROBLEM)
             assert all(set(error) == {"loc", "msg"} for error in problem["errors"])
-    if (method, path) == ("GET", "/quota"):
-        return  # implementada: `tests/test_quotas.py`
+    if (method, path) in TESTED_ELSEWHERE:
+        return
     status, headers, problem = invoke(app, event(method, path, valid))
     if (method, path) in IMPLEMENTED:
         assert status == IMPLEMENTED[(method, path)]

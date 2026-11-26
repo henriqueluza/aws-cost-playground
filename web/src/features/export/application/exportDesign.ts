@@ -126,6 +126,7 @@ function exportWith(
       block,
       links: model.links.get(block.id) ?? [],
       blocks: model.blocks,
+      designLinks: model.links,
       region: design.region,
     });
     const title = `${block.type} "${block.label}"`;

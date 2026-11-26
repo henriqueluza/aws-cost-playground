@@ -23,7 +23,6 @@ describe('registro dos geradores', () => {
         'aws.codepipeline',
         'aws.cognito',
         'aws.dynamodb',
-        'aws.ec2',
         'aws.ecs',
         'aws.elasticache',
         'aws.iam',
