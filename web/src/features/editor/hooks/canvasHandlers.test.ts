@@ -135,3 +135,44 @@ describe('conectar pela store', () => {
     expect(refusalMessage(document, { source: 'blk_fn_api', target: 'blk_assets' })).toBeNull();
   });
 });
+
+describe('anúncios (say)', () => {
+  const current = { kind: 'block', id: 'blk_a' } as const;
+  it('remoção aceita diz "Bloco removido" por último; recusada não diz nada', () => {
+    const say = vi.fn();
+    const a = { ...actions(), removeBlock: vi.fn(() => ({ ok: true as const, value: undefined })) };
+    applyNodeChanges(
+      [
+        { type: 'remove', id: 'blk_a' },
+        { type: 'select', id: 'blk_a', selected: false },
+      ],
+      a,
+      current,
+      'client',
+      say,
+    );
+    expect(say.mock.calls.map(([m]) => m)).toEqual(['Seleção limpa', 'Bloco removido']);
+    const refused = vi.fn();
+    const b = {
+      ...actions(),
+      removeBlock: vi.fn(() => ({ ok: false as const, error: { code: 'unknown-block' as const } })),
+    };
+    applyNodeChanges([{ type: 'remove', id: 'blk_a' }], b, null, 'client', refused);
+    expect(refused).not.toHaveBeenCalled();
+  });
+
+  it('remover aresta diz "Conexão removida"; limpar a seleção diz "Seleção limpa"', () => {
+    const say = vi.fn();
+    applyEdgeChanges([{ type: 'remove', id: 'edg_1' }], actions(), null, say);
+    expect(say).toHaveBeenCalledExactlyOnceWith('Conexão removida');
+    const clear = vi.fn();
+    applyNodeChanges(
+      [{ type: 'select', id: 'blk_a', selected: false }],
+      actions(),
+      current,
+      'client',
+      clear,
+    );
+    expect(clear).toHaveBeenCalledExactlyOnceWith('Seleção limpa');
+  });
+});
