@@ -132,6 +132,17 @@ describe('checkConnection', () => {
     expect(checkConnection(d, 'blk_cdn', 'client')).toEqual({ ok: true, kind: 'data' });
   });
 
+  it('ECS para EC2 infere runs-on (o par também aceita data)', () => {
+    const host = [
+      { ...doc.blocks[0]!, id: 'blk_ecs', type: 'aws.ecs', attributes: {} },
+      { ...doc.blocks[0]!, id: 'blk_ec2', type: 'aws.ec2', attributes: {} },
+    ];
+    expect(checkConnection({ ...d, blocks: host }, 'blk_ecs', 'blk_ec2')).toEqual({
+      ok: true,
+      kind: 'runs-on',
+    });
+  });
+
   it.each([
     ['blk_c', 'blk_a', 'not-allowed', 'IAM não se conecta com Lambda'],
     ['blk_a', 'client', 'not-allowed', 'Lambda não se conecta com a internet'],
@@ -168,5 +179,19 @@ describe('selectionMessage', () => {
     );
     expect(selectionMessage(d, null)).toBeNull();
     expect(selectionMessage(d, { kind: 'block', id: 'nada' })).toBeNull();
+  });
+});
+
+describe('toCanvasEdges: tipo da aresta', () => {
+  it('cada aresta usa o componente tipado e leva o tipo do design no dado e no nome acessível', () => {
+    const edges = (['data', 'runs-on', 'logs'] as const).map((kind, i) => ({
+      ...doc.edges[0]!,
+      id: `edg_k${i}`,
+      kind,
+    }));
+    const out = toCanvasEdges({ ...doc, edges }, null);
+    expect(out.map((e) => e.type)).toEqual(['typed', 'typed', 'typed']);
+    expect(out.map((e) => e.data.kind)).toEqual(['data', 'runs-on', 'logs']);
+    expect(out.map((e) => e.ariaLabel.split(':')[0])).toEqual(['Dados', 'Executa em', 'Logs']);
   });
 });

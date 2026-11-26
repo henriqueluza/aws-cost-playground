@@ -249,3 +249,82 @@
   border-radius: calc(var(--radius-sheet) - var(--space-2));
   pointer-events: none;
 }
+
+/* Tipos de aresta (DESIGN.md, "Arestas"): o traçado diz o tipo, a cor não. */
+.canvas,
+.legend {
+  --dash-runs-on: 6 4;
+  --dash-logs: 1.5 4;
+}
+.strokeData {
+  stroke-dasharray: none;
+}
+.strokeRunsOn {
+  stroke-dasharray: var(--dash-runs-on);
+}
+.strokeLogs {
+  stroke-dasharray: var(--dash-logs);
+  stroke-linecap: round;
+}
+
+/* Etiqueta no meio do traço: ícone do tipo; selecionada, também o nome. Fica sobre a aresta. */
+.edgeTag {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-1);
+  background-color: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-chip);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.edgeTag[data-selected] {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.legend {
+  margin: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-card);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+.legendList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.legendItem strong {
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+}
+.legendSample {
+  flex: none;
+  width: 32px;
+  height: 8px;
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 1.5;
+}
+
+/* A legenda fica acima da atribuição do React Flow, no canto inferior esquerdo. */
+.legendPanel {
+  margin-bottom: var(--space-6);
+}

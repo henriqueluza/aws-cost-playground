@@ -17,6 +17,7 @@ import {
   removeBlock,
   removeEdge,
   setOverride,
+  setEdgeKind,
   setRegion,
   setUsage,
 } from './designActions';
@@ -229,5 +230,65 @@ describe('imutabilidade', () => {
     ];
     run.forEach((action) => expect(action).not.toThrow());
     expect(frozen).toEqual(before);
+  });
+});
+
+describe('setEdgeKind', () => {
+  const ecs = { ...s3, id: 'blk_ecs', type: 'aws.ecs', attributes: {} };
+  const ec2 = { ...s3, id: 'blk_ec2', type: 'aws.ec2', attributes: {} };
+  const hosted: DesignDocument = {
+    ...doc,
+    blocks: [...doc.blocks, ecs, ec2],
+    edges: [
+      ...doc.edges,
+      {
+        ...edge1,
+        id: 'edg_host',
+        source: 'blk_ecs',
+        target: 'blk_ec2',
+        kind: 'runs-on',
+        usage: { source: 'default', values: {} },
+      },
+    ],
+  };
+  const kindOf = (r: Result<DesignDocument>, id: string) =>
+    r.ok ? r.value.edges.find((e) => e.id === id) : undefined;
+
+  it('troca para um tipo que o contrato permite para o par', () => {
+    const edge = kindOf(setEdgeKind(hosted, 'edg_host', 'data'), 'edg_host');
+    expect(edge?.kind).toBe('data');
+  });
+
+  it('para um tipo sem gbPerMonth, descarta o uso e o override da aresta', () => {
+    const withUsage = {
+      ...hosted,
+      edges: hosted.edges.map((e) =>
+        e.id === 'edg_host'
+          ? {
+              ...e,
+              kind: 'data' as const,
+              usage: { source: 'llm' as const, values: { gbPerMonth: 9 } },
+              overrides: { gbPerMonth: 3 },
+            }
+          : e,
+      ),
+    };
+    const edge = kindOf(setEdgeKind(withUsage, 'edg_host', 'runs-on'), 'edg_host');
+    expect(edge).toMatchObject({ kind: 'runs-on', usage: { values: {} }, overrides: {} });
+  });
+
+  it('recusa tipo que o contrato não permite para o par, e aresta inexistente', () => {
+    expect(setEdgeKind(doc, 'edg_1', 'runs-on')).toEqual({
+      ok: false,
+      error: { code: 'kind-not-allowed' },
+    });
+    expect(setEdgeKind(doc, 'edg_1', 'logs')).toEqual({
+      ok: false,
+      error: { code: 'kind-not-allowed' },
+    });
+    expect(setEdgeKind(doc, 'nada', 'data')).toEqual({
+      ok: false,
+      error: { code: 'unknown-edge' },
+    });
   });
 });

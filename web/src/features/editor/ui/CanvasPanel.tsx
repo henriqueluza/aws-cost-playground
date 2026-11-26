@@ -42,11 +42,14 @@ import { dropBlock, isBlockDrag } from '../model/palette';
 import { BlockNode, ClientNode, type BlockFlowNode, type ClientFlowNode } from './BlockNode';
 import styles from './CanvasPanel.module.css';
 import { Icon } from './CategoryIcon';
+import { EdgeLegend } from './EdgeLegend';
 import { FLOW_ARIA_LABELS } from './flowA11y';
+import { TypedEdge } from './TypedEdge';
 
 type AppNode = BlockFlowNode | ClientFlowNode;
 
 const NODE_TYPES = { block: BlockNode, client: ClientNode };
+const EDGE_TYPES = { typed: TypedEdge };
 /** `minZoom` do ajuste: abaixo de ~0,7 o texto de 12 px passa a ~8 px e some; sobra o pan. */
 const FIT_OPTIONS = { padding: 0.2, minZoom: 0.7, maxZoom: 1 };
 const GRID: [number, number] = [8, 8];
@@ -165,6 +168,7 @@ function Canvas(): ReactElement {
         nodes={nodes}
         edges={edges}
         nodeTypes={NODE_TYPES}
+        edgeTypes={EDGE_TYPES}
         onNodesChange={onNodesChange as never}
         onEdgesChange={onEdgesChange as never}
         onNodeDragStart={() => designStore.getState().beginGesture()}
@@ -193,6 +197,11 @@ function Canvas(): ReactElement {
         aria-label="Diagrama da arquitetura"
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
+        {document.blocks.length > 0 && (
+          <Panel position="bottom-left" className={styles.legendPanel}>
+            <EdgeLegend />
+          </Panel>
+        )}
         <Panel
           position="top-right"
           className={styles.tools}
