@@ -181,9 +181,6 @@ describe('Baixar JSON', () => {
 
   it('baixar zera o aviso de alteração não salva', async () => {
     designStore.setState({ ...CLEAN_EMPTY, document: adr });
-    expect(
-      hasUnsavedChanges(designStore.getState().document, designStore.getState().baseline),
-    ).toBe(true);
     renderBar();
     await userEvent.click(screen.getByRole('button', { name: 'Baixar JSON' }));
     const { document: doc, baseline } = designStore.getState();

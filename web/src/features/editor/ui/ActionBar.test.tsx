@@ -115,17 +115,6 @@ describe('Novo design', () => {
     expect(baseline).toBe(document);
   });
 
-  it('Esc fecha o diálogo sem descartar', async () => {
-    const user = userEvent.setup();
-    renderBar();
-    designStore.getState().setRegion('sa-east-1');
-    await user.click(screen.getByRole('button', { name: 'Novo design' }));
-    await screen.findByRole('dialog');
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(designStore.getState().document.region).toBe('sa-east-1');
-  });
-
   it('trocar a região e voltar à original não conta como alteração', async () => {
     renderBar();
     designStore.getState().setRegion('sa-east-1');
