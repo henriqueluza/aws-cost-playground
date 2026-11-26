@@ -198,6 +198,34 @@ describe('histórico: agrupamento, seleção e substituição', () => {
   });
 });
 
+describe('troca do design inteiro (replacements)', () => {
+  it('sobe ao abrir, trocar e ao desfazer/refazer uma troca; os outros passos não mexem', () => {
+    const s = setup();
+    const count = () => s.getState().replacements;
+    expect(count()).toBe(0);
+    s.getState().addBlock(newBlock, { x: 1, y: 1 });
+    s.getState().moveBlock('blk_assets', { x: 9, y: 9 });
+    expect(count()).toBe(0);
+    s.getState().newDesign();
+    expect(count()).toBe(1);
+    s.getState().loadDesign(doc);
+    s.getState().replaceDocument(doc);
+    expect(count()).toBe(3);
+    s.getState().undo(); // desfaz replaceDocument
+    s.getState().redo();
+    expect(count()).toBe(5);
+    s.getState().loadDesign({ schemaVersion: 9 }); // recusado: nada muda
+    expect(count()).toBe(5);
+    s.getState().undo();
+    s.getState().undo();
+    s.getState().undo(); // desfaz newDesign: três trocas desfeitas no total
+    expect(count()).toBe(8);
+    s.getState().undo(); // add-block e move-block: não contam
+    s.getState().undo();
+    expect(count()).toBe(8);
+  });
+});
+
 describe('descrição da carga e estimativa', () => {
   it('digitar em sequência é um passo só; depois da pausa, outro', () => {
     let now = 0;

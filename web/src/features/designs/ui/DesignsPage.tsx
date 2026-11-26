@@ -1,13 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { isApiError, type DesignSummary } from '../../../shared/lib/api';
-import { useDesignStore } from '../../editor';
+import { hasUnsavedChanges, useDesignStore } from '../../editor';
 import { Button, Dialog, EmptyState, Notice } from '../../../shared/ui';
-import { useSavedDesign } from '../hooks/savedDesignStore';
 import { useDesignsList, useOpenDesign } from '../hooks/useDesigns';
 import { DESIGN_LIMIT, designErrorMessage, isRetryable } from '../model/designMessages';
 import { blockCountLabel, formatUpdatedAt } from '../model/format';
-import { hasUnsavedChanges } from '../model/saveState';
 import styles from './DesignsPage.module.css';
 
 const SKELETON_ROWS = 4;
@@ -87,16 +85,14 @@ export function DesignsPage({ signInAction }: { signInAction?: ReactNode }) {
   const navigate = useNavigate();
   const list = useDesignsList();
   const open = useOpenDesign();
-  const current = useDesignStore((s) => s.document);
-  const saved = useSavedDesign((s) => s.saved);
+  const unsaved = useDesignStore((s) => hasUnsavedChanges(s.document, s.baseline));
   const [pending, setPending] = useState<DesignSummary | null>(null);
 
   const run = (id: string) => {
     setPending(null);
     open.mutate(id, { onSuccess: () => void navigate('/') });
   };
-  const request = (d: DesignSummary) =>
-    hasUnsavedChanges(current, saved) ? setPending(d) : run(d.id);
+  const request = (d: DesignSummary) => (unsaved ? setPending(d) : run(d.id));
 
   const failure = list.error ?? null;
   const anonymous = isApiError(failure, 'unauthenticated');
