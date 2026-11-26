@@ -25,6 +25,10 @@ def _too_large(value: str) -> str:
     return value
 
 
+class Many(BaseModel):
+    values: dict[str, int]
+
+
 class Doc(BaseModel):
     text: Annotated[str, AfterValidator(_too_large)]
     qty: int
@@ -38,6 +42,9 @@ def probe(app: FastAPI) -> FastAPI:
 
     @app.post("/items")
     def items(item: Item) -> None: ...
+
+    @app.post("/many")
+    def many(body: Many) -> None: ...
 
     @app.post("/docs")
     def docs(doc: Doc) -> None: ...
@@ -80,6 +87,15 @@ def test_doc_too_large_is_413_without_errors(probe: FastAPI, payload: str, statu
     assert (code, headers["content-type"], body["status"]) == (status, PROBLEM, status)
     assert ("errors" in body) is (status == 422)
     assert "toolong" not in str(body)
+
+
+def test_validation_errors_are_capped_and_loc_truncated(probe: FastAPI) -> None:
+    values = {f"{i:03d}" + "k" * 200: "x" for i in range(50)}
+    event = make_event("/many", method="POST", body=json.dumps({"values": values}))
+    event["headers"]["content-type"] = "application/json"
+    status, _, body = invoke(probe, event)
+    assert (status, len(body["errors"])) == (422, 20)
+    assert all(len(str(part)) <= 40 for e in body["errors"] for part in e["loc"])
 
 
 def test_unhandled_error_is_500_and_logs_no_message(
