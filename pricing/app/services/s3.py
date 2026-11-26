@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from app.model import Filter, Price, PricingError, Product, Query, ServiceSpec, region_filter
 from app.products import tiers
 
-PREFIX = {"us-east-1": "", "sa-east-1": "SAE1-"}
+_PREFIX = {"us-east-1": "", "sa-east-1": "SAE1-"}
 _CODE = "AmazonS3"
 
 
@@ -56,7 +56,7 @@ _ITEMS = (
 
 
 def _prefix(region: str) -> str:
-    prefix = PREFIX.get(region)
+    prefix = _PREFIX.get(region)
     if prefix is None:
         raise PricingError("região sem prefixo de usagetype do S3")
     return prefix
@@ -90,8 +90,12 @@ def _price(item: _Item, product: Product) -> Price:
     """Preço do item; recusa outra unidade (preço por 1.000 requisições daria custo 1.000x)."""
     if any(d.unit != item.kind.aws_unit for d in product.dimensions):
         raise PricingError(f"unidade da AWS inesperada: {item.sku}")
+    price_tiers = tiers(product.dimensions)
+    # Zero sai sempre "0" (`decimal_text`); 1ª faixa grátis é a franquia, fora do contrato.
+    if price_tiers[0].unit_price == "0":
+        raise PricingError(f"primeira faixa sem preço: {item.sku}")
     description = item.kind.description.format(item.storage_class)
-    return Price(item.sku, description, item.kind.unit, tiers(product.dimensions))
+    return Price(item.sku, description, item.kind.unit, price_tiers)
 
 
 def build(region: str, products: Sequence[Product]) -> tuple[Price, ...]:

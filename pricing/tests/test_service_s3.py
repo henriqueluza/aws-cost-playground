@@ -92,20 +92,24 @@ def test_missing_product_is_left_to_expected_skus() -> None:
     assert {p.sku for p in prices} == SERVICE.expected_skus - {"s3-storage-standard"}
 
 
+Change = Callable[[list[Product]], list[Product]]
+
+
 def _duplicate(ps: list[Product]) -> list[Product]:
     return [*ps, replace(next(p for p in ps if p.sku == STANDARD_US), sku="DUPLICATE1")]
 
 
-def _per_1k(ps: list[Product]) -> list[Product]:
-    """PUT cobrada por 1.000 requisições: aceitar daria custo 1.000x."""
-    per_1k = (Dimension("1K Requests", "0", None, "0.005"),)
-    return [replace(p, dimensions=per_1k) if p.sku == PUT_US else p for p in ps]
+def _put(unit: str, usd: str) -> Change:
+    """PUT de us-east-1 com uma faixa só, da unidade e preço dados."""
+    dimensions = (Dimension(unit, "0", None, usd),)
+    return lambda ps: [replace(p, dimensions=dimensions) if p.sku == PUT_US else p for p in ps]
 
 
-Change = Callable[[list[Product]], list[Product]]
 CASES: dict[str, tuple[Change, str]] = {
     "duplicate": (_duplicate, "mais de um produto da AWS: s3-storage-standard"),
-    "unit": (_per_1k, "unidade da AWS inesperada: s3-requests-put-standard"),
+    # Preço por 1.000 requisições: aceitar daria custo 1.000x.
+    "unit": (_put("1K Requests", "0.005"), "unidade da AWS inesperada: s3-requests-put-standard"),
+    "zero-price": (_put("Requests", "0"), "primeira faixa sem preço: s3-requests-put-standard"),
 }
 
 

@@ -69,10 +69,15 @@ def test_region_without_edge_is_refused() -> None:
 
 
 @pytest.mark.parametrize("region", REGIONS)
-def test_build_takes_only_the_region_edge(region: str) -> None:
+def test_build_takes_only_the_closed_set(region: str) -> None:
     assert build(region, answer(region)) == EXPECTED[region]
     # Pior caso, resposta sem filtro: o ruído e a outra borda são ignorados.
     assert build(region, ALL) == EXPECTED[region]
+    # Gêmeos: mesmo `usagetype`, mas com a família ou um atributo do conjunto fechado trocado.
+    https, out = answer(region)
+    keys = ((https, "requestType"), (out, "transferType"), (out, "toLocation"))
+    other = [replace(p, attributes={**p.attributes, k: "x"}) for p, k in keys]
+    assert build(region, [*ALL, replace(https, family="Fee"), *other]) == EXPECTED[region]
 
 
 def test_missing_product_is_left_to_expected_skus() -> None:
@@ -113,7 +118,7 @@ def test_generated_file_matches_the_versioned_seed(region: str, tmp_path: Path) 
     for content in (generated, seed):
         assert validate_price_file(content) == []
         assert {p["sku"] for p in content["prices"]} == SERVICE.expected_skus
-    # Sem faixas nem `freeTier.quantity`: números da AWS que o workflow semanal (#29) atualiza.
+    # Sem faixas, números da AWS que o workflow semanal (#29) atualiza; a franquia é constante.
     for price in (*generated["prices"], *seed["prices"]):
-        del price["tiers"], price["freeTier"]["quantity"]
+        del price["tiers"]
     assert generated["prices"] == seed["prices"]

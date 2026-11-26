@@ -61,4 +61,10 @@ describe('priceCloudFront', () => {
     const out = { service, sku: 'cloudfront-data-transfer-out', quantity: decimal(gb) };
     expect(rate(createRater(catalog), [{ ...out, charge: 'variable' }])).toEqual(lines);
   });
+
+  it('lança RangeError fora do contrato: uso ausente', () => {
+    const call = () => priceCloudFront({ attributes: {}, usage: {} });
+    expect(call).toThrow(RangeError);
+    expect(call).toThrow('aws.cloudfront: uso fora do contrato');
+  });
 });

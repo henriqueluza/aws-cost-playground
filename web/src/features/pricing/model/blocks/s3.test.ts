@@ -70,4 +70,12 @@ describe('priceS3', () => {
     // Classe sem SKU, que não é texto ou ausente: o motor marca o bloco `unavailable`, nunca zero.
     expect(rate(input(attrs, 5, 2000, 500000))).toBeUndefined();
   });
+
+  const ok = { storageGb: 1, putRequestsPerMonth: 1, getRequestsPerMonth: 1 };
+  it.each(Object.keys(ok))('lança RangeError fora do contrato: uso sem %s', (key) => {
+    const usage = Object.fromEntries(Object.entries(ok).filter(([k]) => k !== key));
+    const call = () => priceS3({ attributes: { storageClass: 'STANDARD' }, usage });
+    expect(call).toThrow(RangeError);
+    expect(call).toThrow('aws.s3: uso fora do contrato');
+  });
 });

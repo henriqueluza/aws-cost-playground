@@ -14,7 +14,7 @@ from app.model import Filter, FreeTier, Price, PricingError, Product, Query, Ser
 from app.products import tiers
 
 _CODE = "AmazonCloudFront"
-EDGE = {"us-east-1": "US", "sa-east-1": "SA"}
+_EDGE = {"us-east-1": "US", "sa-east-1": "SA"}
 _EDGE_NAME = {"US": "dos Estados Unidos", "SA": "da América do Sul"}
 
 
@@ -56,9 +56,9 @@ _SKUS: Mapping[str, _Sku] = {
 
 def _edge(region: str) -> str:
     """Local de borda (prefixo do `usagetype`) da região do design."""
-    if region not in EDGE:
+    if region not in _EDGE:
         raise PricingError("região sem local de borda do CloudFront")
-    return EDGE[region]
+    return _EDGE[region]
 
 
 def queries(region: str) -> tuple[Query, ...]:
