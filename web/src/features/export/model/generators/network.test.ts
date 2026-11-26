@@ -41,6 +41,14 @@ describe('rede compartilhada', () => {
     expect(text.indexOf('"blk_a"')).toBeLessThan(text.indexOf('"blk_b"'));
   });
 
+  it('bloco recusado não é o dono da rede: ela sai com o primeiro bloco aceito', () => {
+    const refused = block('blk_0', 'aws.ec2', { instanceType: 'x1.huge' });
+    const nodes = generate(design([refused, ec2('blk_1'), ec2('blk_2')]));
+    expect(labels(nodes, 'aws_vpc')).toEqual(['main']);
+    expect(blocksOf(nodes, 'aws_ami', 'data')).toHaveLength(1);
+    expect(labels(nodes, 'aws_instance')).toEqual(['blk_1', 'blk_2']);
+  });
+
   it('cria uma sub-rede pública e uma privada por zona usada, com a zona tirada da região', () => {
     const nodes = generate(design([ec2('blk_1', 'a'), ec2('blk_2', 'c'), rds('blk_3')]));
     expect(labels(nodes, 'aws_subnet')).toEqual(['public_a', 'private_a', 'public_c', 'private_c']);
@@ -154,13 +162,18 @@ describe('security groups', () => {
     expect(ruleNames(linked).filter((name) => name?.includes('db'))).toEqual([]);
   });
 
-  it('aresta do ALB direto para o banco não abre o banco, e aresta de logs não conta', () => {
-    const nodes = generate(
-      design(full, [edge('blk_1', 'blk_3'), edge('blk_2', 'blk_3', 'logs' as never)]),
-    );
-    expect(ruleNames(nodes)).toEqual(expect.arrayContaining(['db_postgres_from_app']));
-    const direct = generate(design(full, [edge('blk_1', 'blk_3'), edge('blk_1', 'blk_2')]));
-    expect(ruleNames(direct).filter((name) => name?.includes('db'))).toEqual([]);
+  it('aresta do ALB direto para o banco não abre par nenhum, e aresta de logs não conta como desenho', () => {
+    const direct = generate(design(full, [edge('blk_1', 'blk_3')]));
+    expect(ruleNames(direct).sort()).toEqual(['alb_http', 'alb_https', 'app_https']);
+    const logs = generate(design(full, [edge('blk_2', 'blk_3', 'logs')]));
+    expect(ruleNames(logs)).toEqual(expect.arrayContaining(['db_postgres_from_app']));
+  });
+
+  it('descrições de grupo e de regra só têm os caracteres que a API do EC2 aceita', () => {
+    const nodes = generate(design([...full, cache('blk_6', 'memcached')]));
+    for (const found of [...blocksOf(nodes, 'aws_security_group'), ...rules(nodes)]) {
+      expect(attrs(found).description).toMatch(/^"[A-Za-z0-9 ._:,-]+"$/);
+    }
   });
 
   it('sem ALB a aplicação não tem regra de entrada', () => {

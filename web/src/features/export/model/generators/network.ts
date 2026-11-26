@@ -31,11 +31,12 @@ const ROLE_OF: Partial<Record<BlockType, NetworkRole>> = {
   'aws.rds': 'db',
   'aws.elasticache': 'cache',
 };
+/** Descrições só em ASCII: a API do EC2 recusa acento em descrição de security group e de regra. */
 const ROLE_TEXT: Record<NetworkRole, string> = {
-  alb: 'Balanceadores de carga: entrada da internet.',
-  app: 'Instâncias de aplicação.',
-  db: 'Bancos de dados: só a aplicação entra.',
-  cache: 'Caches: só a aplicação entra.',
+  alb: 'Balanceadores de carga: entrada da internet',
+  app: 'Servidores de app',
+  db: 'Bancos de dados: entra apenas o grupo app',
+  cache: 'Caches: entra apenas o grupo app',
 };
 /** Pares de papéis que podem se falar. Outro par (ALB direto no banco, por exemplo) nunca é aberto. */
 const CHAIN: readonly (readonly [NetworkRole, NetworkRole])[] = [
@@ -102,20 +103,25 @@ function subnetNodes(az: AzLetter): HclNode[] {
   ];
 }
 
-/** Pares de papéis ligados por aresta `data`; sem nenhuma aresta dessas, vale a cadeia inteira. */
+/**
+ * Pares de papéis ligados por aresta `data`. Só quando o design não tem nenhuma aresta `data`
+ * entre blocos com papel vale a cadeia inteira; aresta fora da cadeia não abre par nenhum.
+ */
 function connectedPairs(input: GeneratorInput): ReadonlySet<string> {
   const pairs = new Set<string>();
+  let drawn = false;
   for (const block of input.blocks) {
     const from = ROLE_OF[block.type];
     for (const link of input.designLinks.get(block.id) ?? []) {
       const to = link.peer && ROLE_OF[link.peer.type];
       if (link.kind !== 'data' || !from || !to) continue;
+      drawn = true;
       for (const [a, b] of CHAIN) {
         if ((a === from && b === to) || (a === to && b === from)) pairs.add(`${a}-${b}`);
       }
     }
   }
-  return pairs.size > 0 ? pairs : new Set(CHAIN.map(([a, b]) => `${a}-${b}`));
+  return drawn ? pairs : new Set(CHAIN.map(([a, b]) => `${a}-${b}`));
 }
 
 type Peer = { readonly role: NetworkRole } | { readonly cidr: typeof ANY_IPV4 };
@@ -165,18 +171,18 @@ function securityGroupNodes(input: GeneratorInput): HclNode[] {
     // As duas únicas regras de entrada abertas à internet do arquivo; a 80 só redireciona para a 443.
     nodes.push(
       rule('ingress', 'alb_https', 'alb', 443, { cidr: ANY_IPV4 }, 'HTTPS da internet'),
-      rule('ingress', 'alb_http', 'alb', 80, { cidr: ANY_IPV4 }, 'HTTP, só para redirecionar'),
+      rule('ingress', 'alb_http', 'alb', 80, { cidr: ANY_IPV4 }, 'HTTP, apenas para redirecionar'),
     );
   }
   if (talks('alb', 'app')) {
     nodes.push(
-      rule('egress', 'alb_to_app', 'alb', APP_PORT, { role: 'app' }, 'ALB para a aplicação'),
-      rule('ingress', 'app_from_alb', 'app', APP_PORT, { role: 'alb' }, 'Só o ALB entra'),
+      rule('egress', 'alb_to_app', 'alb', APP_PORT, { role: 'app' }, 'ALB para o grupo app'),
+      rule('ingress', 'app_from_alb', 'app', APP_PORT, { role: 'alb' }, 'Entra apenas o ALB'),
     );
   }
   if (roles.includes('app')) {
     // Saída da aplicação: HTTPS (APIs da AWS e atualizações) e os bancos e caches ligados a ela.
-    nodes.push(rule('egress', 'app_https', 'app', 443, { cidr: ANY_IPV4 }, 'HTTPS de saída'));
+    nodes.push(rule('egress', 'app_https', 'app', 443, { cidr: ANY_IPV4 }, 'HTTPS para fora'));
   }
   const stores = [
     ['db', engines('aws.rds', DB_PORTS)],
@@ -192,9 +198,9 @@ function securityGroupNodes(input: GeneratorInput): HclNode[] {
           role,
           port,
           { role: 'app' },
-          'Só a aplicação',
+          'Entra apenas o grupo app',
         ),
-        rule('egress', `app_to_${role}_${engine}`, 'app', port, { role }, 'Aplicação para o dado'),
+        rule('egress', `app_to_${role}_${engine}`, 'app', port, { role }, 'Grupo app para o dado'),
       );
     }
   }
