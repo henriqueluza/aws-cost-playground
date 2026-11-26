@@ -22,6 +22,25 @@ const setup = (clock = () => 0): DesignStore => {
     clock,
   );
 };
+/** Par ECS → EC2 ligado por `runs-on`: o único que admite trocar de tipo. */
+const withHost = (): DesignStore => {
+  const host = { ...doc.blocks[1]!, id: 'blk_ecs', type: 'aws.ecs', attributes: {} };
+  const ec2 = { ...doc.blocks[1]!, id: 'blk_ec2', type: 'aws.ec2', attributes: {} };
+  const runsOn = {
+    ...doc.edges[0]!,
+    id: 'edg_host',
+    source: 'blk_ecs',
+    target: 'blk_ec2',
+    kind: 'runs-on' as const,
+    usage: { source: 'default' as const, values: {} },
+  };
+  return createDesignStore({
+    ...initial,
+    document: { ...doc, blocks: [...doc.blocks, host, ec2], edges: [...doc.edges, runsOn] },
+  });
+};
+/** Ação que precisa de um estado inicial próprio. */
+const START: Record<string, () => DesignStore> = { setEdgeKind: withHost };
 const past = (s: DesignStore) => s.getState().history.past.length;
 const view = (s: DesignStore) => ({ document: s.getState().document, layout: s.getState().layout });
 
@@ -34,6 +53,7 @@ const MUTATIONS: Record<string, (s: DesignStore) => void> = {
   connect: (s) =>
     void s.getState().connect({ source: 'blk_assets', target: 'blk_fn_api', kind: 'data' }),
   removeEdge: (s) => void s.getState().removeEdge('edg_1'),
+  setEdgeKind: (s) => void s.getState().setEdgeKind('edg_host', 'data'),
   setUsage: (s) =>
     void s
       .getState()
@@ -63,7 +83,7 @@ describe('histórico: toda ação da store é desfazível', () => {
   });
 
   it.each(actions)('%s: um passo, desfaz ao estado de antes e refaz ao de depois', (name) => {
-    const s = setup();
+    const s = (START[name] ?? setup)();
     const before = view(s);
     MUTATIONS[name]?.(s);
     const after = view(s);
