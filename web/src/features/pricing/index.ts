@@ -9,6 +9,7 @@ export {
   type PriceSource,
   type PriceTier,
 } from './model/catalog';
+export * from './model/blockRegistry';
 export {
   estimate,
   type BlockCost,
