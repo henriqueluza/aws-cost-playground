@@ -57,7 +57,8 @@ export function AccountPage() {
         <p className={styles.text}>{quotaSummary(quota.data.remaining, quota.data.limit)}.</p>
         <p className={styles.muted}>
           Renova em{' '}
-          <time dateTime={quota.data.resetsAt}>{formatResetsAt(quota.data.resetsAt)}</time>
+          <time dateTime={quota.data.resetsAt}>{formatResetsAt(quota.data.resetsAt)}</time> (horário
+          local)
         </p>
       </>
     );
