@@ -5,8 +5,13 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ApiProvider } from '../../../shared/lib/api/ApiProvider';
+import { createInMemoryApi } from '../../../shared/lib/api/inMemoryApi';
+import { ApiError, type Api, type ApiErrorKind } from '../../../shared/lib/api';
+import { fakeAuth } from '../../../test/authFixtures';
 import { expectNoAxeViolations } from '../../../test/axe';
 import type { DesignDocument, Region } from '../../../shared/lib/design';
+import { AuthProvider } from '../../auth';
 import { designStore } from '../../editor';
 import {
   catalogServices,
@@ -35,7 +40,19 @@ function seedOf(region: Region): PriceCatalog {
   };
 }
 
-function renderPage(docs: DesignDocument[] = []) {
+const newApi = (): Api =>
+  createInMemoryApi({
+    maxDesigns: 5,
+    maxDocBytes: 350_000,
+    userDailyLimit: 5,
+    globalDailyLimit: 5,
+  });
+const SIGNED_IN = {
+  status: 'authenticated',
+  user: { sub: 'usuario-de-teste', email: null },
+} as const;
+
+function renderPage(docs: DesignDocument[] = [], api: Api = newApi(), signedIn = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   for (const doc of [designStore.getState().document, ...docs]) {
     client.setQueryData(priceCatalogKey(doc.region, catalogServices(doc)), seedOf(doc.region));
@@ -47,9 +64,14 @@ function renderPage(docs: DesignDocument[] = []) {
     ],
     { initialEntries: ['/comparar'] },
   );
+  const auth = fakeAuth(signedIn ? SIGNED_IN : { status: 'anonymous' });
   return render(
     <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
+      <ApiProvider api={api}>
+        <AuthProvider service={auth.service}>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ApiProvider>
     </QueryClientProvider>,
   );
 }
@@ -210,5 +232,108 @@ describe('ComparePage (anônimo: design em edição × arquivo, sem API)', () =>
     const { container } = renderPage([api]);
     await pickB(file(api));
     await expectNoAxeViolations(container);
+  });
+});
+
+describe('ComparePage com designs salvos (sessão)', () => {
+  /** Uma API com os designs já salvos na conta; devolve também os ids na ordem dada. */
+  async function savedApi(...docs: [string, DesignDocument][]) {
+    const api = newApi();
+    const ids: string[] = [];
+    for (const [name, doc] of docs) ids.push((await api.designs.create({ name, doc })).id);
+    return { api, ids };
+  }
+  const origin = (side: 'A' | 'B', option: string) =>
+    userEvent.selectOptions(screen.getByLabelText(`Origem do design ${side}`), option);
+  const pickSaved = (side: 'A' | 'B', id: string) =>
+    userEvent.selectOptions(screen.getByLabelText(`Design salvo ${side}`), id);
+  const failWith = (api: Api, kind: ApiErrorKind, method: 'list' | 'get') =>
+    vi.spyOn(api.designs, method).mockRejectedValue(new ApiError({ kind } as never));
+
+  it('escolhe dois designs salvos, com a região de cada um e o nome só como texto', async () => {
+    const [app, serverless] = [scenario('app-classico'), scenario('api-serverless')];
+    const { api, ids } = await savedApi(['<b>App</b>', app], ['Serverless', serverless]);
+    const { container } = renderPage([app, serverless], api, true);
+    await origin('A', 'saved');
+    expect(screen.getByRole('option', { name: '<b>App</b> (us-east-1)' })).toBeInTheDocument();
+    await pickSaved('A', ids[0]!);
+    await origin('B', 'saved');
+    await pickSaved('B', ids[1]!);
+    const total = group('Total por mês');
+    expect(total).toHaveTextContent('A US$ 333,65');
+    expect(total).toHaveTextContent('B US$ 29,67');
+    expect(total).toHaveTextContent('−US$ 303,98');
+    expect(container.querySelector('b')).toBeNull();
+  });
+
+  it('mistura as origens: o design em edição (A) contra um salvo (B)', async () => {
+    const app = scenario('app-classico');
+    const before = designStore.getState();
+    const { api, ids } = await savedApi(['App', app]);
+    renderPage([app], api, true);
+    await origin('B', 'saved');
+    await pickSaved('B', ids[0]!);
+    expect(group('Total por mês')).toHaveTextContent('+US$ 202,37');
+    expect(designStore.getState()).toBe(before);
+  });
+
+  it('o anônimo não vê a opção de salvos e não chama a API', async () => {
+    const api = newApi();
+    const calls = (Object.keys(api.designs) as (keyof Api['designs'])[]).map((m) =>
+      vi.spyOn(api.designs, m),
+    );
+    renderPage([], api);
+    expect(screen.queryByRole('option', { name: 'Salvo na conta' })).toBeNull();
+    await pickB(file(designStore.getState().document));
+    expect(calls.every((call) => call.mock.calls.length === 0)).toBe(true);
+  });
+
+  it('lista vazia: diz o que fazer', async () => {
+    renderPage([], newApi(), true);
+    await origin('B', 'saved');
+    expect(await screen.findByText(/ainda não salvou nenhum design/)).toBeInTheDocument();
+    expect(screen.getByText('Escolha o design B')).toBeInTheDocument();
+  });
+
+  it('erro da lista: texto próprio por código e nova tentativa só quando vale', async () => {
+    const api = newApi();
+    const list = failWith(api, 'network', 'list');
+    renderPage([], api, true);
+    await origin('B', 'saved');
+    expect(await screen.findByText(/Sem conexão com o serviço/)).toBeInTheDocument();
+    list.mockRestore();
+    await userEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByText(/ainda não salvou/)).toBeInTheDocument();
+    failWith(api, 'unauthenticated', 'list');
+    await origin('B', 'file');
+    await origin('B', 'saved');
+    expect(await screen.findByText(/Entre na sua conta/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull();
+  });
+
+  it('erro ao buscar o design: texto próprio por código, sem tabela', async () => {
+    const app = scenario('app-classico');
+    const { api, ids } = await savedApi(['App', app]);
+    failWith(api, 'not-found', 'get');
+    renderPage([app], api, true);
+    await origin('B', 'saved');
+    await pickSaved('B', ids[0]!);
+    expect(await screen.findByText('Este design não existe mais na sua conta.')).toBeVisible();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('documento inválido vindo do servidor é recusado antes de calcular', async () => {
+    const app = scenario('app-classico');
+    const { api, ids } = await savedApi(['App', app]);
+    const get = api.designs.get;
+    vi.spyOn(api.designs, 'get').mockImplementation(async (id) => ({
+      ...(await get(id)),
+      doc: { ...app, blocks: [{ id: 1 }] } as never,
+    }));
+    renderPage([app], api, true);
+    await origin('B', 'saved');
+    await pickSaved('B', ids[0]!);
+    expect(await screen.findByText(/devolveu um design que não conseguimos abrir/)).toBeVisible();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 });

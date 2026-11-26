@@ -1,26 +1,16 @@
-import {
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
+import { useId, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import {
-  designFileMessage,
-  readDesignFile,
-  useDesignStore,
-  type DesignFileError,
-} from '../../editor';
+import { useAuth } from '../../auth';
+import { designErrorMessage, isRetryable } from '../../designs';
 import { catalogErrorText } from '../../pricing';
 import type { DesignDocument } from '../../../shared/lib/design';
 import { Button, EmptyState, Notice } from '../../../shared/ui';
 import { plural } from '../application/format';
+import { useSideDocument, type SideDocument, type Source } from '../hooks/useSideDocument';
 import { useSideEstimate, type SideState } from '../hooks/useSideEstimate';
 import { compareEstimates, contextDifferences } from '../model/compare';
 import { CompareTable, SummaryStrip } from './CompareTable';
+import { SourcePicker } from './SourcePicker';
 import styles from './ComparePage.module.css';
 
 const REGION_NOTICE =
@@ -28,15 +18,19 @@ const REGION_NOTICE =
 const WORKLOAD_NOTICE =
   'As descrições de carga dos dois designs são diferentes. A diferença de custo mistura a arquitetura e a carga que cada um assume.';
 
-/** Um lado: título, região e tamanho do design, e o estado dos preços da região dele. */
-function Side(props: {
-  side: 'A' | 'B';
-  document: DesignDocument | null;
-  state: SideState;
-  children?: ReactNode;
-}) {
+type SideView = { doc: SideDocument; state: SideState; document: DesignDocument | null };
+
+/** O documento do lado e o custo dele, com o catálogo da região do próprio design. */
+function useSide(source: Source): SideView {
+  const doc = useSideDocument(source);
+  const document = doc.status === 'ready' ? doc.document : null;
+  return { doc, state: useSideEstimate(document), document };
+}
+
+/** Um lado: título, origem, região e tamanho do design, e o estado do documento e dos preços. */
+function Side(props: { side: 'A' | 'B'; view: SideView; children: ReactNode }) {
   const titleId = useId();
-  const { document, state } = props;
+  const { doc, state, document } = props.view;
   return (
     <section aria-labelledby={titleId} className={styles.side}>
       <h2 id={titleId} className={styles.sectionTitle}>
@@ -50,10 +44,16 @@ function Side(props: {
           <span>{plural(document.edges.length, 'aresta', 'arestas')}</span>
         </p>
       )}
-      {state.status === 'loading' && (
+      {(doc.status === 'loading' || state.status === 'loading') && (
         <p role="status" className={styles.hint}>
-          Buscando os preços de {document?.region}…
+          {document === null ? 'Buscando o design…' : `Buscando os preços de ${document.region}…`}
         </p>
+      )}
+      {doc.status === 'error' && (
+        <>
+          <Notice tone="negative" message={designErrorMessage(doc.kind)} />
+          {isRetryable(doc.kind) && <Button onClick={doc.retry}>Tentar de novo</Button>}
+        </>
       )}
       {state.status === 'error' && document !== null && (
         <>
@@ -65,68 +65,32 @@ function Side(props: {
   );
 }
 
-/** Escolhe o arquivo do design B. Passa pela MESMA leitura e validação de "Abrir arquivo" do editor. */
-function FilePicker(props: {
-  onLoad: (file: { name: string; document: DesignDocument }) => void;
-  name?: string;
-}) {
-  const input = useRef<HTMLInputElement>(null);
-  const chosen = props.name !== undefined;
-  const [error, setError] = useState<{ name: string; error: DesignFileError } | null>(null);
-  const pick = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = ''; // o mesmo arquivo de novo precisa disparar `change`
-    if (file === undefined) return;
-    const result = await readDesignFile(file);
-    if (!result.ok) return setError({ name: file.name, error: result.error });
-    setError(null);
-    props.onLoad({ name: file.name, document: result.document });
-  };
-  return (
-    <>
-      <div className={styles.file}>
-        <input
-          ref={input}
-          type="file"
-          accept=".json,application/json"
-          hidden
-          aria-label="Arquivo JSON do design B"
-          onChange={(event) => void pick(event)}
-        />
-        <Button variant={chosen ? 'secondary' : 'primary'} onClick={() => input.current?.click()}>
-          {chosen ? 'Trocar arquivo' : 'Escolher arquivo JSON'}
-        </Button>
-        {chosen && (
-          <span className={styles.fileName} title={props.name}>
-            {props.name}
-          </span>
-        )}
-      </div>
-      {error !== null && (
-        <Notice tone="negative" message={`${error.name}: ${designFileMessage(error.error)}`} />
-      )}
-    </>
-  );
-}
+const NO_FILE: Source = { kind: 'file', file: null };
 
 /**
- * Compara dois designs (F28): o que está no editor (A) e um arquivo JSON (B). Só lê: a store do
- * editor não é alterada e nada sai do navegador além da busca dos preços.
+ * Compara dois designs (F28). Cada lado vem do design em edição, de um arquivo JSON ou, com
+ * sessão, de um salvo na conta. Só lê: a store do editor não é alterada e o anônimo não chama a API.
  */
 export function ComparePage(): ReactElement {
-  const docA = useDesignStore((s) => s.document);
-  const [file, setFile] = useState<{ name: string; document: DesignDocument } | null>(null);
-  const docB = file?.document ?? null;
-  const [stateA, stateB] = [useSideEstimate(docA), useSideEstimate(docB)];
+  const signedIn = useAuth().snapshot.status === 'authenticated';
+  const [pickedA, setPickedA] = useState<Source>({ kind: 'editor' });
+  const [pickedB, setPickedB] = useState<Source>(NO_FILE);
+  // Sem sessão (ou depois de sair) a origem "salvo" deixa de valer.
+  const sourceA = !signedIn && pickedA.kind === 'saved' ? NO_FILE : pickedA;
+  const sourceB = !signedIn && pickedB.kind === 'saved' ? NO_FILE : pickedB;
+  const [a, b] = [useSide(sourceA), useSide(sourceB)];
   const comparison = useMemo(
     () =>
-      stateA.status === 'ready' && stateB.status === 'ready'
-        ? compareEstimates(stateA.estimate, stateB.estimate)
+      a.state.status === 'ready' && b.state.status === 'ready'
+        ? compareEstimates(a.state.estimate, b.state.estimate)
         : null,
-    [stateA, stateB],
+    [a.state, b.state],
   );
-  const context = docB && contextDifferences(docA, docB);
+  const context = a.document && b.document && contextDifferences(a.document, b.document);
   const missing = comparison && comparison.unavailable.a + comparison.unavailable.b;
+  const waiting = [a.doc.status === 'empty' && 'A', b.doc.status === 'empty' && 'B'].filter(
+    Boolean,
+  );
 
   return (
     <main className={styles.page}>
@@ -138,11 +102,11 @@ export function ComparePage(): ReactElement {
           </Link>
         </header>
         <div className={styles.pickers}>
-          <Side side="A" document={docA} state={stateA}>
-            <p className={styles.hint}>Design em edição</p>
+          <Side side="A" view={a}>
+            <SourcePicker side="A" source={sourceA} signedIn={signedIn} onChange={setPickedA} />
           </Side>
-          <Side side="B" document={docB} state={stateB}>
-            <FilePicker onLoad={setFile} name={file?.name} />
+          <Side side="B" view={b}>
+            <SourcePicker side="B" source={sourceB} signedIn={signedIn} onChange={setPickedB} />
           </Side>
         </div>
         {context && (context.region || context.workload) && (
@@ -151,10 +115,10 @@ export function ComparePage(): ReactElement {
             {context.workload && <Notice tone="warning" message={WORKLOAD_NOTICE} />}
           </div>
         )}
-        {docB === null && (
+        {waiting.length > 0 && (
           <EmptyState
-            title="Escolha o design B"
-            description="Escolha um arquivo JSON baixado do editor para compará-lo com o design em edição."
+            title={`Escolha o design ${waiting.join(' e ')}`}
+            description="Escolha a origem: o design em edição, um arquivo JSON baixado do editor ou, com sessão, um design salvo na conta."
             action={null}
           />
         )}
