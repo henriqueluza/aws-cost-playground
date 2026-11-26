@@ -2,6 +2,11 @@
 # Cada igualdade abaixo é uma trava: curinga, StringLike, condição ou ação a mais quebra o assert.
 mock_provider "aws" {}
 
+# O domínio só importa para a política de `by_id.tf`; aqui vale qualquer nome válido.
+variables {
+  zone_name = "example.com"
+}
+
 override_data {
   target = data.aws_caller_identity.current
   values = {

@@ -32,16 +32,6 @@ export function sameDocument(a: unknown, b: unknown): boolean {
   );
 }
 
-/** Design com conteúdo que valha perder: blocos, arestas ou descrição da carga. */
-export function hasContent(doc: DesignDocument): boolean {
-  return doc.blocks.length > 0 || doc.edges.length > 0 || doc.workload.description !== '';
-}
-
-/** Sair ou trocar de design perderia trabalho? Sem salvamento anterior, só se há conteúdo. */
-export function hasUnsavedChanges(current: DesignDocument, saved: SavedDesign | null): boolean {
-  return saved === null ? hasContent(current) : !sameDocument(current, saved.doc);
-}
-
 /**
  * Estado do salvamento, derivado do documento atual e do último salvo:
  * salvando > nunca salvo > igual ao salvo (salvo) > diferente (alterações não salvas).

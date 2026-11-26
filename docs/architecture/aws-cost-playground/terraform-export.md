@@ -167,3 +167,45 @@ Geradores em `model/generators/s3.ts` e `cloudfront.ts`.
   ```
 
 - **Export inteiro:** a validação nos 3 cenários, com o provider da AWS, é o job da #68.
+
+## Blocos sem VPC: Lambda, SQS e DynamoDB (#65)
+
+Geradores em `model/generators/lambda.ts`, `sqs.ts` e `dynamodb.ts`.
+
+### Lambda
+
+- **Recursos:** `aws_lambda_function`, `aws_iam_role` (rótulo do papel de assunção em `<nome>__assume`), `aws_iam_role_policy`, `aws_cloudwatch_log_group`, a variável `<nome>__package` e um `aws_lambda_event_source_mapping` (`<nome>__sqs_N`) por fila que aponta para a função.
+- **Do design:** `architecture`, `memoryMb` e o tempo limite: `timeout` = 3 × `avgDurationMs`, arredondado para cima em segundos, entre 3 s e 900 s.
+- **Padrões seguros:** papel de menor privilégio (só `logs:CreateLogStream` e `logs:PutLogEvents` no grupo de logs, mais o que as arestas pedem), grupo de logs com retenção de 30 dias e nenhuma variável de ambiente.
+
+### SQS
+
+- **Recursos:** `aws_sqs_queue`, `data "aws_iam_policy_document"` e `aws_sqs_queue_policy`.
+- **Do design:** `queueType`. Fila `fifo` leva `fifo_queue = true` e o nome termina em `.fifo`.
+- **Padrões seguros:** `sqs_managed_sse_enabled = true` e política que nega `sqs:*` quando a chamada não usa TLS.
+- **Visibilidade:** 6 × o tempo limite da função que consome a fila (a maior, se forem várias), com teto de 43.200 s. Sem função consumidora, o atributo não é escrito.
+
+### DynamoDB
+
+- **Recursos:** `aws_dynamodb_table`.
+- **Do design:** `capacityMode`. `provisioned` vira `PROVISIONED` com `read_capacity` e `write_capacity` tirados de `provisionedReadUnits` e `provisionedWriteUnits` do uso, com mínimo 1; o outro modo vira `PAY_PER_REQUEST`.
+- **Padrões seguros:** criptografia em repouso, recuperação pontual e `deletion_protection_enabled = true`.
+
+### O que cada aresta cria
+
+Só a aresta `data` dá permissão, nas ações abaixo e no ARN do par (no S3, sobre os objetos: `<arn>/*`). A tabela é o `GRANTS` de `lambda.ts`.
+
+| Aresta                  | Cria                                                                                               |
+| ----------------------- | -------------------------------------------------------------------------------------------------- |
+| fila SQS → função       | `aws_lambda_event_source_mapping` e leitura da fila: `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:GetQueueAttributes` |
+| função → fila SQS       | `sqs:SendMessage`                                                                                  |
+| função → tabela DynamoDB | `dynamodb:GetItem`, `Query`, `PutItem`, `UpdateItem` e `DeleteItem`                               |
+| função → bucket S3      | `s3:GetObject` e `s3:PutObject` nos objetos                                                        |
+| bucket S3 → função      | só `s3:GetObject` nos objetos                                                                      |
+| aresta de logs, tabela → função | nada                                                                                       |
+
+### Pontos de partida
+
+- O código não existe no design: o pacote .zip vem de `var.<nome>__package`, sem valor padrão. Runtime `nodejs22.x` e handler `index.handler` são fixos e precisam de ajuste.
+- O esquema de chaves da tabela é de exemplo: `pk` e `sk`, ambas string.
+- Gatilho de bucket para função (notificação de evento do S3) não é gerado.

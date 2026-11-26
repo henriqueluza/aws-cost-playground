@@ -1,17 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useBlocker } from 'react-router';
-import { useDesignStore } from '../../editor';
+import { designStore, hasUnsavedChanges, useDesignStore } from '../../editor';
 import { designNameSchema } from '../../../shared/lib/api';
 import { Button, Dialog, Notice, TextField } from '../../../shared/ui';
 import { savedDesignStore, useSavedDesign } from '../hooks/savedDesignStore';
 import { useSaveDesign } from '../hooks/useDesigns';
 import { designErrorMessage, isRetryable } from '../model/designMessages';
-import {
-  hasUnsavedChanges,
-  SAVE_STATUS_LABEL,
-  saveStatus,
-  type SaveStatus,
-} from '../model/saveState';
+import { SAVE_STATUS_LABEL, saveStatus, type SaveStatus } from '../model/saveState';
 import styles from './SaveControls.module.css';
 
 const DEFAULT_NAME = 'Meu design';
@@ -60,6 +55,22 @@ function LeaveGuard({ active }: { active: boolean }) {
   );
 }
 
+/**
+ * O design salvo só vale para o documento que o originou. Trocar o design inteiro ("Novo design",
+ * abrir arquivo, desfazer ou refazer uma troca dessas) solta o vínculo: o próximo "Salvar" pede um
+ * nome e cria outro design, nunca grava por cima do salvo. Desfazer não o devolve.
+ */
+function useUnlinkOnReplace() {
+  useEffect(() => {
+    let last = designStore.getState().replacements;
+    return designStore.subscribe(({ replacements }) => {
+      if (replacements === last) return;
+      last = replacements;
+      savedDesignStore.getState().unlink();
+    });
+  }, []);
+}
+
 /** Estado do salvamento; `role="status"` (aria-live educado) anuncia cada mudança. */
 function StatusPill({ status }: { status: SaveStatus }) {
   return (
@@ -105,6 +116,9 @@ function NameDialog(props: { open: boolean; onCancel: () => void; onSubmit: (n: 
 /** `signInAction`: o botão "Entrar" do login (#52); entra no aviso de quem não está autenticado. */
 export function SaveControls({ signInAction }: { signInAction?: ReactNode } = {}) {
   const document = useDesignStore((s) => s.document);
+  // Uma só noção de "trabalho a perder": o documento difere do último carregado ou salvo.
+  const unsaved = useDesignStore((s) => hasUnsavedChanges(s.document, s.baseline));
+  useUnlinkOnReplace();
   const saved = useSavedDesign((s) => s.saved);
   const saving = useSavedDesign((s) => s.saving);
   const error = useSavedDesign((s) => s.error);
@@ -113,7 +127,6 @@ export function SaveControls({ signInAction }: { signInAction?: ReactNode } = {}
   const lastName = useRef(DEFAULT_NAME); // o nome do último envio, para "Tentar de novo"
 
   const status = saveStatus(document, saved, saving);
-  const unsaved = hasUnsavedChanges(document, saved);
   const run = (name: string) => {
     lastName.current = name;
     save.mutate({ name, doc: document });
