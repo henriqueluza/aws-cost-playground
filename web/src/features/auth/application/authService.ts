@@ -1,5 +1,5 @@
 import { AuthError } from '../model/authError';
-import { isFresh, type Session } from '../model/session';
+import { isFresh, sessionSchema, type Session } from '../model/session';
 import { safeReturnTo } from '../model/returnTo';
 import type { AuthService, AuthServiceDeps, AuthSnapshot, SignInOptions } from './ports';
 
@@ -33,8 +33,11 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
   async function renew(current: Session): Promise<Session | null> {
     const started = generation;
     try {
-      const next = await provider.refresh(current);
+      const refreshed = await provider.refresh(current);
       if (generation !== started) return session;
+      const checked = sessionSchema.safeParse(refreshed);
+      if (!checked.success) throw new AuthError('invalid-response');
+      const next = checked.data;
       // Mesmo usuário: a renovação não troca a identidade, só os tokens.
       store.write(next);
       session = next;
@@ -68,7 +71,10 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     completeSignIn(callbackUrl) {
       let existing = completions.get(callbackUrl);
       if (!existing) {
+        const started = generation;
         existing = provider.completeSignIn(callbackUrl).then((result) => {
+          // Saiu enquanto a troca estava em voo: o resultado não vale mais.
+          if (generation !== started) throw new AuthError('session-expired');
           setSession(result.session);
           return safeReturnTo(result.returnTo);
         });
@@ -99,10 +105,10 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         setSession(null);
         return null;
       }
-      refreshing ??= renew(current).finally(() => {
-        refreshing = undefined;
-      });
-      const renewed = await refreshing;
+      const flight: Promise<Session | null> = (refreshing ??= renew(current).finally(() => {
+        if (refreshing === flight) refreshing = undefined;
+      }));
+      const renewed = await flight;
       return renewed?.accessToken ?? null;
     },
   };

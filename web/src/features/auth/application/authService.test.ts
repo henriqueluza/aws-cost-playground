@@ -118,6 +118,19 @@ describe('completeSignIn', () => {
     expect(provider.completeSignIn).toHaveBeenCalledTimes(1);
   });
 
+  it('sair com a troca em voo descarta o resultado dela', async () => {
+    const { service, provider } = setup(null);
+    let release: (
+      value: Awaited<ReturnType<IdentityProvider['completeSignIn']>>,
+    ) => void = () => {};
+    provider.completeSignIn.mockReturnValueOnce(new Promise((resolve) => (release = resolve)));
+    const pending = service.completeSignIn(url);
+    await service.signOut();
+    release({ session: fakeSession(), returnTo: '/' });
+    await expect(pending).rejects.toMatchObject({ kind: 'session-expired' });
+    expect(service.getSnapshot().status).toBe('anonymous');
+  });
+
   it('uma falha não derruba a sessão que já existia', async () => {
     const { service, provider } = setup();
     provider.completeSignIn.mockRejectedValueOnce(new AuthError('state-mismatch'));
@@ -146,7 +159,7 @@ describe('getAccessToken', () => {
   });
 
   it('duas chamadas simultâneas disparam UMA renovação', async () => {
-    const { service, provider } = setup(stale());
+    const { service, provider, store } = setup(stale());
     const tokens = await Promise.all([
       service.getAccessToken(),
       service.getAccessToken(),
@@ -154,8 +167,7 @@ describe('getAccessToken', () => {
     ]);
     expect(tokens).toEqual(['renovado', 'renovado', 'renovado']);
     expect(provider.refresh).toHaveBeenCalledTimes(1);
-    // Resolvida a renovação, a próxima precisa já vir do token novo, sem outra ida ao provedor.
-    expect(provider.refresh).toHaveBeenCalledTimes(1);
+    expect(store.read()?.accessToken).toBe('renovado');
   });
 
   it('depois de uma renovação que terminou, uma nova pode acontecer', async () => {
@@ -191,6 +203,13 @@ describe('getAccessToken', () => {
     await expect(service.getAccessToken()).resolves.toBeNull();
     expect(service.getSnapshot().status).toBe('anonymous');
     expect(provider.refresh).not.toHaveBeenCalled();
+  });
+
+  it('renovação fora do schema: invalid-response encerra a sessão', async () => {
+    const { service, provider } = setup(stale());
+    provider.refresh.mockResolvedValueOnce(fakeSession({ accessToken: 'com espaço' }));
+    await expect(service.getAccessToken()).resolves.toBeNull();
+    expect(service.getSnapshot().status).toBe('anonymous');
   });
 
   it('sair durante a renovação descarta o resultado dela', async () => {
