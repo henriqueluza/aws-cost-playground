@@ -40,7 +40,33 @@ Nenhum segredo vai em código nem em variável commitada.
 - `errors.py` — erros no formato problem details (`install_error_handlers`).
 - `logs.py` — logs JSON, id da requisição e `RequestLogMiddleware`.
 - `dynamo.py` — acesso à tabela única (`get_table()`).
+- `design_document.py` — modelos Pydantic do documento do design, equivalentes ao schema zod do `web/`.
+- `contracts.py` — leitor de `contracts/blocks.json` e `contracts/edges.json` (`load_contracts()`, `get_contracts()`).
 - `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade (ainda vazios). Cada um segue `router` → `service` → repositório.
+
+## Documento do design e contratos
+
+`app/design_document.py` valida o documento do design com as mesmas regras do `designDocumentSchema` (`web/src/shared/lib/design/designDocument.ts`), que é a fonte da verdade. Os dois lados leem os exemplos de `contracts/examples/design/{valid,invalid}/` e precisam dar o mesmo veredito: `tests/test_design_document.py` aqui e `designExamples.test.ts` no `web/`. Uma divergência quebra um dos testes.
+
+`app/contracts.py` lê `contracts/blocks.json` e `contracts/edges.json`, os mesmos arquivos do `web/` (`docs/architecture/aws-cost-playground/block-contract.md`). `get_contracts()` carrega na primeira chamada e guarda o resultado em cache; `load_contracts(directory)` lê de uma pasta explícita. Contrato inválido levanta `ValidationError`; sem `blocks.json`, `RuntimeError`. A pasta `contracts/` é procurada em `/var/task/contracts` (zip da Lambda) e, depois, na raiz do repositório.
+
+- **Leitura tolerante.** Chave desconhecida no documento é descartada, não recusada, para permitir rollback entre builds.
+- **Tipos estritos.** Nada é convertido: `"1"` não vira `1`, `true` não vira `1`, `1` não vira texto. Como no JS, `1.0` e `1` são o mesmo número. Texto é medido em pontos de código (um emoji vale 1), como no zod 4.
+- **Chave repetida no JSON.** Vale a última ocorrência, nos dois lados (`JSON.parse`, `json.loads` e o `model_validate_json`).
+- **Divergências conhecidas** (nenhuma pode ter exemplo compartilhado, porque os lados discordam ou o arquivo nem é JSON):
+  - Substituto UTF-16 solto em texto (`"\ud800"`): a API recusa (não é serializável em UTF-8), o zod aceita.
+  - `NaN` e `Infinity` escritos no JSON: o `JSON.parse` recusa o arquivo; o `json.loads` lê e o modelo recusa. Os dois lados dão inválido. Número que estoura o float64 (`1e400`) tem exemplo e é recusado nos dois.
+  - Número de 1e-6 até antes de 1e-5: o Pydantic escreve `1e-6`, o JS escreve `0.000001`. O `sizeBytes` do documento muda em poucos bytes conforme o lado que serializa. Os demais números (inteiros, `-0`, expoentes grandes) saem com o mesmo tamanho.
+  - A lista de erros: o zod relata todos; a API para no primeiro bloco e na primeira aresta inválidos (`fail_fast`). O veredito é o mesmo.
+
+### Como a Lambda enxerga `contracts/`
+
+`app/contracts.py` não recebe caminho de fora: procura `contracts/` em dois lugares fixos, calculados a partir do próprio arquivo, nesta ordem:
+
+1. ao lado de `app/` — no zip da Lambda, `/var/task/contracts/`;
+2. um nível acima — a raiz do repositório, no desenvolvimento e nos testes (`api/app/contracts.py` → `contracts/`).
+
+Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **o zip precisa levar `contracts/blocks.json` e `contracts/edges.json` na raiz, ao lado de `app/`**. O `scripts/build-functions.sh` da #22 (PR #218) hoje copia só `app/` e as dependências: enquanto ele não copiar `contracts/`, `get_contracts()` levanta `RuntimeError` na Lambda (falha fechada: arquivo ausente, cortado ou fora do contrato nunca vira contrato vazio). Nenhuma rota chama `get_contracts()` ainda; as primeiras são as de estimativa (#61, #62).
 
 ## Identidade
 

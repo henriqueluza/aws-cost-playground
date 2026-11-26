@@ -1,0 +1,120 @@
+/* DESIGN.md, "A casca do editor" (Paleta) e "Categorias dos blocos". Só tokens. */
+
+.search {
+  margin-block: var(--space-1) 0;
+}
+
+.results {
+  margin-block-start: var(--space-3);
+}
+
+.group {
+  margin-block-start: var(--space-5);
+}
+
+.groupTitle {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-semibold);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--row-table);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-semibold);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--t-hover) var(--ease-out),
+    transform var(--t-press) var(--ease-out);
+}
+
+.item:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) {
+  .item:hover {
+    background-color: var(--active);
+  }
+}
+
+/* Só o item que está por cima do canvas, durante o arrasto, ganha sombra. */
+.item[data-dragging] {
+  cursor: grabbing;
+  background-color: var(--surface);
+  box-shadow: var(--shadow-tip);
+}
+
+.tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tile-node);
+  height: var(--tile-node);
+  border-radius: var(--radius-chip);
+}
+
+.tile svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.item[data-group='compute'] .tile {
+  background-color: var(--cat-compute-tint);
+  color: var(--cat-compute-ink);
+}
+.item[data-group='data'] .tile {
+  background-color: var(--cat-data-tint);
+  color: var(--cat-data-ink);
+}
+.item[data-group='network'] .tile {
+  background-color: var(--cat-network-tint);
+  color: var(--cat-network-ink);
+}
+.item[data-group='security'] .tile {
+  background-color: var(--cat-security-tint);
+  color: var(--cat-security-ink);
+}
+.item[data-group='ops'] .tile {
+  background-color: var(--cat-ops-tint);
+  color: var(--cat-ops-ink);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere; /* nome longo quebra em vez de vazar da coluna de 200px */
+}
+
+.grip {
+  display: inline-flex;
+  flex: none;
+  color: var(--faint);
+}
+
+.grip svg {
+  width: var(--icon);
+  height: var(--icon);
+}

@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "service": "s3",
+  "region": "us-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "s3-requests-get-standard",
+      "description": "Requisições GET e demais (S3 Standard)",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0000004"
+        }
+      ]
+    },
+    {
+      "sku": "s3-requests-get-standard-ia",
+      "description": "Requisições GET e demais (S3 Standard-IA)",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.000001"
+        }
+      ]
+    },
+    {
+      "sku": "s3-requests-put-standard",
+      "description": "Requisições PUT, COPY, POST e LIST (S3 Standard)",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.000005"
+        }
+      ]
+    },
+    {
+      "sku": "s3-requests-put-standard-ia",
+      "description": "Requisições PUT, COPY, POST e LIST (S3 Standard-IA)",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.00001"
+        }
+      ]
+    },
+    {
+      "sku": "s3-storage-standard",
+      "description": "Armazenamento S3 Standard",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": "51200",
+          "unitPrice": "0.023"
+        },
+        {
+          "upTo": "512000",
+          "unitPrice": "0.022"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.021"
+        }
+      ]
+    },
+    {
+      "sku": "s3-storage-standard-ia",
+      "description": "Armazenamento S3 Standard-IA",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0125"
+        }
+      ]
+    }
+  ]
+}

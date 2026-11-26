@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "service": "cloudwatch",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "cloudwatch-alarms",
+      "description": "Alarmes (resolução padrão)",
+      "unit": "alarm-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.135"
+        }
+      ],
+      "freeTier": {
+        "quantity": "10"
+      }
+    },
+    {
+      "sku": "cloudwatch-custom-metrics",
+      "description": "Métricas customizadas",
+      "unit": "metric-month",
+      "tiers": [
+        {
+          "upTo": "10000",
+          "unitPrice": "0.3"
+        },
+        {
+          "upTo": "250000",
+          "unitPrice": "0.1"
+        },
+        {
+          "upTo": "1000000",
+          "unitPrice": "0.05"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.02"
+        }
+      ],
+      "freeTier": {
+        "quantity": "10"
+      }
+    },
+    {
+      "sku": "cloudwatch-logs-ingestion",
+      "description": "Ingestão de logs (Standard)",
+      "unit": "GB",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.9"
+        }
+      ],
+      "freeTier": {
+        "quantity": "5"
+      }
+    },
+    {
+      "sku": "cloudwatch-logs-storage",
+      "description": "Armazenamento de logs",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0408"
+        }
+      ],
+      "freeTier": {
+        "quantity": "5"
+      }
+    }
+  ]
+}

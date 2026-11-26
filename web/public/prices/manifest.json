@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "source": "seed",
+  "generatedAt": "2026-11-25T00:00:00Z",
+  "files": [
+    {
+      "path": "sa-east-1/alb.json",
+      "sha256": "735a2a1fb27211dad61fcce9f36049bc74ba26300052186845c57072f09b0481"
+    },
+    {
+      "path": "sa-east-1/cloudfront.json",
+      "sha256": "a3a913d53ecad078431d0b00816a07b9b4235077851b52c75025d921bd045007"
+    },
+    {
+      "path": "sa-east-1/cloudtrail.json",
+      "sha256": "ccac50b2a52d140f5901f570fb7c7a1857586511a7692be450926f0cf3487ff9"
+    },
+    {
+      "path": "sa-east-1/cloudwatch.json",
+      "sha256": "6738add14831ac987a9621cd93d491c3ad6a51587198db9d138b0ba68f528203"
+    },
+    {
+      "path": "sa-east-1/codepipeline.json",
+      "sha256": "b51f3a1cd5b76059613e08c7366d85a6997c4c331b68d48714039fd2024d5af3"
+    },
+    {
+      "path": "sa-east-1/cognito.json",
+      "sha256": "8530d83ebe2d7594af729cecc3cc8c207604db0111ef091e2d9b30518becb74e"
+    },
+    {
+      "path": "sa-east-1/data-transfer.json",
+      "sha256": "83d76d46f09fde9df349ea48e80d855f3fe7baff23c240dbd74123bcf52d50d4"
+    },
+    {
+      "path": "sa-east-1/dynamodb.json",
+      "sha256": "142a82baa54724200b779a6c3f4cee3f8b2e3fd17d5c0f8b9cc4c1f6760335e5"
+    },
+    {
+      "path": "sa-east-1/ec2.json",
+      "sha256": "e44ebd6f4962fa8e446a9babdc7071b78637ac8e4299ba405ab6408c22490e11"
+    },
+    {
+      "path": "sa-east-1/elasticache.json",
+      "sha256": "12b84fef2fad8546bfd551f805ff1aff7a873d61ff1c1ec895145512bf3bb5d3"
+    },
+    {
+      "path": "sa-east-1/lambda.json",
+      "sha256": "d6df1e15662b0f044ab60528dc0e5b59aea6f3a4a91f5af7c3837f811dd8727a"
+    },
+    {
+      "path": "sa-east-1/nat-gateway.json",
+      "sha256": "9458e33e99def7fedbdfb26b2ebe3ed31d6e77cbd59bd3617af3c8955a186098"
+    },
+    {
+      "path": "sa-east-1/rds.json",
+      "sha256": "73cbb18738ad10840b1955ad6b396110f3b6417fd623d5503d6c02c50d153eef"
+    },
+    {
+      "path": "sa-east-1/route53.json",
+      "sha256": "e4d1b2f175fab25d9c06622aaa190387df98f2cd2c92b6d81544b9f22c88ab7d"
+    },
+    {
+      "path": "sa-east-1/s3.json",
+      "sha256": "231e8d0fcd6295c11f7945fb6e73d90d6fe54475a49aae06bd42e999bf90b606"
+    },
+    {
+      "path": "sa-east-1/secrets-manager.json",
+      "sha256": "df5bea6007f18b7ea258966b44e98f86bdad0e0c2cc8f59c90312fc801422d19"
+    },
+    {
+      "path": "sa-east-1/sqs.json",
+      "sha256": "8d1fd5e03360179330653c3b30f77122b6bce8b3b31b0ae14a90f7ca47dbd95b"
+    },
+    {
+      "path": "sa-east-1/waf.json",
+      "sha256": "ce6c08050b14afdead4936fc2e076153e2e25eb9f2e8849ea5cd9dfbe3357a1f"
+    },
+    {
+      "path": "us-east-1/alb.json",
+      "sha256": "2560d413e0ab97f3bea7ff1c717eee4761d2e3d7bf2c20c2af6270b9f18764f5"
+    },
+    {
+      "path": "us-east-1/cloudfront.json",
+      "sha256": "d46187f127c6f0a6fd938e2ee325702ccffb65f1f75073e894125d61fa67f0f3"
+    },
+    {
+      "path": "us-east-1/cloudtrail.json",
+      "sha256": "6263964633db4aef87ade070493f74bcff741ed8354d897fa3ef1744fdc7f5c4"
+    },
+    {
+      "path": "us-east-1/cloudwatch.json",
+      "sha256": "eb4cd9d8c9f9bd582cff4449751b7cf8caeabb7795f09fc3084011ef262e01ae"
+    },
+    {
+      "path": "us-east-1/codepipeline.json",
+      "sha256": "ac0a6de04b77605ab9ac69091e27dd5d3ee77e9ca088981c4b814d0cdcdebf1a"
+    },
+    {
+      "path": "us-east-1/cognito.json",
+      "sha256": "1b1565e81e302961734b6ab0ec52f27dfeeab8d837c6dc2daf29ecd9845d2993"
+    },
+    {
+      "path": "us-east-1/data-transfer.json",
+      "sha256": "965fd1833fee6e722d116a8ea3aac1793e06078c64dfe02afe7221ccf8356238"
+    },
+    {
+      "path": "us-east-1/dynamodb.json",
+      "sha256": "531e223f5cb1486e2736b750466b894de3428ea1673c78736aad7b4826529bad"
+    },
+    {
+      "path": "us-east-1/ec2.json",
+      "sha256": "a2fda58b16a48a74f1a2f36cf2dbd59a780837127aaa4360e5c30074d0c68624"
+    },
+    {
+      "path": "us-east-1/elasticache.json",
+      "sha256": "7cad162b06551c2f0a7401da7e7220e96069f680beaccacd237dcd35af3d7fba"
+    },
+    {
+      "path": "us-east-1/lambda.json",
+      "sha256": "5f64e54721d321d572115bd9e1dfbe5c924145c3572b77dc719c0584a760ad73"
+    },
+    {
+      "path": "us-east-1/nat-gateway.json",
+      "sha256": "7cf6ed8924797f59b7b40c3bd376b9ef5b9dfb5d448a44172a4bfb8863552725"
+    },
+    {
+      "path": "us-east-1/rds.json",
+      "sha256": "0429d4a59312524e1fce366d3a0737f505e3f03859af733aa9c4bd4bb29c3b0b"
+    },
+    {
+      "path": "us-east-1/route53.json",
+      "sha256": "c2f9b5aff70ab83aabf16b24db71550654bff8ec697353e1a49704921b81de20"
+    },
+    {
+      "path": "us-east-1/s3.json",
+      "sha256": "f16f42166b9dd5b4729f719e911a9bb6703fb92a4f0802e714ae4729683d435d"
+    },
+    {
+      "path": "us-east-1/secrets-manager.json",
+      "sha256": "609f1a7406529e3119ce5dd7ff7185966d2b0520ccaee25550df8afbf756feab"
+    },
+    {
+      "path": "us-east-1/sqs.json",
+      "sha256": "f9648f959f1ce6b238fadb38e0f64909690c2ea892a62fb4d24ae109e176f9e3"
+    },
+    {
+      "path": "us-east-1/waf.json",
+      "sha256": "078bc4f4fd2bab668b3855e7d0bb86540efeedcfcc6ae54e7c7bf09f4430938b"
+    }
+  ]
+}

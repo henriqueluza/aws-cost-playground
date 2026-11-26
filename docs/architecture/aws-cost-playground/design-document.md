@@ -1,6 +1,6 @@
 # Contrato do documento do design
 
-O documento do design é o JSON que o anônimo baixa e o logado salva. A API (#10, Pydantic) e o frontend validam o mesmo contrato. Quem mudar um dos lados muda o outro junto.
+O documento do design é o JSON que o anônimo baixa e o logado salva. A API (#10, Pydantic) e o frontend validam o mesmo contrato. Quem mudar um dos lados muda o outro junto. Os modelos da API estão em `api/app/design_document.py`; os dois lados leem os exemplos de `contracts/examples/design/` e precisam dar o mesmo veredito.
 
 - **Origem:** [ADR-0001, "Modelo de dados"](ADR-0001-stack.md#modelo-de-dados). O formato e o exemplo são os do ADR, e este documento só detalha a validação.
 - **Onde mora:** `web/src/shared/lib/design/` (schema zod, tipos, `DESIGN_LIMITS` e `effectiveUsage`). Importe pelo `index.ts`. Se este texto e o código divergirem, vale o código.

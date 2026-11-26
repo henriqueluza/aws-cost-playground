@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "service": "cloudfront",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "cloudfront-data-transfer-out",
+      "description": "Saída para a internet (bordas da América do Sul)",
+      "unit": "GB",
+      "tiers": [
+        {
+          "upTo": "10240",
+          "unitPrice": "0.11"
+        },
+        {
+          "upTo": "51200",
+          "unitPrice": "0.105"
+        },
+        {
+          "upTo": "153600",
+          "unitPrice": "0.09"
+        },
+        {
+          "upTo": "512000",
+          "unitPrice": "0.08"
+        },
+        {
+          "upTo": "1048576",
+          "unitPrice": "0.06"
+        },
+        {
+          "upTo": "5242880",
+          "unitPrice": "0.05"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.04"
+        }
+      ],
+      "freeTier": {
+        "quantity": "1024"
+      }
+    },
+    {
+      "sku": "cloudfront-https-requests",
+      "description": "Requisições HTTPS (bordas da América do Sul)",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0000022"
+        }
+      ],
+      "freeTier": {
+        "quantity": "10000000"
+      }
+    }
+  ]
+}
