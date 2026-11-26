@@ -199,3 +199,4 @@ Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInp
 - **Uma linha por atributo e por chave de uso.** Os JSON são formatados à mão: o Prettier do `web/` não alcança `contracts/`.
 - **Unidade e `name` em inglês.** O contrato não tem rótulo de UI: os rótulos em pt-BR dos blocos, atributos e chaves de uso são da UI (#48).
 - **Sem valor em dólar.** O preço vem só do catálogo; o contrato só diz o que o bloco aceita.
+- **Cenários de referência:** os designs de `contracts/scenarios/` são conferidos contra este contrato por teste. Mudar `blocks.json` ou `edges.json` pode exigir atualizar os cenários; veja [scenarios.md](../../scenarios.md).

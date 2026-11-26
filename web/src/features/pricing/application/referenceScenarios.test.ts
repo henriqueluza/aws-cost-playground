@@ -49,9 +49,10 @@ function contractProblems(design: DesignDocument): string[] {
   const blockProblems = design.blocks.flatMap((block) => {
     const definition = blockDefinition(block.type);
     if (!definition) return [`${block.id}: tipo fora do contrato: ${block.type}`];
-    const attributes = definition.attributes.flatMap(({ key, options, default: fallback }) => {
+    // Cenário de referência não depende de padrão: todo atributo é escrito, inclusive o `az` opcional.
+    const attributes = definition.attributes.flatMap(({ key, options }) => {
       const value = block.attributes[key];
-      if (value === undefined) return fallback === undefined ? [] : [`atributo ausente: ${key}`];
+      if (value === undefined) return [`atributo ausente: ${key}`];
       return options.some((option) => option === value) ? [] : [`${key} fora das opções: ${value}`];
     });
     const unknown = Object.keys(block.attributes)
