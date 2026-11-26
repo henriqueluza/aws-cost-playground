@@ -100,6 +100,14 @@ def test_diretorio_sem_contratos_levanta_runtime_error(tmp_path: Path) -> None:
         load_contracts(tmp_path)
 
 
+@pytest.mark.parametrize("damage", [Path.unlink, lambda p: p.write_text("{")])
+@pytest.mark.parametrize("name", ["blocks.json", "edges.json"])
+def test_arquivo_ausente_ou_cortado_falha_fechado(tmp_path: Path, name: str, damage: Any) -> None:
+    damage(_write(tmp_path, lambda b, e: None) / name)
+    with pytest.raises((RuntimeError, OSError, ValidationError)):
+        load_contracts(tmp_path)
+
+
 def test_get_contracts_le_uma_vez_e_reutiliza() -> None:
     get_contracts.cache_clear()
     first = get_contracts()
