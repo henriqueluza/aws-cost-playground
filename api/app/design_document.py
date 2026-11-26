@@ -98,6 +98,8 @@ def _not_bool(value: object) -> object:
     return value
 
 
+SchemaVersion = Annotated[Literal[1], BeforeValidator(_not_bool)]
+"""`schemaVersion` dos arquivos de contrato: o literal 1, nunca `true`."""
 # Regex só com classes ASCII explícitas (`[0-9]`, nunca `\d`). O `$` do motor Rust não casa `\n`.
 BlockId = Annotated[str, StringConstraints(pattern=r"^blk_[A-Za-z0-9_-]{1,60}$")]
 EdgeId = Annotated[str, StringConstraints(pattern=r"^edg_[A-Za-z0-9_-]{1,60}$")]
@@ -170,7 +172,7 @@ class Workload(ContractModel):
 class DesignDocument(ContractModel):
     """O JSON que o anônimo baixa e o logado salva. Regras de grafo no validador do modelo."""
 
-    schema_version: Annotated[Literal[1], BeforeValidator(_not_bool)]
+    schema_version: SchemaVersion
     region: Region
     workload: Workload
     blocks: Annotated[list[Block], Field(max_length=MAX_BLOCKS)]

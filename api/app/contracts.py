@@ -13,7 +13,6 @@ from typing import Annotated, Literal, Self, get_args
 
 from pydantic import (
     AfterValidator,
-    BeforeValidator,
     Field,
     StringConstraints,
     field_validator,
@@ -23,10 +22,11 @@ from pydantic import (
 from app.design_document import (
     CLIENT_NODE_ID,
     MAX_FIELDS_PER_RECORD,
-    MAX_USAGE_VALUE,
     ContractModel,
     EdgeKind,
     FieldKey,
+    SchemaVersion,
+    UsageNumber,
 )
 
 BlockLevel = Literal["A", "B", "C"]
@@ -60,17 +60,9 @@ _SEARCH_DIRS = tuple(parent / "contracts" for parent in Path(__file__).resolve()
 """Zip da Lambda (`/var/task/contracts`) e, depois, a raiz do repositório."""
 
 
-def _reject_bool(value: object) -> object:
-    if isinstance(value, bool):
-        raise ValueError("Booleano não é número.")
-    return value
-
-
-SchemaVersion = Annotated[Literal[1], BeforeValidator(_reject_bool)]
 Text = Annotated[str, StringConstraints(min_length=1, max_length=MAX_TEXT_LENGTH)]
 OptionText = Annotated[str, StringConstraints(min_length=1, max_length=MAX_OPTION_LENGTH)]
 OptionValue = OptionText | int | Annotated[float, Field(allow_inf_nan=False)]
-UsageNumber = Annotated[int | float, Field(ge=0, le=MAX_USAGE_VALUE)]
 
 
 class AttributeDefinition(ContractModel):
