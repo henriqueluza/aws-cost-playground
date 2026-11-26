@@ -55,35 +55,32 @@ describe.each(pages)('%s', (path, doc) => {
     await expectNoAxeViolations(container);
   });
 
-  it('destaca os marcadores a preencher como texto', () => {
+  it('destaca como texto só os marcadores listados em MARKERS', () => {
     const { container } = renderAt(path);
     const marks = container.querySelectorAll('mark');
     expect(marks.length).toBeGreaterThan(0);
-    for (const m of marks) expect(m.textContent).toMatch(/^\[.+\]$/);
+    for (const m of marks) expect(Object.values(MARKERS)).toContain(m.textContent);
   });
 });
 
-describe('conteúdo exigido pela Issue #59', () => {
-  const text = (doc: typeof privacyPolicy) => JSON.stringify(doc.sections);
-
-  it('a política declara dado, hospedagem, Anthropic, retenção, exclusão e contato', () => {
-    const t = text(privacyPolicy);
-    for (const needle of [
-      'e-mail',
-      'us-east-1',
-      'Anthropic',
-      '7 dias',
-      'exclusão na página Conta',
-      MARKERS.contact,
-      'Não coloque dado pessoal',
-    ])
-      expect(t).toContain(needle);
-  });
-
-  it('os termos declaram estimativa sem cotação oficial, sem garantia e sem dado pessoal na carga', () => {
-    const t = text(termsOfUse);
-    for (const needle of ['não uma cotação oficial', 'sem garantia', 'Não inclua dado pessoal'])
-      expect(t).toContain(needle);
+describe('conteúdo exigido pela Issue #59, na seção certa', () => {
+  it.each([
+    ['/privacidade', 'dados', 'O único dado pessoal que o serviço pede é o seu e-mail.'],
+    ['/privacidade', 'dados', 'Ele é enviado à Claude API, da Anthropic'],
+    ['/privacidade', 'finalidades', 'Criar e manter a sua conta, e salvar e abrir os seus designs'],
+    ['/privacidade', 'finalidades', 'Gerar a estimativa de uso a partir da sua descrição de carga'],
+    ['/privacidade', 'transferencia', 'A infraestrutura fica na região us-east-1 da AWS'],
+    ['/privacidade', 'retencao', 'E-mail e senha: até você excluir a conta.'],
+    ['/privacidade', 'retencao', 'Registros técnicos: 7 dias.'],
+    ['/privacidade', 'direitos', 'Excluir a sua conta: use a opção de exclusão na página Conta.'],
+    ['/privacidade', 'controlador', `assunto de privacidade: ${MARKERS.contact}.`],
+    ['/privacidade', 'aviso-descricao', 'Não escreva nomes, e-mails, documentos'],
+    ['/termos', 'estimativa', 'Os valores mostrados são uma estimativa, não uma cotação oficial.'],
+    ['/termos', 'garantia', 'O serviço é oferecido como está, sem garantia'],
+    ['/termos', 'descricao-de-carga', 'Não inclua dado pessoal nela nem nos rótulos dos blocos.'],
+  ])('%s, seção #%s: "%s"', (path, id, needle) => {
+    const { container } = renderAt(path);
+    expect(container.querySelector(`section[aria-labelledby="${id}"]`)).toHaveTextContent(needle);
   });
 });
 
