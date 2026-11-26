@@ -21,6 +21,7 @@ const estimateOf = (blocks: Record<string, ReturnType<typeof item>>): CostEstima
     ...cost,
   })),
   edges: [{ edgeId: 'edg_1', kind: 'data', ...item('0') }],
+  warnings: [],
 });
 
 const lambda: Block = {

@@ -1,10 +1,22 @@
 import { z } from 'zod';
 
-/** https em qualquer host; http só em localhost (desenvolvimento). */
-const webUrl = z.union([
-  z.url({ protocol: /^https$/ }),
-  z.url({ protocol: /^http$/, hostname: /^(localhost|127\.0\.0\.1)$/ }),
-]);
+/** Credenciais, query ou fragmento não fazem parte de uma URL de serviço e não são aceitos. */
+function isBareUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return !url.username && !url.password && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+/** https em qualquer host; http só em localhost (desenvolvimento). Sem credenciais, query nem fragmento. */
+const webUrl = z
+  .union([
+    z.url({ protocol: /^https$/ }),
+    z.url({ protocol: /^http$/, hostname: /^(localhost|127\.0\.0\.1)$/ }),
+  ])
+  .refine(isBareUrl);
 
 /** Configuração de runtime servida em `/config.json`; é o único arquivo que muda por ambiente. */
 export const runtimeConfigSchema = z.object({
