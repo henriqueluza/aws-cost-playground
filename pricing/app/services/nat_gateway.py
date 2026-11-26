@@ -7,15 +7,7 @@ só o SKU do catálogo, nunca texto da AWS.
 
 from collections.abc import Mapping, Sequence
 
-from app.model import (
-    Filter,
-    Price,
-    PricingError,
-    Product,
-    Query,
-    ServiceSpec,
-    region_filter,
-)
+from app.model import Filter, Price, PricingError, Product, Query, ServiceSpec, region_filter
 from app.products import tiers
 
 _CODE = "AmazonEC2"
@@ -39,17 +31,10 @@ def _prefix(region: str) -> str:
 
 def queries(region: str) -> tuple[Query, ...]:
     """Uma consulta por SKU: `regionCode`, `operation` e `usagetype` com o prefixo da região."""
-    prefix = _prefix(region)
+    prefix, common = _prefix(region), (region_filter(region), Filter("operation", _OPERATION))
     return tuple(
-        Query(
-            _CODE,
-            (
-                region_filter(region),
-                Filter("operation", _OPERATION),
-                Filter("usagetype", prefix + usagetype),
-            ),
-        )
-        for usagetype, _, _, _ in _SKUS.values()
+        Query(_CODE, (*common, Filter("usagetype", prefix + usagetype)))
+        for usagetype, *_ in _SKUS.values()
     )
 
 
