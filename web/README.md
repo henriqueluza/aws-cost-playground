@@ -20,6 +20,14 @@ npm run dev   # servidor de desenvolvimento do Vite
 npx prettier --check . && npx eslint . && npx tsc --noEmit && npm test -- --run && npm run build
 ```
 
+### Testes de ponta a ponta (Playwright)
+
+```bash
+npx playwright test   # arquivos web/e2e/*.e2e.ts (o Vitest não os pega)
+```
+
+Sobe o `npm run dev` na porta `E2E_PORT` (padrão 5173) ou reaproveita o servidor que já responde nela. `PLAYWRIGHT_CHROMIUM_PATH` aponta para um Chromium já instalado (opcional). O `export.e2e.ts` abre um design e baixa o `main.tf` pela aba **Exportar** do trilho do editor.
+
 ### Lint de arquitetura
 
 As regras de import do ADR-0001 são verificadas pelo `npx eslint .` (config em `eslint.config.js`) e pelo teste `src/architecture.test.ts`:
