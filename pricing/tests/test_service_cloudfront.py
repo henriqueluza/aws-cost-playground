@@ -1,176 +1,119 @@
+"""Bloco CloudFront sobre o bulk offer file global da AWS (19/10/2026, baixado em 26/11/2026)."""
+
 import json
-from collections.abc import Mapping, Sequence
-from decimal import Decimal
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from app.checks import blocking
-from app.model import Filter, FreeTier, PricingError, Product, Query
+from app.catalog import PRICES_DIR
+from app.generate import generate
+from app.model import Filter, FreeTier, Price, PricingError, Product, Query, Tier
 from app.products import parse_product
-from app.render import render_price_file
+from app.schema import validate_price_file
 from app.services.cloudfront import SERVICE, build, queries
 
-ROOT = Path(__file__).resolve().parents[2]
-REQUESTS, TRANSFER = "cloudfront-https-requests", "cloudfront-data-transfer-out"
-PLACE = {"US": "United States", "SA": "South America", "EU": "Europe"}
-ENDS = ("10240", "51200", "153600", "512000", "1048576", "5242880", "Inf")
+REGIONS = ("us-east-1", "sa-east-1")
+SEED = Path(__file__).resolve().parents[2] / PRICES_DIR
+_LINES = (Path(__file__).parent / "fixtures" / "cloudfront.jsonl").read_text(encoding="utf-8")
+# Price List global: as duas bordas e o ruído (proxy, HTTP e Europa) num arquivo só.
+ALL = [parse_product(line) for line in _LINES.splitlines() if line]
+HTTPS, OUT = "cloudfront-https-requests", "cloudfront-data-transfer-out"
+# SKUs da AWS nas bordas dos Estados Unidos: requisições HTTPS e saída para a internet.
+US_HTTPS, US_OUT = "NPFD6SEH9MXS8M4J", "GV2WFGX37Q9PDSHF"
+
+
+def fetch(query: Query) -> list[Product]:
+    """Emula o TERM_MATCH do `GetProducts` sobre a fixture (as consultas só usam atributos)."""
+    return [p for p in ALL if all(p.attributes.get(f.field) == f.value for f in query.filters)]
+
+
+def answer(region: str) -> list[Product]:
+    return [product for query in queries(region) for product in fetch(query)]
+
+
+US = answer("us-east-1")  # Requisições HTTPS e saída, nessa ordem.
+LIMITS = ("10240", "51200", "153600", "512000", "1048576", "5242880", None)
 US_GB = ("0.085", "0.08", "0.06", "0.04", "0.03", "0.025", "0.02")
 SA_GB = ("0.11", "0.105", "0.09", "0.08", "0.06", "0.05", "0.04")
-REGION_ERROR = r"^região sem local de borda do CloudFront$"
-ZERO_ERROR = r"^faixa de preço zero no CloudFront"
-UNIT_ERROR = r"^unidade inesperada no CloudFront$"
 
 
-def item(
-    sku: str, family: str, attributes: Mapping[str, str], ranges: Sequence[tuple[str, ...]]
-) -> Product:
-    """Item `aws_v1` como os da Price List (preço com 10 casas), lido pelo `parse_product`."""
-    term = f"{sku}.JRTCKXETXF"
-    dimensions = {
-        f"{term}.R{i}": {
-            "rateCode": f"{term}.R{i}",
-            "description": "texto da AWS",
-            "beginRange": begin,
-            "endRange": end,
-            "unit": unit,
-            "pricePerUnit": {"USD": f"{Decimal(usd):.10f}"},
-            "appliesTo": [],
-        }
-        for i, (unit, begin, end, usd) in enumerate(ranges)
-    }
-    term_doc = {"offerTermCode": "JRTCKXETXF", "sku": sku, "priceDimensions": dimensions}
-    raw = {
-        "product": {
-            "sku": sku,
-            "productFamily": family,
-            "attributes": {"servicecode": "AmazonCloudFront", "operation": "", **attributes},
-        },
-        "serviceCode": "AmazonCloudFront",
-        "terms": {"OnDemand": {term: {**term_doc, "termAttributes": {}}}},
-        "version": "20261019150500",
-    }
-    return parse_product(json.dumps(raw))
-
-
-def requests(
-    sku: str,
-    usd: str,
-    usage: str = "US-Requests-Tier2-HTTPS",
-    kind: str = "CloudFront-Request-Tier2",
-    unit: str = "Requests",
-) -> Product:
-    attributes = {"location": PLACE[usage[:2]], "usagetype": usage, "requestType": kind}
-    return item(sku, "Request", attributes, [(unit, "0", "Inf", usd)])
-
-
-def transfer(
-    sku: str,
-    prices: Sequence[str] = US_GB,
-    usage: str = "US-DataTransfer-Out-Bytes",
-    family: str = "Data Transfer",
-    unit: str = "GB",
-) -> Product:
-    attributes = {
-        "transferType": "CloudFront Outbound",
-        "fromLocation": PLACE[usage[:2]],
-        "toLocation": "External",
-        "usagetype": usage,
-    }
-    ranges = zip(("0", *ENDS[:-1]), ENDS, prices, strict=True)
-    return item(sku, family, attributes, [(unit, begin, end, usd) for begin, end, usd in ranges])
-
-
-US_REQUESTS = requests("NPFD6SEH9MXS8M4J", "0.000001")
-US_TRANSFER = transfer("GV2WFGX37Q9PDSHF")
-DISTRACTORS = (
-    requests(
-        "DCX5PSWXNPZDK63Q", "0.000001", "US-Requests-HTTPS-Proxy", "CloudFront-Request-HTTPS-Proxy"
-    ),
-    transfer("VU3485RNDU6HBQF6", US_GB, "EU-DataTransfer-Out-Bytes"),
-    transfer("FAMILIAERRADA001", family="Fee"),
-)
-# Resposta que ignora os filtros (pior caso): as duas bordas e os distratores juntos.
-ALL = (
-    US_REQUESTS,
-    US_TRANSFER,
-    requests("FUWQBJC8EW2AP9J4", "0.0000022", "SA-Requests-Tier2-HTTPS"),
-    transfer("ZT3N6V49SHDM9P3G", SA_GB, "SA-DataTransfer-Out-Bytes"),
-    *DISTRACTORS,
-)
-
-
-@pytest.mark.parametrize(
-    ("region", "https", "out"),
-    [
-        ("us-east-1", "US-Requests-Tier2-HTTPS", "US-DataTransfer-Out-Bytes"),
-        ("sa-east-1", "SA-Requests-Tier2-HTTPS", "SA-DataTransfer-Out-Bytes"),
-    ],
-)
-def test_queries_filter_the_region_edge(region: str, https: str, out: str) -> None:
-    assert queries(region) == (
-        Query("AmazonCloudFront", (Filter("usagetype", https),)),
-        Query("AmazonCloudFront", (Filter("usagetype", out),)),
+def _expected(edge: str, https: str, gb: tuple[str, ...]) -> tuple[Price, ...]:
+    requests = (Tier(None, https),)
+    out = tuple(Tier(up_to, usd) for up_to, usd in zip(LIMITS, gb, strict=True))
+    return (
+        Price(HTTPS, f"Requisições HTTPS {edge}", "request", requests, FreeTier("10000000")),
+        Price(OUT, f"Saída para a internet {edge}", "GB", out, FreeTier("1024")),
     )
-    assert (SERVICE.queries, SERVICE.build) == (queries, build)
-    assert frozenset({REQUESTS, TRANSFER}) == SERVICE.expected_skus
 
 
-def test_unknown_region_is_refused() -> None:
-    with pytest.raises(PricingError, match=REGION_ERROR):
-        queries("eu-west-1")
-    with pytest.raises(PricingError, match=REGION_ERROR):
-        build("eu-west-1", ALL)
+EXPECTED = {
+    "us-east-1": _expected("(bordas dos Estados Unidos)", "0.000001", US_GB),
+    "sa-east-1": _expected("(bordas da América do Sul)", "0.0000022", SA_GB),
+}
 
 
-@pytest.mark.parametrize(
-    ("region", "https", "out"),
-    [("us-east-1", "0.000001", "0.085"), ("sa-east-1", "0.0000022", "0.11")],
-)
-def test_build_takes_the_region_edge_and_adds_free_tier(region: str, https: str, out: str) -> None:
-    prices = build(region, ALL)
-    assert isinstance(prices, tuple)
-    assert len(prices) == 2
-    assert {p.sku: p.tiers[0].unit_price for p in prices} == {REQUESTS: https, TRANSFER: out}
-    assert {p.sku: p.free_tier for p in prices} == {
-        REQUESTS: FreeTier("10000000"),
-        TRANSFER: FreeTier("1024"),
-    }
+@pytest.mark.parametrize(("region", "edge"), [("us-east-1", "US"), ("sa-east-1", "SA")])
+def test_queries_filter_the_region_edge(region: str, edge: str) -> None:
+    assert queries(region) == (
+        Query("AmazonCloudFront", (Filter("usagetype", f"{edge}-Requests-Tier2-HTTPS"),)),
+        Query("AmazonCloudFront", (Filter("usagetype", f"{edge}-DataTransfer-Out-Bytes"),)),
+    )
 
 
-@pytest.mark.parametrize("region", ["us-east-1", "sa-east-1"])
-def test_build_renders_the_seed_byte_for_byte(region: str) -> None:
-    seed = (ROOT / f"web/public/prices/{region}/cloudfront.json").read_bytes()
-    assert render_price_file(SERVICE.slug, region, build(region, ALL)) == seed
+def test_region_without_edge_is_refused() -> None:
+    for call in (queries, lambda region: build(region, ALL)):
+        with pytest.raises(PricingError, match=r"^região sem local de borda do CloudFront$"):
+            call("eu-west-1")
 
 
-@pytest.mark.parametrize(
-    ("product", "error"),
-    [
-        (requests("NPFD6SEH9MXS8M4J", "0"), ZERO_ERROR),
-        (transfer("GV2WFGX37Q9PDSHF", ("0", *US_GB[1:])), ZERO_ERROR),
-        (requests("NPFD6SEH9MXS8M4J", "0.000001", unit="GB"), UNIT_ERROR),
-        (transfer("GV2WFGX37Q9PDSHF", unit="TB"), UNIT_ERROR),
-    ],
-    ids=["requests-zero", "transfer-zero", "requests-unit", "transfer-unit"],
-)
-def test_zero_tier_and_unexpected_unit_are_refused(product: Product, error: str) -> None:
-    with pytest.raises(PricingError, match=error):
-        build("us-east-1", (product,))
+@pytest.mark.parametrize("region", REGIONS)
+def test_build_takes_only_the_region_edge(region: str) -> None:
+    assert build(region, answer(region)) == EXPECTED[region]
+    # Pior caso, resposta sem filtro: o ruído e a outra borda são ignorados.
+    assert build(region, ALL) == EXPECTED[region]
 
 
-def test_two_products_for_one_sku_are_refused() -> None:
-    twin = requests("TWIN000000000001", "0.000001")
-    with pytest.raises(PricingError, match=rf"^mais de um produto para {REQUESTS}$"):
-        build("us-east-1", (US_REQUESTS, twin, US_TRANSFER))
+def test_missing_product_is_left_to_expected_skus() -> None:
+    prices = build("us-east-1", [p for p in US if p.sku != US_OUT])
+    assert {p.sku for p in prices} == SERVICE.expected_skus - {OUT}
 
 
-def test_missing_product_is_left_out_and_blocked() -> None:
-    prices = build("us-east-1", (US_REQUESTS, *DISTRACTORS))
-    assert [p.sku for p in prices] == [REQUESTS]
-    content = render_price_file(SERVICE.slug, "us-east-1", prices)
-    assert blocking(SERVICE, prices, content) == [f"SKU esperado ausente: {TRANSFER}"]
-    assert blocking(SERVICE, build("sa-east-1", ()), b"{}") == [
-        "nenhum preço gerado",
-        f"SKU esperado ausente: {TRANSFER}, {REQUESTS}",
-    ]
+def _last_tier(sku: str, **changes: str) -> list[Product]:
+    """Resposta de us-east-1 com a última faixa (a aberta) do produto `sku` da AWS alterada."""
+    p = next(p for p in US if p.sku == sku)
+    edited = replace(p, dimensions=(*p.dimensions[:-1], replace(p.dimensions[-1], **changes)))
+    return [edited if q.sku == sku else q for q in US]
+
+
+# Unidade e preço zero valem para toda faixa, não só a primeira: a saída tem sete.
+CASES: dict[str, tuple[list[Product], str]] = {
+    "duplicate": ([*US, replace(US[0], sku="DUPLICATE1")], f"mais de um produto da AWS: {HTTPS}"),
+    "unit": (_last_tier(US_HTTPS, unit="GB"), f"unidade da AWS inesperada: {HTTPS}"),
+    "unit-last-tier": (_last_tier(US_OUT, unit="TB"), f"unidade da AWS inesperada: {OUT}"),
+    "zero-price": (_last_tier(US_HTTPS, usd="0"), f"faixa sem preço: {HTTPS}"),
+    "zero-price-last-tier": (_last_tier(US_OUT, usd="0"), f"faixa sem preço: {OUT}"),
+}
+
+
+@pytest.mark.parametrize(("products", "message"), CASES.values(), ids=CASES)
+def test_build_rejects_unexpected_shapes(products: list[Product], message: str) -> None:
+    with pytest.raises(PricingError) as info:
+        build("us-east-1", products)
+    # Mensagem fixa e só com o SKU do catálogo: nenhum texto da AWS.
+    assert str(info.value) == message
+
+
+@pytest.mark.parametrize("region", REGIONS)
+def test_generated_file_matches_the_versioned_seed(region: str, tmp_path: Path) -> None:
+    now = datetime(2026, 11, 26, tzinfo=UTC)
+    raw = generate([SERVICE], fetch, tmp_path, now).files[f"{region}/cloudfront.json"]
+    generated, seed = json.loads(raw), json.loads((SEED / region / "cloudfront.json").read_bytes())
+    for content in (generated, seed):
+        assert validate_price_file(content) == []
+        assert {p["sku"] for p in content["prices"]} == SERVICE.expected_skus
+    # Sem faixas nem `freeTier.quantity`: números da AWS que o workflow semanal (#29) atualiza.
+    for price in (*generated["prices"], *seed["prices"]):
+        del price["tiers"], price["freeTier"]["quantity"]
+    assert generated["prices"] == seed["prices"]

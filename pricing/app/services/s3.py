@@ -14,20 +14,23 @@ from app.model import Filter, Price, PricingError, Product, Query, ServiceSpec, 
 from app.products import tiers
 
 PREFIX = {"us-east-1": "", "sa-east-1": "SAE1-"}
-_SERVICE_CODE = "AmazonS3"
+_CODE = "AmazonS3"
 
 
 @dataclass(frozen=True, slots=True)
 class _Kind:
-    """Família na Price List, unidade da AWS e unidade do catálogo."""
+    """Família na Price List, unidade da AWS, unidade do catálogo e descrição (`{}` é a classe)."""
 
     family: str
     aws_unit: str
     unit: str
+    description: str
 
 
-_STORAGE = _Kind("Storage", "GB-Mo", "GB-month")
-_REQUEST = _Kind("API Request", "Requests", "request")
+_STORAGE = _Kind("Storage", "GB-Mo", "GB-month", "Armazenamento S3 {}")
+_PUT = _Kind("API Request", "Requests", "request", "Requisições PUT, COPY, POST e LIST (S3 {})")
+_GET = _Kind("API Request", "Requests", "request", "Requisições GET e demais (S3 {})")
+_IA = "Standard - Infrequent Access"
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,51 +38,20 @@ class _Item:
     """SKU do catálogo e o produto que o define; `usagetype` sem o prefixo da região."""
 
     sku: str
-    description: str
     kind: _Kind
+    storage_class: str
     usagetype: str
     volume_type: str | None = None
 
 
+# Conjunto fechado, na ordem das consultas; só o armazenamento exige o `volumeType`.
 _ITEMS = (
-    _Item(
-        "s3-storage-standard",
-        "Armazenamento S3 Standard",
-        _STORAGE,
-        "TimedStorage-ByteHrs",
-        "Standard",
-    ),
-    _Item(
-        "s3-storage-standard-ia",
-        "Armazenamento S3 Standard-IA",
-        _STORAGE,
-        "TimedStorage-SIA-ByteHrs",
-        "Standard - Infrequent Access",
-    ),
-    _Item(
-        "s3-requests-put-standard",
-        "Requisições PUT, COPY, POST e LIST (S3 Standard)",
-        _REQUEST,
-        "Requests-Tier1",
-    ),
-    _Item(
-        "s3-requests-get-standard",
-        "Requisições GET e demais (S3 Standard)",
-        _REQUEST,
-        "Requests-Tier2",
-    ),
-    _Item(
-        "s3-requests-put-standard-ia",
-        "Requisições PUT, COPY, POST e LIST (S3 Standard-IA)",
-        _REQUEST,
-        "Requests-SIA-Tier1",
-    ),
-    _Item(
-        "s3-requests-get-standard-ia",
-        "Requisições GET e demais (S3 Standard-IA)",
-        _REQUEST,
-        "Requests-SIA-Tier2",
-    ),
+    _Item("s3-storage-standard", _STORAGE, "Standard", "TimedStorage-ByteHrs", "Standard"),
+    _Item("s3-storage-standard-ia", _STORAGE, "Standard-IA", "TimedStorage-SIA-ByteHrs", _IA),
+    _Item("s3-requests-put-standard", _PUT, "Standard", "Requests-Tier1"),
+    _Item("s3-requests-get-standard", _GET, "Standard", "Requests-Tier2"),
+    _Item("s3-requests-put-standard-ia", _PUT, "Standard-IA", "Requests-SIA-Tier1"),
+    _Item("s3-requests-get-standard-ia", _GET, "Standard-IA", "Requests-SIA-Tier2"),
 )
 
 
@@ -94,7 +66,7 @@ def queries(region: str) -> tuple[Query, ...]:
     """Uma consulta por `usagetype`, na ordem dos itens."""
     prefix = _prefix(region)
     return tuple(
-        Query(_SERVICE_CODE, (region_filter(region), Filter("usagetype", prefix + item.usagetype)))
+        Query(_CODE, (region_filter(region), Filter("usagetype", prefix + item.usagetype)))
         for item in _ITEMS
     )
 
@@ -110,15 +82,16 @@ def _pick(item: _Item, region: str, prefix: str, products: Sequence[Product]) ->
         and (item.volume_type is None or p.attributes.get("volumeType") == item.volume_type)
     ]
     if len(found) > 1:
-        raise PricingError(f"mais de um produto para {item.sku}")
+        raise PricingError(f"mais de um produto da AWS: {item.sku}")
     return found[0] if found else None
 
 
 def _price(item: _Item, product: Product) -> Price:
     """Preço do item; recusa outra unidade (preço por 1.000 requisições daria custo 1.000x)."""
     if any(d.unit != item.kind.aws_unit for d in product.dimensions):
-        raise PricingError(f"unidade inesperada para {item.sku}")
-    return Price(item.sku, item.description, item.kind.unit, tiers(product.dimensions))
+        raise PricingError(f"unidade da AWS inesperada: {item.sku}")
+    description = item.kind.description.format(item.storage_class)
+    return Price(item.sku, description, item.kind.unit, tiers(product.dimensions))
 
 
 def build(region: str, products: Sequence[Product]) -> tuple[Price, ...]:
@@ -130,7 +103,7 @@ def build(region: str, products: Sequence[Product]) -> tuple[Price, ...]:
 
 SERVICE = ServiceSpec(
     slug="s3",
-    service_code=_SERVICE_CODE,
+    service_code=_CODE,
     queries=queries,
     build=build,
     expected_skus=frozenset(item.sku for item in _ITEMS),
