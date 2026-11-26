@@ -48,6 +48,13 @@ O build é o mesmo em todos os ambientes. O que muda por ambiente é o arquivo `
 
 Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de erro e não carrega. Não coloque segredos nele: é público.
 
+## SEO e arquivos públicos
+
+- `index.html` traz título, descrição, `theme-color` (claro e escuro), Open Graph, Twitter Card e favicon (`public/favicon.svg`). Sem `og:image` (o cartão é `summary`) e sem JSON-LD: a CSP (`script-src 'self'`) bloqueia script inline.
+- `VITE_SITE_URL` (origem https, sem caminho, como `https://exemplo.com`) é lida no **build**. Com ela, o build emite `canonical`, `og:url`, as URLs do `sitemap.xml` e a linha `Sitemap:` do `robots.txt`; sem ela, esses itens saem vazios e o build avisa. Valor inválido derruba o build. O pipeline de deploy (#22) precisa defini-la por ambiente; não há padrão.
+- `robots.txt` e `sitemap.xml` são gerados por `tooling/seo.ts` (rotas públicas em `PUBLIC_ROUTES`; as páginas legais entram quando existirem).
+- `public/seo.js` (classe como `theme.js`) põe `noindex` em `/designs`, `/conta` e `/auth/callback` e ajusta o canonical ao caminho atual. Essas rotas não têm `Disallow` no `robots.txt` de propósito: o rastreador precisa abri-las para ver o `noindex`.
+
 ## Estrutura
 
 - `src/app/` — composition root: bootstrap (carga da config e providers) e rotas (`/`, `/designs`, `/comparar`, `/conta`, `/privacidade`, `/termos`, `/auth/callback`; as páginas ainda estão vazias).
