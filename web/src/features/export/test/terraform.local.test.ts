@@ -10,6 +10,7 @@ import pipelineDeFilas from '../../../../../contracts/scenarios/pipeline-de-fila
 import { adrExampleDesign } from '../../../test/designFixtures';
 import { exportDesign } from '../application/exportDesign';
 import { hcl, renderHcl } from '../model/hcl';
+import { design, relabel } from './generatorHarness';
 import { INJECTION_PAYLOADS } from './injectionPayloads';
 
 /**
@@ -21,7 +22,36 @@ import { INJECTION_PAYLOADS } from './injectionPayloads';
 const enabled = process.env.EXPORT_TERRAFORM_CHECK === '1';
 /** Com `EXPORT_TERRAFORM_AWS=1` também valida o export dos cenários com o provider da AWS (baixa o plugin). */
 const withAws = enabled && process.env.EXPORT_TERRAFORM_AWS === '1';
-const SCENARIOS = { apiServerless, appClassico, pipelineDeFilas };
+/** Só os blocos sem VPC (#65): as arestas que viram referência e um de cada sem aresta. */
+const serverlessOnly = design(
+  [
+    { id: 'cdn', type: 'aws.cloudfront' },
+    { id: 'site', type: 'aws.s3' },
+    { id: 'queue', type: 'aws.sqs', attributes: { queueType: 'fifo' } },
+    { id: 'worker', type: 'aws.lambda', label: 'x'.repeat(80) },
+    { id: 'table', type: 'aws.dynamodb', attributes: { capacityMode: 'provisioned' } },
+    { id: 'archive', type: 'aws.s3', attributes: { storageClass: 'STANDARD_IA' } },
+    { id: 'lone_cdn', type: 'aws.cloudfront', label: 'y'.repeat(80) },
+    { id: 'lone_fn', type: 'aws.lambda' },
+  ],
+  [
+    ['cdn', 'site'],
+    ['cdn', 'client'],
+    ['queue', 'worker'],
+    ['worker', 'queue'],
+    ['worker', 'table'],
+    ['worker', 'archive'],
+    ['archive', 'worker'],
+  ],
+);
+const SCENARIOS = {
+  apiServerless,
+  appClassico,
+  pipelineDeFilas,
+  serverlessOnly,
+  pipelineComRotulosHostis: relabel(pipelineDeFilas, INJECTION_PAYLOADS[0]?.[1] ?? ''),
+  apiComInterpolacaoNosRotulos: relabel(apiServerless, INJECTION_PAYLOADS[1]?.[1] ?? ''),
+};
 
 describe.skipIf(!enabled)('conferência com o binário terraform', { timeout: 120_000 }, () => {
   it('as cargas de injeção viram HCL bem formado e voltam com o mesmo valor', () => {
