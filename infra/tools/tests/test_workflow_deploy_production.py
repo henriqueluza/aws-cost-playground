@@ -104,12 +104,28 @@ class TriggerAndPermissionsTest(unittest.TestCase):
 
 
 class SameArtifactTest(unittest.TestCase):
-    def test_check_finds_the_staging_run_and_requires_its_smoke(self) -> None:
-        run = joined(run_block(step(CHECK, "staging")))
-        self.assertIn("actions/workflows/deploy-staging.yml/runs", run)
-        self.assertRegex(run, r'run_id=\$\(python3 infra/tools/release_gate\.py staging-run "\$SHA" ')
-        self.assertRegex(run, r'actions/runs/\$run_id/jobs" -f filter=latest')
-        self.assertLess(run.index("release_gate.py staging-jobs"), run.index('>> "$GITHUB_OUTPUT"'))
+    def test_check_finds_the_staging_run_before_any_output(self) -> None:
+        run = run_block(step(CHECK, "staging"))
+        self.assertTrue(run.startswith('release=$(scripts/find-staging-release.sh "$SHA")\n'), run)
+        self.assertIn('echo "run_id=${release%% *}" >> "$GITHUB_OUTPUT"', run)
+        find = (ROOT / "scripts" / "find-staging-release.sh").read_text(encoding="utf-8")
+        self.assertIn("actions/workflows/deploy-staging.yml/runs", find)
+
+    def test_both_jobs_require_the_same_staging_run_and_attempt_after_the_download(self) -> None:
+        for text in (CHECK, DEPLOY):
+            ids = [sid for sid, s in steps(text) if sid == "verify" or "actions/download-artifact@" in s]
+            self.assertEqual(ids[-1], "verify", "a conferência vem depois do download")
+            chunk = step(text, "verify")
+            self.assertRegex(chunk, r"(?m)^\s+RELEASE: \$\{\{ \S+\.outputs\.release \}\}\s*$")
+            self.assertRegex(run_block(chunk), r'if \[ "\$\(scripts/find-staging-release\.sh "\$SHA"\)" != "\$RELEASE" \]; then\n.*\n\s+exit 1')
+
+    def test_deploy_only_accepts_the_checksums_file_that_check_verified(self) -> None:
+        self.assertIn("      sums: ${{ steps.verify.outputs.sums }}\n", CHECK)
+        self.assertIn('sums=$(sha256sum < "$RUNNER_TEMP/release/SHA256SUMS")', run_block(step(CHECK, "verify")))
+        chunk = step(DEPLOY, "verify")
+        self.assertIn("SUMS: ${{ needs.check.outputs.sums }}", chunk)
+        lines = run_block(chunk).splitlines()
+        self.assertEqual(lines[0], '(cd "$RUNNER_TEMP/release" && echo "$SUMS  SHA256SUMS" | sha256sum --check --strict -)')
 
     def test_staging_still_has_what_the_gate_looks_for(self) -> None:
         staging_deploy = job("deploy", STAGING)
@@ -168,6 +184,10 @@ class DeployStepsTest(unittest.TestCase):
         self.assertIn('"$GITHUB_WORKSPACE/infra/tools/plan_guard.py"', run_block(chunk))
         self.assertNotIn("TF_STATE_BUCKET_STAGING", CODE)
 
+    def test_no_step_is_conditional_or_allowed_to_fail(self) -> None:
+        self.assertNotIn("continue-on-error", CODE)
+        self.assertNotRegex(CODE, r"(?m)^\s+(- )?if:")
+
     def test_smoke_runs_the_versioned_script_against_the_release_manifest(self) -> None:
         run = joined(run_block(step(DEPLOY, "smoke")))
         self.assertEqual(
@@ -181,6 +201,8 @@ class DeployStepsTest(unittest.TestCase):
         runbook = RUNBOOK.read_text(encoding="utf-8")
         for token in ("deploy-production.yml", "SHA anterior", "workflow_dispatch", "plan-guard", "90 dias"):
             self.assertIn(token, runbook)
+        how = runbook.split("## 2. Disparar o workflow\n", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("deploy-production.yml --ref main -f sha=<SHA anterior>", how)
 
 
 GATE_FIELDS = {

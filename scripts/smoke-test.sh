@@ -17,7 +17,7 @@ if [ "$#" -ne 4 ]; then
   echo "uso: $0 <site_url> <api_base_url> <config.json> <manifest.json>" >&2
   exit 2
 fi
-site_url="$1" api_base_url="$2" config="$3" manifest="$4"
+site_url="${1%/}" api_base_url="${2%/}" config="$3" manifest="$4"
 delay="${SMOKE_RETRY_DELAY:-10}"
 
 for url in "$site_url" "$api_base_url"; do

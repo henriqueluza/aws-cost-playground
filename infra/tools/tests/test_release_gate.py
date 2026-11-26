@@ -1,7 +1,7 @@
-"""Testes de infra/tools/release_gate.py e scripts/smoke-test.sh (#23).
+"""Testes de infra/tools/release_gate.py, scripts/find-staging-release.sh e scripts/smoke-test.sh (#23).
 
 O release-gate roda como processo, contra um repositório git descartável e arquivos JSON no
-formato da API do GitHub. O smoke roda em bash com um `curl` falso no PATH. Sem rede.
+formato da API do GitHub. Os scripts rodam em bash com `gh` e `curl` falsos no PATH. Sem rede.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 GATE = ROOT / "infra" / "tools" / "release_gate.py"
 SMOKE = ROOT / "scripts" / "smoke-test.sh"
+FIND = ROOT / "scripts" / "find-staging-release.sh"
 SHA = "a" * 40
 MAIN = "refs/heads/main"
 STAGING = ".github/workflows/deploy-staging.yml"
@@ -87,8 +88,8 @@ class ShaTest(TempDirTest):
 
 
 def run(**overrides: object) -> dict[str, object]:
-    base = {"id": 7, "head_sha": SHA, "head_branch": "main", "event": "push", "path": STAGING,
-            "status": "completed", "conclusion": "success"}  # fmt: skip
+    base = {"id": 7, "run_attempt": 1, "head_sha": SHA, "head_branch": "main", "event": "push",
+            "path": STAGING, "status": "completed", "conclusion": "success"}  # fmt: skip
     return {**base, **overrides}
 
 
@@ -104,14 +105,16 @@ class StagingTest(TempDirTest):
     def run_id(self, runs: object) -> subprocess.CompletedProcess[str]:
         return gate("staging-run", SHA, self.write("runs.json", runs))
 
-    def test_successful_run_of_the_sha_gives_its_id(self) -> None:
-        done = self.run_id({"workflow_runs": [run(id=3), run(id=9), run(id=11, head_sha="b" * 40)]})
-        self.assertEqual((done.returncode, done.stdout.strip()), (0, "9"), done.stderr)
+    def test_successful_run_of_the_sha_gives_its_id_and_attempt(self) -> None:
+        runs = [run(id=3), run(id=9, run_attempt=2), run(id=11, head_sha="b" * 40)]
+        done = self.run_id({"workflow_runs": runs})
+        self.assertEqual((done.returncode, done.stdout.strip()), (0, "9 2"), done.stderr)
 
     def test_sha_without_a_successful_staging_run_is_refused(self) -> None:
         others = [
             run(head_sha="b" * 40), run(conclusion="failure"), run(status="in_progress", conclusion=None),
             run(event="workflow_dispatch"), run(head_branch="outra"), run(path=".github/workflows/x.yml"),
+            run(run_attempt=None),
         ]  # fmt: skip
         for runs in ([], others):
             with self.subTest(len(runs)):
@@ -142,6 +145,46 @@ class StagingTest(TempDirTest):
                 done = gate("staging-jobs", self.write("jobs.json", payload))
                 self.assertEqual(done.returncode, 1, done.stderr)
                 self.assertIn("::error::", done.stderr)
+
+
+FAKE_GH = """#!/bin/sh
+echo "$*" >> "$FAKE/log"
+case "$4" in
+  repos/dono/repo/actions/workflows/deploy-staging.yml/runs) cat "$FAKE/runs.json" ;;
+  repos/dono/repo/actions/runs/9/jobs) cat "$FAKE/jobs.json" ;;
+  *) exit 1 ;;
+esac
+"""
+
+
+class FindStagingReleaseTest(TempDirTest):
+    def find(self, sha: str = SHA, runs: object = None, jobs_payload: object = None) -> subprocess.CompletedProcess[str]:
+        Path(self.write("bin/gh", FAKE_GH)).chmod(0o755)
+        self.write("fake/runs.json", runs or {"workflow_runs": [run(id=9, run_attempt=2)]})
+        self.write("fake/jobs.json", jobs_payload or jobs())
+        env = {"PATH": f"{self.tmp / 'bin'}:{os.environ['PATH']}", "FAKE": str(self.tmp / "fake"),
+               "GITHUB_REPOSITORY": "dono/repo", "GH_TOKEN": "x"}  # fmt: skip
+        return subprocess.run(["bash", str(FIND), sha], env=env, capture_output=True, text=True, timeout=30, check=False)
+
+    def test_prints_run_and_attempt_after_asking_for_the_sha_and_the_latest_jobs(self) -> None:
+        done = self.find()
+        self.assertEqual((done.returncode, done.stdout), (0, "9 2\n"), done.stderr)
+        log = (self.tmp / "fake" / "log").read_text("utf-8").splitlines()
+        self.assertEqual(len(log), 2)
+        self.assertIn(f"-f head_sha={SHA}", log[0])
+        self.assertIn("-f filter=latest", log[1])
+
+    def test_refuses_without_printing_a_release(self) -> None:
+        cases = {"sem run": {"runs": {"workflow_runs": []}}, "deploy pulado": {"jobs_payload": jobs(smoke="skipped")}}
+        for name, kwargs in cases.items():
+            with self.subTest(name):
+                done = self.find(**kwargs)
+                self.assertEqual((done.returncode, done.stdout), (1, ""), done.stderr)
+
+    def test_malformed_sha_never_reaches_the_api(self) -> None:
+        for sha in ("main", SHA[:12], SHA + "/../x"):
+            self.assertEqual(self.find(sha).returncode, 2)
+        self.assertFalse((self.tmp / "fake" / "log").exists())
 
 
 class PricesTest(TempDirTest):
@@ -215,8 +258,13 @@ class SmokeTest(TempDirTest):
             ["bash", str(SMOKE), *(args or defaults)], env=env, capture_output=True, text=True, timeout=60, check=False
         )
 
+    def test_site_requests_fail_on_http_errors(self) -> None:
+        source = SMOKE.read_text("utf-8")
+        self.assertRegex(source, r"curl_opts=\([^)]*--fail")
+        self.assertEqual(source.count('curl "${curl_opts[@]}"'), 3)
+
     def test_healthy_deploy_passes_and_hits_the_four_urls(self) -> None:
-        done = self.smoke()
+        done = self.smoke("https://site.example.invalid/", "https://api.example.invalid/", self.config, self.manifest)
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(
             (self.tmp / "fake" / "log").read_text("utf-8").split(),

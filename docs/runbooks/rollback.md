@@ -60,7 +60,7 @@ O job `check` confere o SHA, o deploy de staging e os preços sem credencial da 
 | Nenhum deploy de staging com sucesso para o SHA | O commit nunca foi publicado em staging, ou o deploy de staging falhou ou foi pulado | Escolha outro SHA. Só vai para produção o que passou por staging |
 | Artefato não encontrado | O artefato `release-<sha>` dura 90 dias | Faça o rollback por PR de `git revert` (abaixo) |
 | `manifest.json` de preços com `source: seed` | O SHA é de antes dos preços gerados | Escolha um SHA mais novo, ou faça o rollback por `git revert` |
-| plan-guard reprovou o plano | Voltar a infraestrutura para o SHA anterior apagaria ou substituiria um recurso | Não force. Faça o rollback por `git revert` só do código, mantendo a infraestrutura |
+| plan-guard reprovou o plano | Voltar a infraestrutura para o SHA anterior apagaria ou substituiria um recurso | Não force. Se só o código tem problema, faça o rollback por `git revert` do commit com problema; se a infraestrutura também precisa voltar, a decisão é do autor |
 | Faltam variáveis | Environment `production` sem configuração | Cadastre as variáveis de [`docs/infra.md`](../infra.md) |
 
 ## Rollback por `git revert`

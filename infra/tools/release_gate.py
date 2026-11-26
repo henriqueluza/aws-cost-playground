@@ -7,7 +7,7 @@ Uso:
       e o commit pertence a `main`. Imprime o SHA validado.
   release_gate.py staging-run <sha> <runs.json>
       `runs.json` é a resposta de `GET /actions/workflows/deploy-staging.yml/runs`. Imprime
-      o id do run de staging concluído com sucesso para o SHA (push em `main`).
+      `<id> <tentativa>` do run de staging concluído com sucesso para o SHA (push em `main`).
   release_gate.py staging-jobs <jobs.json>
       `jobs.json` é a resposta de `GET /actions/runs/<id>/jobs`. Exige que o job de deploy e
       o smoke test de staging tenham terminado com sucesso. Run verde com o deploy pulado
@@ -70,15 +70,17 @@ def check_sha(sha: str, ref: str, repo: str, main: str) -> str:
     return sha
 
 
-def staging_run_id(sha: str, payload: Any) -> int:
+def staging_run(sha: str, payload: Any) -> tuple[int, int]:
+    """(id, tentativa) do run de staging do SHA; a tentativa muda a cada re-execução."""
     runs = payload.get("workflow_runs") if isinstance(payload, dict) else None
     if not isinstance(runs, list):
         raise InvalidInputError("resposta sem `workflow_runs`")
-    ids = [
-        run["id"]
+    found = [
+        (run["id"], run["run_attempt"])
         for run in runs
         if isinstance(run, dict)
         and isinstance(run.get("id"), int)
+        and isinstance(run.get("run_attempt"), int)
         and run.get("head_sha") == sha
         and run.get("head_branch") == "main"
         and run.get("event") == "push"
@@ -86,9 +88,9 @@ def staging_run_id(sha: str, payload: Any) -> int:
         and run.get("status") == "completed"
         and run.get("conclusion") == "success"
     ]
-    if not ids:
+    if not found:
         raise RefusedError(f"nenhum deploy de staging concluído com sucesso para {sha}")
-    return max(ids)
+    return max(found)
 
 
 def check_staging_jobs(payload: Any) -> None:
@@ -140,7 +142,7 @@ def main(argv: list[str]) -> int:
         if args.command == "sha":
             print(check_sha(args.sha, args.ref, args.repo, args.main))
         elif args.command == "staging-run":
-            print(staging_run_id(args.sha, load_json(args.runs)))
+            print(*staging_run(args.sha, load_json(args.runs)))
         elif args.command == "staging-jobs":
             check_staging_jobs(load_json(args.jobs))
         else:

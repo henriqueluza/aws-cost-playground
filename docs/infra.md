@@ -73,12 +73,12 @@ Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 Workflow `deploy-production.yml`. Só roda por `workflow_dispatch`, disparado por um humano, com o campo `sha`: o SHA completo de um commit de `main` que já foi publicado em staging. Nada é reconstruído.
 
 - **Concorrência** `deploy-production`, sem cancelar o que está rodando.
-- **Job `check`** (sem Environment e sem credencial AWS). As recusas ficam em `infra/tools/release_gate.py`:
+- **Job `check`** (sem Environment e sem credencial AWS). As recusas ficam em `infra/tools/release_gate.py`; `scripts/find-staging-release.sh` consulta a API do GitHub:
   1. o SHA tem 40 hexadecimais minúsculos, o workflow roda em `refs/heads/main` e o commit é ancestral de `origin/main`;
   2. existe um run de `deploy-staging.yml` desse SHA (`push` em `main`) concluído com sucesso, e nele o job `deploy (staging)` e o passo `Smoke test` terminaram com sucesso. Um run verde com o deploy pulado (staging sem configuração) não conta;
   3. o artefato `release-<sha>` desse run é baixado e confere com o `SHA256SUMS`;
   4. `site/prices/manifest.json` tem `source: price-list`. Com `source: seed` o deploy é recusado.
-- **Job `deploy`** (Environment `production`): baixa o mesmo artefato do mesmo run, confere de novo e publica com os mesmos comandos de staging. O teste `test_workflow_deploy_production.py` compara os passos dos dois workflows.
+- **Job `deploy`** (Environment `production`): baixa o mesmo artefato do mesmo run, confere de novo e publica com os mesmos comandos de staging. Só segue se o `SHA256SUMS` baixado tiver o hash que o `check` registrou. Os dois jobs consultam o run de staging de novo depois do download e exigem o mesmo run e a mesma tentativa: um "Re-run all jobs" de staging troca o artefato, e o deploy de produção para. O teste `test_workflow_deploy_production.py` compara os passos dos dois workflows.
 
 O mesmo artefato vale para os dois ambientes: o zip das funções vai para `functions/<sha>.zip` no bucket de artefatos de produção, sem sobrescrever, e as funções só passam se o `CodeSha256` for o desse zip.
 
@@ -89,7 +89,7 @@ O mesmo artefato vale para os dois ambientes: o zip das funções vai para `func
 | `gate` | Confere a configuração. Falta de qualquer valor falha fechada (produção nunca é pulada em silêncio) |
 | `source` | Checkout do SHA publicado em `release-src/`, só para o Terraform |
 | `download` | Baixa o artefato `release-<sha>` do run de staging |
-| `verify` | `sha256sum -c SHA256SUMS` e origem dos preços |
+| `verify` | Hash do `SHA256SUMS` igual ao do `check`, `sha256sum -c SHA256SUMS`, origem dos preços e o mesmo run de staging |
 | `aws` | OIDC no papel `acp-ci-apply-production`, sem chave estática |
 | `package` | Igual a staging, no bucket de artefatos de produção |
 | `terraform` | `init`, `plan`, plan-guard e `apply` do plano salvo de `infra/envs/production` no SHA publicado. O plan-guard é o do commit do disparo |
@@ -123,6 +123,9 @@ O Environment `production` tem de aceitar só o branch `main` (Settings → Envi
 - Depois de 90 dias o artefato expira e o SHA deixa de ser publicável por este workflow (ver o runbook de rollback).
 - O release-gate identifica o deploy de staging pelo nome do job (`deploy (staging)`) e do passo (`Smoke test`). Renomear um deles em `deploy-staging.yml` exige ajustar `release_gate.py`; o teste trava isso.
 - O Terraform de um SHA antigo pode pedir para apagar o que commits mais novos criaram. O plan-guard para o deploy nesse caso.
+- O Terraform do SHA publicado roda com o papel de produção. Um `local-exec` ou uma fonte `external` nesse código executaria com essa credencial; hoje não há nenhum, e a revisão de PR de `infra/` é a barreira.
+- O GitHub guarda só um run pendente por grupo de concorrência. Um terceiro disparo, com outro deploy rodando e um na fila, substitui o da fila.
+- O job `check` roda as ferramentas do branch de onde o workflow foi disparado, sem credencial. Só o `deploy` recebe o papel, e só a partir de `main`.
 
 ## Limites conhecidos
 

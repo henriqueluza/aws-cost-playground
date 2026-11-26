@@ -2,7 +2,7 @@
 
 O que fazer quando um alarme do CloudWatch chega por e-mail. O módulo [`infra/modules/alarms`](../../infra/modules/alarms/README.md) (Issue #20) cria, por ambiente (`acp-stg` e `acp-prod`), o tópico SNS `<prefixo>-alarms` com assinatura por e-mail e 5 alarmes. Todos disparam com soma maior que 0 em 1 período de 5 minutos; dado ausente conta como OK; só há aviso ao entrar em alarme, não ao voltar a OK. Não há dashboards.
 
-**Pendências de outros PRs:** as funções (nomes `<prefixo>-api` e `<prefixo>-llm-proxy`, log group `/aws/lambda/<função>`, variável `LLM_ENABLED` e reserva de concorrência) vêm do módulo `functions`; confirme esses nomes no `terraform output` do ambiente (`function_names`). O workflow de produção com SHA e `docs/runbooks/rollback.md`, previstos no ADR-0001, também ainda não existem no repositório; até lá, o rollback é decisão do autor.
+**Pendências de outros PRs:** as funções (nomes `<prefixo>-api` e `<prefixo>-llm-proxy`, log group `/aws/lambda/<função>`, variável `LLM_ENABLED` e reserva de concorrência) vêm do módulo `functions`; confirme esses nomes no `terraform output` do ambiente (`function_names`). O rollback está em [`rollback.md`](rollback.md).
 
 **Placeholders:** tudo entre `< >` é substituído na hora de rodar e nunca é escrito de volta aqui. `<prefixo>` é `acp-stg` ou `acp-prod`; `<topic_arn>`, `<API_ID>` e os nomes das funções saem do `terraform output` do ambiente. O endereço de e-mail vem de `TF_VAR_alarm_email` e não fica no repositório.
 
@@ -47,7 +47,7 @@ aws cloudwatch describe-alarms \
   | limit 20
   ```
 
-- **Mitigar:** se o erro começou após um deploy, faça rollback com o SHA anterior pelo workflow de produção previsto no ADR-0001 (ver pendências acima) e confirme que o alarme sai de `ALARM`. No `llm-proxy`, se a causa for a Claude API ou a chave, desligue com `LLM_ENABLED=false` ([guardrails de custo](guardrails-de-custo.md), "Interruptor manual"). Confira também se o corte do Budgets está ativo: `AccessDenied` nos logs do proxy é o sintoma (passo 5 e "Reverter o corte do Budgets" do mesmo runbook).
+- **Mitigar:** se o erro começou após um deploy, faça rollback com o SHA anterior pelo workflow de produção ([`rollback.md`](rollback.md)) e confirme que o alarme sai de `ALARM`. No `llm-proxy`, se a causa for a Claude API ou a chave, desligue com `LLM_ENABLED=false` ([guardrails de custo](guardrails-de-custo.md), "Interruptor manual"). Confira também se o corte do Budgets está ativo: `AccessDenied` nos logs do proxy é o sintoma (passo 5 e "Reverter o corte do Budgets" do mesmo runbook).
 
 ## `<prefixo>-api-throttles` e `<prefixo>-llm-proxy-throttles`
 
@@ -82,7 +82,7 @@ aws cloudwatch describe-alarms \
   ```
 
   `integrationError` ou `errorMessage` preenchidos apontam o gateway; `integrationLatency` perto de 30000 ms indica timeout da função.
-- **Mitigar:** siga a função da rota em `routeKey` (`/estimates` e `/quota` vão ao `llm-proxy`, o resto à `api`). Se não houver erro nem throttle na função, o problema é do gateway: rollback com o SHA anterior (ADR-0001, ver pendências acima), se houve deploy ou `apply` recente, e abra Issue com os `requestId` do log.
+- **Mitigar:** siga a função da rota em `routeKey` (`/estimates` e `/quota` vão ao `llm-proxy`, o resto à `api`). Se não houver erro nem throttle na função, o problema é do gateway: rollback com o SHA anterior ([`rollback.md`](rollback.md)), se houve deploy ou `apply` recente, e abra Issue com os `requestId` do log.
 
 ## Depois de mitigar
 

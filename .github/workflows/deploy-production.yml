@@ -8,6 +8,10 @@ name: Deploy production
 # mesmo artefato de novo e publica em produção na mesma ordem de staging: pacote no bucket de
 # artefatos, Terraform, funções, site, /config.json, invalidação do CloudFront e smoke test.
 #
+# Mesmo artefato: o `deploy` só segue se o SHA256SUMS baixado tiver o hash que o `check`
+# registrou, e os dois jobs exigem o mesmo run e a mesma tentativa de staging antes e depois
+# do download (um "Re-run all jobs" de staging troca o artefato e a tentativa).
+#
 # Recusas (infra/tools/release_gate.py), todas antes de qualquer credencial da AWS:
 #   - SHA fora do formato de 40 hexadecimais, workflow fora de `main` ou commit fora de `main`;
 #   - SHA sem deploy de staging com sucesso (run verde com o deploy pulado não conta);
@@ -52,6 +56,8 @@ jobs:
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
       run_id: ${{ steps.staging.outputs.run_id }}
+      release: ${{ steps.staging.outputs.release }}
+      sums: ${{ steps.verify.outputs.sums }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -70,13 +76,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.sha.outputs.sha }}
         run: |
-          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-staging.yml/runs" \
-            -f head_sha="$SHA" -f per_page=100 > "$RUNNER_TEMP/runs.json"
-          run_id=$(python3 infra/tools/release_gate.py staging-run "$SHA" "$RUNNER_TEMP/runs.json")
-          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs" \
-            -f filter=latest -f per_page=100 > "$RUNNER_TEMP/jobs.json"
-          python3 infra/tools/release_gate.py staging-jobs "$RUNNER_TEMP/jobs.json"
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          release=$(scripts/find-staging-release.sh "$SHA")
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "run_id=${release%% *}" >> "$GITHUB_OUTPUT"
       - name: Baixar o release de staging
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -85,9 +87,20 @@ jobs:
           run-id: ${{ steps.staging.outputs.run_id }}
           github-token: ${{ github.token }}
       - name: Conferir a integridade e a origem dos preços
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.sha.outputs.sha }}
+          RELEASE: ${{ steps.staging.outputs.release }}
         run: |
           (cd "$RUNNER_TEMP/release" && sha256sum --check --strict SHA256SUMS)
           python3 infra/tools/release_gate.py prices "$RUNNER_TEMP/release"
+          if [ "$(scripts/find-staging-release.sh "$SHA")" != "$RELEASE" ]; then
+            echo "::error::o run de staging mudou durante o download do artefato; dispare de novo"
+            exit 1
+          fi
+          sums=$(sha256sum < "$RUNNER_TEMP/release/SHA256SUMS")
+          echo "sums=${sums%% *}" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: deploy (production)
@@ -146,10 +159,21 @@ jobs:
 
       - name: Conferir a integridade e a origem dos preços
         id: verify
-        # De novo, porque este job baixa o artefato outra vez.
+        # Este job baixa o artefato outra vez: tem de ser o que o `check` conferiu (mesmo
+        # hash do SHA256SUMS, mesmo run e mesma tentativa de staging).
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.check.outputs.sha }}
+          RELEASE: ${{ needs.check.outputs.release }}
+          SUMS: ${{ needs.check.outputs.sums }}
         run: |
+          (cd "$RUNNER_TEMP/release" && echo "$SUMS  SHA256SUMS" | sha256sum --check --strict -)
           (cd "$RUNNER_TEMP/release" && sha256sum --check --strict SHA256SUMS)
           python3 infra/tools/release_gate.py prices "$RUNNER_TEMP/release"
+          if [ "$(scripts/find-staging-release.sh "$SHA")" != "$RELEASE" ]; then
+            echo "::error::o run de staging mudou depois da conferência; dispare de novo"
+            exit 1
+          fi
 
       - name: Credenciais AWS (OIDC)
         id: aws
