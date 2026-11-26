@@ -7,7 +7,7 @@ import { expectNoAxeViolations } from '../../../test/axe';
 import { catalogOf } from '../../../test/catalogFixtures';
 import { adrExampleDesign } from '../../../test/designFixtures';
 import { catalogServices, priceCatalogKey } from '../../pricing';
-import { designStore } from '../application/designStore';
+import { designStore } from '../hooks/designStore';
 import { EMPTY_STATE } from '../model/editorState';
 import { EditorPage } from './EditorPage';
 import { EstimateNotice } from './EstimateNotice';
