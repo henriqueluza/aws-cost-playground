@@ -132,6 +132,8 @@ Valores copiados de `contracts/blocks.json`. Atributo sem `default` é opcional.
 | `aws.cloudwatch` | `alarms` | alarms | `10` | `0` | `100000` | sim |
 | `aws.nat-gateway` | `processedGbPerMonth` | GB | `100` | `0` | `100000000` | não |
 
+`backupStorageGb` do `aws.rds` é só o backup além do incluído (o campo "Additional backup storage" da AWS Pricing Calculator), cobrado inteiro por GB-mês: o backup gratuito, até 100% do armazenamento provisionado na região, não entra na chave.
+
 ## Blocos de nível B e C
 
 Valores copiados de `contracts/blocks.json`, no mesmo formato. Atributo sem `default` é opcional. Blocos de B e C sem atributo (`aws.waf`, `aws.secrets-manager`, `aws.cloudtrail`, `aws.route53`, `aws.iam`, `aws.cloudformation`) não aparecem na tabela de atributos.
