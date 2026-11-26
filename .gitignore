@@ -6,6 +6,8 @@ __pycache__/
 
 # Terraform: diretório local de providers e planos (nunca versionar)
 **/.terraform/
+# Lockfile só é versionado nas raízes (infra/envs/*, infra/bootstrap); módulo não trava provider
+infra/modules/**/.terraform.lock.hcl
 *.tfplan
 *.tfstate*
 
