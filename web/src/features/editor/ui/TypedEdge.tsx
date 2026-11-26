@@ -19,6 +19,8 @@ export const STROKE_CLASS: Record<EdgeKind, string> = {
   'runs-on': styles.strokeRunsOn ?? '',
   logs: styles.strokeLogs ?? '',
 };
+/** Abaixo disto (px do traço) a etiqueta não cabe sem cobrir os blocos. */
+const MIN_TAG_LENGTH = 48;
 export const EDGE_ICON: Record<EdgeKind, IconName> = {
   data: 'edge-data',
   'runs-on': 'edge-runs-on',
@@ -51,13 +53,21 @@ export const TypedEdge = memo(function TypedEdge({
     targetPosition,
     borderRadius: 6,
   });
+  // DESIGN.md: em aresta com menos de 48px a etiqueta só aparece quando ela está selecionada.
+  const short = Math.hypot(targetX - sourceX, targetY - sourceY) < MIN_TAG_LENGTH;
   return (
     <>
       <BaseEdge id={id} path={path} markerEnd={markerEnd} className={STROKE_CLASS[kind]} />
+      {selected && (
+        <>
+          <circle cx={sourceX} cy={sourceY} r={3} className={styles.endDot} />
+          <circle cx={targetX} cy={targetY} r={3} className={styles.endDot} />
+        </>
+      )}
       <EdgeLabelRenderer>
         <span
           className={styles.edgeTag}
-          data-kind={kind}
+          data-short={short || undefined}
           data-selected={selected || undefined}
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
           aria-hidden="true"

@@ -328,3 +328,11 @@
 .legendPanel {
   margin-bottom: var(--space-6);
 }
+.edgeTag[data-short]:not([data-selected]) {
+  display: none;
+}
+/* Pontas da aresta selecionada: ponto de 6px, para a seleção não depender só da espessura. */
+.endDot {
+  fill: var(--accent);
+  pointer-events: none;
+}

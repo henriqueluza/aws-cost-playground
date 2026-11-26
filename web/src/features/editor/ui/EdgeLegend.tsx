@@ -10,7 +10,7 @@ const KINDS: readonly EdgeKind[] = ['data', 'runs-on', 'logs'];
 /** Legenda dos tipos de conexão: amostra do traço, ícone e texto (a diferença não é só de cor). */
 export function EdgeLegend(): ReactElement {
   return (
-    <section className={styles.legend} aria-label="Legenda das conexões">
+    <div className={styles.legend} role="group" aria-label="Legenda das conexões">
       <ul className={styles.legendList}>
         {KINDS.map((kind) => (
           <li key={kind} className={styles.legendItem}>
@@ -25,6 +25,6 @@ export function EdgeLegend(): ReactElement {
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }

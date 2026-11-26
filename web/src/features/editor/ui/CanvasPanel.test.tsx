@@ -54,7 +54,7 @@ describe('CanvasPanel', () => {
 
   it('legenda dos tipos de conexão em texto, com o traçado de cada um', async () => {
     const { container } = renderCanvas();
-    const legend = await screen.findByRole('region', { name: 'Legenda das conexões' });
+    const legend = await screen.findByRole('group', { name: 'Legenda das conexões' });
     expect(within(legend).getByText('Dados')).toBeInTheDocument();
     expect(legend).toHaveTextContent('Executa em, tracejado');
     expect(legend).toHaveTextContent('Logs, pontilhado');
@@ -66,7 +66,7 @@ describe('CanvasPanel', () => {
   it('sem blocos não há legenda', () => {
     const { container } = renderCanvas();
     act(() => designStore.setState({ document: { ...adrExampleDesign, blocks: [], edges: [] } }));
-    expect(container.querySelector('section[aria-label="Legenda das conexões"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Legenda das conexões"]')).toBeNull();
   });
 
   it('mostra o rótulo com marcação como texto, nunca como HTML', async () => {
