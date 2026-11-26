@@ -175,12 +175,13 @@ def test_build_rejects_unexpected_shapes(change: Change, message: str) -> None:
     assert str(info.value) == message
 
 
-def test_generate_requires_data_events(tmp_path: Path) -> None:
-    def without_data(query: Query) -> list[Product]:
-        return [p for p in fetch(query) if p.family != DATA_FAMILY]
+@pytest.mark.parametrize(("sku", "is_data"), [(DATA, True), (MANAGEMENT, False)])
+def test_generate_requires_both_skus(sku: str, is_data: bool, tmp_path: Path) -> None:
+    def without(query: Query) -> list[Product]:
+        return [p for p in fetch(query) if (p.family == DATA_FAMILY) != is_data]
 
-    with pytest.raises(PricingError, match="SKU esperado ausente: cloudtrail-data-events"):
-        generate([SERVICE], without_data, tmp_path, NOW)
+    with pytest.raises(PricingError, match=f"SKU esperado ausente: {sku}"):
+        generate([SERVICE], without, tmp_path, NOW)
 
 
 @pytest.mark.parametrize("region", REGIONS)
