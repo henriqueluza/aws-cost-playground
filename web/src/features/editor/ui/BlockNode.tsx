@@ -15,7 +15,7 @@ export const BlockNode = memo(function BlockNode({ data }: NodeProps<BlockFlowNo
       <Handle type="target" position={Position.Left} className={styles.handle} />
       <div className={styles.head}>
         <span className={styles.tile} title={category ? CATEGORY_LABELS[category] : undefined}>
-          <Icon name={category ?? 'none'} />
+          {category && <Icon name={category} />}
         </span>
         <span className={styles.name} title={label}>
           {label}
