@@ -1,6 +1,6 @@
-import type { ReactElement } from 'react';
+import { useId, type ReactElement } from 'react';
 import { formatUsd } from '../../pricing';
-import type { Decimal } from '../../../shared/lib/money';
+import { compare, decimal, div, toFixed, type Decimal } from '../../../shared/lib/money';
 import {
   DIRECTION_WORD,
   blockTypeLabel,
@@ -32,10 +32,75 @@ function Diff({ diff, large = false }: { diff: Decimal; large?: boolean }): Reac
   );
 }
 
-function Cell({ title, amounts, large }: { title: string; amounts: Amounts; large?: boolean }) {
+/** Fração `part / whole` como número para geometria (só desenho; dinheiro segue em `Decimal`). */
+function fraction(part: Decimal, whole: Decimal): number {
+  if (compare(whole, decimal(0)) <= 0) return 0;
+  return Math.min(1, Math.max(0, Number(toFixed(div(part, whole), 6))));
+}
+
+/**
+ * Tinta do fixo (sólida) e do variável (hachurada, DESIGN.md): `width` é a fração do desenho que
+ * ocupa e `solid`, a fração dela que é fixo. Lê-se sem cor; os números ficam ao lado.
+ */
+function Ink(props: { width: number; solid: number; className?: string }): ReactElement {
+  const hatch = useId();
+  const width = (share: number) => `${props.width * share * 100}%`;
+  return (
+    <svg className={props.className} aria-hidden="true" focusable="false">
+      <defs>
+        <pattern
+          id={hatch}
+          width="4"
+          height="4"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <line x1="0" y1="0" x2="0" y2="4" className={styles.hatchLine} />
+        </pattern>
+      </defs>
+      <rect width={width(1)} height="100%" className={styles.outline} fill={`url(#${hatch})`} />
+      <rect width={width(props.solid)} height="100%" className={styles.solid} />
+    </svg>
+  );
+}
+
+/** Barras dos dois totais na mesma escala (o maior ocupa a largura toda). */
+function SplitBars({ comparison: { total, fixed } }: { comparison: Comparison }): ReactElement {
+  const scale = compare(total.a, total.b) >= 0 ? total.a : total.b;
+  const sides = [
+    { side: 'A', total: total.a, fixed: fixed.a },
+    { side: 'B', total: total.b, fixed: fixed.b },
+  ];
+  return (
+    <div className={styles.bars} aria-hidden="true">
+      {sides.map((one) => (
+        <div key={one.side} className={styles.barRow}>
+          <span className={styles.barSide}>{one.side}</span>
+          <Ink
+            className={styles.bar}
+            width={fraction(one.total, scale)}
+            solid={fraction(one.fixed, one.total)}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Cell(props: {
+  title: string;
+  amounts: Amounts;
+  large?: boolean;
+  swatch?: 'fixed' | 'variable';
+  bars?: ReactElement;
+}) {
+  const { title, amounts, large } = props;
   return (
     <div role="group" aria-label={title} className={styles.cell}>
       <p className={styles.cellTitle} aria-hidden="true">
+        {props.swatch !== undefined && (
+          <Ink className={styles.swatch} width={1} solid={props.swatch === 'fixed' ? 1 : 0} />
+        )}
         {title}
       </p>
       <Diff diff={amounts.diff} large={large} />
@@ -43,6 +108,7 @@ function Cell({ title, amounts, large }: { title: string; amounts: Amounts; larg
         <span>A {formatUsd(amounts.a)}</span>
         <span>B {formatUsd(amounts.b)}</span>
       </p>
+      {props.bars}
     </div>
   );
 }
@@ -51,9 +117,14 @@ function Cell({ title, amounts, large }: { title: string; amounts: Amounts; larg
 export function SummaryStrip({ comparison }: { comparison: Comparison }): ReactElement {
   return (
     <section aria-label="Resumo do custo mensal" className={styles.strip}>
-      <Cell title="Total por mês" amounts={comparison.total} large />
-      <Cell title="Fixo" amounts={comparison.fixed} />
-      <Cell title="Variável" amounts={comparison.variable} />
+      <Cell
+        title="Total por mês"
+        amounts={comparison.total}
+        large
+        bars={<SplitBars comparison={comparison} />}
+      />
+      <Cell title="Fixo" amounts={comparison.fixed} swatch="fixed" />
+      <Cell title="Variável" amounts={comparison.variable} swatch="variable" />
     </section>
   );
 }
@@ -69,10 +140,10 @@ function Side({ amount, count, unit }: { amount: Decimal; count: number; unit: [
           <span className={styles.srOnly}>Este design não tem {unit[1]} deste tipo.</span>
         </>
       ) : (
-        <>
+        <span className={styles.amounts}>
           <span className={styles.money}>{formatUsd(amount)}</span>
           <span className={styles.count}>{plural(count, ...unit)}</span>
-        </>
+        </span>
       )}
     </td>
   );

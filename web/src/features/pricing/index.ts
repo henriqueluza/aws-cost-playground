@@ -25,7 +25,12 @@ export {
   type CostWarningCode,
   type EdgeCost,
 } from './model/engine';
-export { PricingPanel, type CostSelection, type PricingPanelProps } from './ui/PricingPanel';
+export {
+  PricingPanel,
+  errorText as catalogErrorText,
+  type CostSelection,
+  type PricingPanelProps,
+} from './ui/PricingPanel';
 export { edgeCharges, EDGE_SKUS } from './model/edgeCharges';
 export { formatUsd } from './application/formatUsd';
 export { catalogServices } from './application/catalogServices';
