@@ -159,14 +159,16 @@ Geradores em `model/generators/s3.ts` e `cloudfront.ts`.
   EXPORT_TERRAFORM_CHECK=1 npx vitest run src/features/export/test/terraform.local.test.ts
   ```
 
-  Roda o formatador e a validação do Terraform num diretório temporário, com só `locals` e `output` (sem provider nem credencial), e compara o valor que o Terraform lê de volta com o original. Não entra no `npm test` nem no CI.
+  Roda o formatador e a validação do Terraform num diretório temporário, com só `locals` e `output` (sem provider nem credencial), e compara o valor que o Terraform lê de volta com o original.
 - **Com o provider da AWS, opcional:** `EXPORT_TERRAFORM_AWS=1` junto de `EXPORT_TERRAFORM_CHECK=1` também exporta os 3 cenários de `contracts/scenarios/`, um design só com os blocos sem VPC e dois cenários com cargas de injeção nos rótulos, e roda `fmt -check`, `init -backend=false` e `validate` em cada um. Baixa o provider; não precisa de credencial.
 
   ```bash
   EXPORT_TERRAFORM_CHECK=1 EXPORT_TERRAFORM_AWS=1 npx vitest run src/features/export/test/terraform.local.test.ts
   ```
 
-- **Export inteiro:** a validação nos 3 cenários, com o provider da AWS, é o job da #68.
+- **No CI:** o job `export-validate` (`.github/workflows/export-validate.yml`, #68) roda o comando acima, com `EXPORT_TERRAFORM_AWS=1`, nos 3 cenários de `contracts/scenarios/`. Reprova se algum cenário não for exportado, não passar no `validate` ou se algum bloco virar só comentário ("Blocos exportados: N de N"). Para reproduzir localmente, use o mesmo comando. Se várias sessões compartilham o `plugin_cache_dir` do `~/.terraformrc`, o `init` pode falhar com checksum do pacote em cache ou o plugin não iniciar; defina um `TF_PLUGIN_CACHE_DIR` próprio.
+- **Cenário novo:** um arquivo novo em `contracts/scenarios/` precisa entrar em `SCENARIOS` do teste, com a chave em camelCase do nome do arquivo. Sem isso, o job reprova.
+- **Sem lock file:** o export não leva `.terraform.lock.hcl`, então o `init` resolve a versão mais nova do provider dentro de `~> 6.73`. Uma versão nova pode reprovar o job sem mudança no repositório. É sinal real: quem baixa o export veria o mesmo.
 
 ## Blocos sem VPC: Lambda, SQS e DynamoDB (#65)
 

@@ -23,7 +23,7 @@ concurrency:
 
 env:
   TF_IN_AUTOMATION: "true"
-  TF_VERSION: "1.16.0" # a de `infra/` e a do `required_version` do export (`~> 1.16.0`)
+  TF_VERSION: "1.16.0" # a de `terraform.yml` e a do `required_version` do export (`~> 1.16.0`)
 
 jobs:
   export-validate:
@@ -43,9 +43,9 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
-      - name: Sem variável da AWS no ambiente
+      # Falha fechada e sem imprimir valor: só os nomes aparecem.
+      - name: Sem variável AWS_* no ambiente
         run: |
-          # Falha fechada e sem imprimir valor: só os nomes aparecem.
           names=$(env | cut -d= -f1 | grep '^AWS_' || true)
           if [ -n "$names" ]; then
             echo "::error::este job não usa a AWS, mas o ambiente tem: $(echo "$names" | tr '\n' ' ')"

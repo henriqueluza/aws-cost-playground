@@ -28,21 +28,24 @@ def scenario_name(path: Path) -> str:
 
 def check(report: object, names: list[str]) -> list[str]:
     if not isinstance(report, dict) or not isinstance(report.get("testResults"), list):
-        raise ValueError("relatório sem `testResults`")
-    statuses: dict[str, str] = {}
-    for suite in report["testResults"]:
-        for test in suite.get("assertionResults", []):
-            statuses[str(test.get("title"))] = str(test.get("status"))
+        raise TypeError("relatório sem `testResults`")
+    # Lista, não dicionário: um título repetido não pode esconder um teste reprovado.
+    results = [
+        (str(test.get("title")), str(test.get("status")))
+        for suite in report["testResults"]
+        for test in suite.get("assertionResults", [])
+    ]
+    passed = {title for title, status in results if status == "passed"}
     errors = []
     if not names:
         errors.append("nenhum cenário em contracts/scenarios")
     if report.get("success") is not True:
         errors.append("o vitest não terminou com sucesso")
-    for title, status in sorted(statuses.items()):
+    for title, status in sorted(results):
         if status != "passed":
             errors.append(f"teste {status}: {title}")
     for name in names:
-        if TITLE.format(name=name) not in statuses:
+        if TITLE.format(name=name) not in passed:
             errors.append(f"cenário sem teste de validate: {name}")
     return errors
 
@@ -55,7 +58,7 @@ def main(argv: list[str]) -> int:
         report = json.loads(Path(argv[1]).read_text(encoding="utf-8"))
         names = sorted(scenario_name(p) for p in Path(argv[2]).iterdir() if p.suffix == ".json")
         errors = check(report, names)
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, TypeError) as error:
         print(f"::error::export-validate: relatório ilegível ({type(error).__name__})")
         return 2
     for error in errors:

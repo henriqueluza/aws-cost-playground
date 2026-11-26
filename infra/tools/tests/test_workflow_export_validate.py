@@ -14,6 +14,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import unittest.mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -40,14 +41,14 @@ def code() -> str:
 
 
 def run_blocks() -> list[str]:
-    """Corpo de cada `run:` do workflow, em ordem."""
-    lines = code().splitlines()
+    """Corpo de cada `run:`, em ordem e com os comentários: o GitHub expande `${{ }}` neles."""
+    lines = text().splitlines()
     blocks = []
     for i, line in enumerate(lines):
         found = re.match(r"^(\s*)(?:- )?run:\s*(.*)$", line)
         if not found:
             continue
-        if found.group(2).strip() != "|":
+        if not re.fullmatch(r"[|>][+-]?", found.group(2).strip()):
             blocks.append(found.group(2).strip())
             continue
         body = []
@@ -57,6 +58,14 @@ def run_blocks() -> list[str]:
             body.append(nxt)
         blocks.append(textwrap.dedent("\n".join(body)).strip("\n"))
     return blocks
+
+
+class HelpersTest(unittest.TestCase):
+    def test_run_blocks_reads_every_block_style_and_keeps_comments(self) -> None:
+        sample = "      - run: |-\n          # ${{ a }}\n          echo 1\n"
+        sample += "      - run: >\n          echo 2\n"
+        with unittest.mock.patch(f"{__name__}.text", return_value=sample):
+            self.assertEqual(run_blocks(), ["# ${{ a }}\necho 1", "echo 2"])
 
 
 class TriggerAndPermissionsTest(unittest.TestCase):
@@ -144,7 +153,11 @@ class AwsGuardExecutionTest(unittest.TestCase):
         script = next(block for block in run_blocks() if "'^AWS_'" in block)
         env = {"PATH": os.environ["PATH"], **extra}
         return subprocess.run(
-            ["bash", "-euo", "pipefail", "-c", script], env=env, capture_output=True, text=True
+            ["bash", "-euo", "pipefail", "-c", script],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
         )
 
     def test_clean_environment_passes(self) -> None:
@@ -176,6 +189,7 @@ class ReportScriptTest(unittest.TestCase):
                     (directory / name).write_text("{}")
             return subprocess.run(
                 [sys.executable, str(SCRIPT), str(path), str(directory)],
+                check=False,
                 capture_output=True,
                 text=True,
             )
@@ -200,6 +214,19 @@ class ReportScriptTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout.count("teste skipped"), 3)
 
+    def test_a_repeated_title_cannot_hide_a_failure(self) -> None:
+        report = self.report(self.all_passed())
+        tests = report["testResults"][0]["assertionResults"]  # type: ignore[index]
+        tests.insert(0, {"title": TITLE.format("appClassico"), "status": "skipped"})
+        result = self.run_script(report)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("teste skipped: " + TITLE.format("appClassico"), result.stdout)
+
+    def test_empty_report_fails(self) -> None:
+        result = self.run_script({"success": True, "testResults": []})
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.count("cenário sem teste de validate"), 3)
+
     def test_a_scenario_file_without_a_test_fails(self) -> None:
         names = [p.name for p in SCENARIOS.glob("*.json")] + ["novo-caso.json"]
         result = self.run_script(self.report(self.all_passed()), names)
@@ -218,7 +245,9 @@ class ReportScriptTest(unittest.TestCase):
             self.assertIn("relatório ilegível", result.stdout)
 
     def test_wrong_arguments_fail_closed(self) -> None:
-        result = subprocess.run([sys.executable, str(SCRIPT)], capture_output=True, text=True)
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT)], check=False, capture_output=True, text=True
+        )
         self.assertEqual(result.returncode, 2)
 
 
