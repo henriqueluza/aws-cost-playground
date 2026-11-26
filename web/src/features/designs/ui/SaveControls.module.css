@@ -1,0 +1,54 @@
+/* DESIGN.md: pílula de estado (--pill-*), links em --accent com sublinhado permanente. */
+.pill {
+  flex: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  height: var(--pill-height);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background-color: var(--pill-neutral-bg);
+  color: var(--text);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+
+.warn {
+  background-color: var(--pill-warning-bg);
+  color: var(--warning);
+}
+
+.name {
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.text {
+  margin: var(--space-3) 0 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}

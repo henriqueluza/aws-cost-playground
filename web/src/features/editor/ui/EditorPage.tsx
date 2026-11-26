@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { PricingPanel, usePriceCatalog } from '../../pricing';
 import { WorkloadPanel } from '../../workload';
@@ -13,7 +14,8 @@ import { InspectorPanel } from './InspectorPanel';
 import { PalettePanel } from './PalettePanel';
 import { RailTabs } from './RailTabs';
 
-export function EditorPage() {
+/** `actions`: botões de outras features para a barra superior (o app os injeta). */
+export function EditorPage({ actions }: { actions?: ReactNode } = {}) {
   const wide = useMediaQuery('(min-width: 1024px)', true);
   const design = useDesignStore((s) => s.document);
   const selection = useDesignStore((s) => s.selection);
@@ -52,7 +54,7 @@ export function EditorPage() {
   return (
     <div className={styles.shell}>
       <header className={styles.topbar}>
-        <ActionBar />
+        <ActionBar>{actions}</ActionBar>
       </header>
       <aside aria-label="Paleta" className={styles.palette}>
         <PalettePanel />
