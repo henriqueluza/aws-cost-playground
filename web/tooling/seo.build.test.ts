@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { build, type Rollup } from 'vite';
 import { afterEach, describe, expect, it } from 'vitest';
-import { parseSiteUrl } from './seo.ts';
+import { parseSiteUrl, sitemapXml } from './seo.ts';
 
 type Asset = Extract<Rollup.RollupOutput['output'][number], { type: 'asset' }>;
 
@@ -33,6 +33,7 @@ describe('SEO no build', () => {
     expect(html).toContain('name="viewport"');
     expect(html).toContain('prefers-color-scheme: dark');
     expect(html).toContain('src="/seo.js"');
+    expect(html).toContain('"origin":null');
     expect(html).toContain('rel="icon"');
     expect(html).not.toContain('rel="canonical"');
     expect(html).not.toContain('og:url');
@@ -43,12 +44,24 @@ describe('SEO no build', () => {
     expect(text('sitemap.xml')).not.toContain('<loc>');
   }, 60_000);
 
-  it('com VITE_SITE_URL: canonical, og:url, sitemap e linha Sitemap', async () => {
+  it('com VITE_SITE_URL: origem no bloco de rotas, sitemap e linha Sitemap', async () => {
     const { text } = await emit('https://exemplo.test/');
-    expect(text('index.html')).toContain('<link rel="canonical" href="https://exemplo.test/"');
-    expect(text('index.html')).toContain('content="https://exemplo.test/"');
+    const html = text('index.html');
+    // O HTML é o mesmo para toda rota: canonical e og:url só pelo seo.js, com a origem do bloco.
+    expect(html).not.toContain('rel="canonical"');
+    expect(html).not.toContain('og:url');
+    expect(html).toContain('"origin":"https://exemplo.test"');
+    // seo.js roda ao ser lido: o bloco de rotas precisa vir antes dele.
+    expect(html.indexOf('id="seo-routes"')).toBeGreaterThan(-1);
+    expect(html.indexOf('id="seo-routes"')).toBeLessThan(html.indexOf('src="/seo.js"'));
+    expect(html.match(/src="\/seo\.js"/g)).toHaveLength(1);
     expect(text('robots.txt')).toContain('Sitemap: https://exemplo.test/sitemap.xml');
-    expect(text('sitemap.xml')).toContain('<loc>https://exemplo.test/</loc>');
+    const locs = [...text('sitemap.xml').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toEqual([
+      'https://exemplo.test/',
+      'https://exemplo.test/privacidade',
+      'https://exemplo.test/termos',
+    ]);
   }, 60_000);
 });
 
@@ -67,5 +80,13 @@ describe('parseSiteUrl', () => {
     ]) {
       expect(() => parseSiteUrl(bad)).toThrow(/VITE_SITE_URL/);
     }
+  });
+});
+
+describe('sitemapXml', () => {
+  it('escapa & < > no <loc>', () => {
+    expect(sitemapXml('https://a&b<c>.test')).toContain(
+      '<loc>https://a&amp;b&lt;c&gt;.test/</loc>',
+    );
   });
 });

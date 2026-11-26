@@ -1,26 +1,46 @@
 /*
  * SEO por rota numa SPA (script clássico no <head>, como theme.js: a CSP não libera inline).
- * Rotas privadas ganham <meta name="robots" content="noindex"> e perdem o canonical; nas demais,
- * o canonical e o og:url seguem o caminho atual (só se o build os emitiu, ou seja, com
- * VITE_SITE_URL). Não há robots.txt Disallow nessas rotas de propósito: o rastreador precisa
- * abrir a página para ver o noindex.
+ * As rotas vêm do bloco JSON #seo-routes, gerado por tooling/seo.ts logo antes deste script.
+ * O HTML é o mesmo para toda rota, então canonical e og:url nascem aqui, nunca no HTML.
+ * - Privada: <meta name="robots" content="noindex">. Não há Disallow no robots.txt de
+ *   propósito: o rastreador precisa abrir a página para ver o noindex.
+ * - Pública: canonical e og:url do caminho (só com VITE_SITE_URL no build), mais título e
+ *   descrições próprios quando a rota os tem.
+ * - Qualquer outra: nada muda, sem canonical.
+ * Roda só no carregamento: é o que o rastreador recebe ao abrir cada URL.
  */
 (() => {
   'use strict';
-  const PRIVATE = ['/designs', '/conta', '/auth/callback'];
+  const data = document.getElementById('seo-routes');
+  if (!data) return;
+  const routes = JSON.parse(data.textContent || '{}');
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
-  if (PRIVATE.some((p) => path === p || path.startsWith(`${p}/`))) {
-    const robots = document.createElement('meta');
-    robots.name = 'robots';
-    robots.content = 'noindex';
-    document.head.appendChild(robots);
-    document.querySelector('link[rel="canonical"]')?.remove();
-    document.querySelector('meta[property="og:url"]')?.remove();
+  const add = (tag, attrs) => {
+    const el = document.createElement(tag);
+    for (const [name, value] of Object.entries(attrs)) el.setAttribute(name, value);
+    document.head.appendChild(el);
+  };
+
+  if ((routes.noindex || []).some((p) => path === p || path.startsWith(`${p}/`))) {
+    add('meta', { name: 'robots', content: 'noindex' });
     return;
   }
-  const canonical = document.querySelector('link[rel="canonical"]');
-  if (!canonical) return;
-  const url = new URL(canonical.href).origin + (path === '/' ? '/' : path);
-  canonical.href = url;
-  document.querySelector('meta[property="og:url"]')?.setAttribute('content', url);
+  if (!(routes.public || []).includes(path)) return;
+
+  const page = Object.hasOwn(routes.pages || {}, path) ? routes.pages[path] : null;
+  if (page) {
+    const set = (selector, value) =>
+      document.querySelector(selector)?.setAttribute('content', value);
+    document.title = page.title;
+    set('meta[name="description"]', page.description);
+    set('meta[property="og:title"]', page.title);
+    set('meta[property="og:description"]', page.description);
+    set('meta[name="twitter:title"]', page.title);
+    set('meta[name="twitter:description"]', page.description);
+  }
+  if (routes.origin) {
+    const url = routes.origin + path;
+    add('link', { rel: 'canonical', href: url });
+    add('meta', { property: 'og:url', content: url });
+  }
 })();
