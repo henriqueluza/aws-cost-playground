@@ -7,7 +7,10 @@ import { errorKind, saveDesign } from '../application/saveDesign';
 import { savedDesignStore } from './savedDesignStore';
 
 /** Só dados serializáveis: nada de `Decimal`, catálogo de preços nem documento na chave. */
-export const designsKeys = { list: ['designs', 'list'] as const };
+export const designsKeys = {
+  list: ['designs', 'list'] as const,
+  doc: (id: string | null) => ['designs', 'doc', id] as const,
+};
 
 export function useDesignsList() {
   const api = useApi();

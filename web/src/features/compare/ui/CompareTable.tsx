@@ -19,7 +19,8 @@ const ICONS = {
 };
 
 /** `B − A` em três canais além da cor: sinal no texto, palavra ("a mais", "a menos", "igual") e ícone. */
-function Diff({ diff, large = false }: { diff: Decimal; large?: boolean }): ReactElement {
+function Diff(props: { diff: Decimal; large?: boolean; only?: 'A' | 'B' }): ReactElement {
+  const { diff, large = false, only } = props;
   const direction = directionOf(diff);
   return (
     <span className={large ? `${styles.diff} ${styles.large}` : styles.diff}>
@@ -27,7 +28,9 @@ function Diff({ diff, large = false }: { diff: Decimal; large?: boolean }): Reac
         <path d={ICONS[direction]} />
       </svg>
       <span className={styles.amount}>{formatDiff(diff)}</span>
-      <span className={styles.word}>{DIRECTION_WORD[direction]}</span>
+      <span className={styles.word}>
+        {direction === 'same' && only ? `só no ${only}` : DIRECTION_WORD[direction]}
+      </span>
     </span>
   );
 }
@@ -102,6 +105,7 @@ function Cell(props: {
           <Ink className={styles.swatch} width={1} solid={props.swatch === 'fixed' ? 1 : 0} />
         )}
         {title}
+        <span className={styles.convention}>B − A</span>
       </p>
       <Diff diff={amounts.diff} large={large} />
       <p className={styles.sides}>
@@ -170,7 +174,10 @@ function Group(props: {
           <Side amount={row.total.a} count={row.countA} unit={props.unit} />
           <Side amount={row.total.b} count={row.countB} unit={props.unit} />
           <td className={styles.num}>
-            <Diff diff={row.total.diff} />
+            <Diff
+              diff={row.total.diff}
+              only={row.countA === 0 ? 'B' : row.countB === 0 ? 'A' : undefined}
+            />
           </td>
         </tr>
       ))}
