@@ -36,7 +36,7 @@ Workflow `deploy-staging.yml`, disparado por `push` em `main`.
 
 ## Sem configuração
 
-- Sem `AWS_APPLY_ROLE_ARN`, o `gate` emite um aviso e o workflow termina verde. O GitHub registra um deployment em `staging` mesmo assim.
+- Sem `AWS_APPLY_ROLE_ARN`, o `gate` emite um aviso e o workflow termina verde. O GitHub registra um deployment em `staging` mesmo assim e, se o Environment ainda não existir, o cria sem regras. Restrinja-o a `main` (#77) antes de cadastrar as variáveis. O trust do papel já exige `ref` igual a `refs/heads/main`, e essa restrição é a segunda camada.
 - Com o papel e faltando outro valor, o `gate` falha fechado e a mensagem cita só o nome.
 
 ## Variáveis que o autor cria
