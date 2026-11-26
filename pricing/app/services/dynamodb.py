@@ -89,7 +89,7 @@ def queries(region: str) -> tuple[Query, ...]:
 
 
 def _select(products: Sequence[Product], region: str, **attributes: str) -> list[Product]:
-    """Produtos da região com todos os atributos iguais (o TERM_MATCH, de novo, sobre a resposta)."""
+    """Produtos da região com todos os atributos iguais: o TERM_MATCH refeito sobre a resposta."""
     return [
         p
         for p in products
