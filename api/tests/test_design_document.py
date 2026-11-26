@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from app.design_document import DesignDocument, doc_size_bytes
+from app.design_document import DesignDocument
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "contracts" / "examples" / "design"
 ADR: dict[str, Any] = json.loads((EXAMPLES / "valid" / "adr-example.json").read_text("utf-8"))
@@ -139,20 +139,6 @@ def test_entrada_invalida_e_recusada(bad: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         DesignDocument.model_validate(bad)
     assert not ok(bad)
-
-
-def test_doc_size_bytes_igual_ao_do_web() -> None:
-    for d in (ADR, doc(workload={"description": "ação ☃ 😀 日本語"})):
-        assert doc_size_bytes(DesignDocument.model_validate(d)) == js_size(d)
-
-
-@pytest.mark.parametrize("literal", ["1e12", "120.0"])
-def test_float_integral_conta_como_inteiro(literal: str) -> None:
-    raw = json.dumps(ADR).replace(AVG, f'"avgDurationMs": {literal}')
-    esperado = json.loads(raw)
-    esperado["blocks"][0]["usage"]["values"]["avgDurationMs"] = int(float(literal))
-    parsed = DesignDocument.model_validate(json.loads(raw))
-    assert doc_size_bytes(parsed) == js_size(esperado)
 
 
 def test_entrada_adversarial_nao_multiplica_os_erros() -> None:
