@@ -86,6 +86,45 @@ export function withAttribute(
   return option === undefined ? null : { ...rest, [field.key]: option };
 }
 
+export type UsageInputError = 'empty' | 'format' | 'thousands' | 'fraction' | 'range';
+export type UsageInputResult =
+  | { readonly ok: true; readonly value: number }
+  | { readonly ok: false; readonly error: UsageInputError };
+
+const DECIMAL = /^\d+(?:[.,]\d+)?$/;
+// Parece milhar em pt-BR ("1.000") ou em inglês ("1,000"): ambíguo, então é recusado. "0,125" não entra.
+const THOUSANDS = /^[1-9]\d{0,2}(?:\.\d{3})+(?:,\d+)?$|^[1-9]\d{0,2}(?:,\d{3})+(?:\.\d+)?$/;
+
+/**
+ * Lê o texto digitado num campo de uso. Regra de entrada (documentada em `docs/handoff/48.md`):
+ * - espaços nas pontas são ignorados; vazio é recusado (para voltar ao estimado há o botão);
+ * - só algarismos e UM separador decimal, vírgula (pt-BR) ou ponto: "1,5" e "1.5" valem 1,5;
+ * - separador de milhar ("1.000", "1,000", "1.000,5") é recusado, porque "1.000" seria lido como
+ *   1 por quem digita em formato inglês (e "1,000" como 1 em pt-BR): o erro pede para digitar
+ *   sem separador de milhar. "0,125" e "0.125" valem 0,125;
+ * - notação científica ("1e9"), sinal ("-1", "+1"), "Infinity", "NaN" e letras são recusados;
+ * - número inteiro quando `integer`; depois `min` e `max` do contrato, e finito.
+ */
+export function parseUsageInput(
+  text: string,
+  field: Pick<UsageField, 'min' | 'max' | 'integer'>,
+): UsageInputResult {
+  const trimmed = text.trim();
+  if (trimmed === '') return { ok: false, error: 'empty' };
+  if (THOUSANDS.test(trimmed)) return { ok: false, error: 'thousands' };
+  if (!DECIMAL.test(trimmed)) return { ok: false, error: 'format' };
+  const value = Number(trimmed.replace(',', '.'));
+  if (!Number.isFinite(value)) return { ok: false, error: 'range' };
+  if (field.integer && !Number.isInteger(value)) return { ok: false, error: 'fraction' };
+  if (value < field.min || value > field.max) return { ok: false, error: 'range' };
+  return { ok: true, value };
+}
+
+/** Texto de um valor para o campo: sem separador de milhar e com vírgula decimal. */
+export function formatUsageInput(value: number): string {
+  return String(value).replace('.', ',');
+}
+
 export type LabelError = 'control' | 'too-long';
 
 // C0, DEL, C1, separadores de linha e parágrafo e os controles de direção do Unicode (bidi).
