@@ -28,6 +28,15 @@
 .form {
   height: var(--control-height-form);
 }
+/* Área de texto: altura pelo conteúdo (`rows`), com o espaço vertical de uma linha de controle. */
+.area {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  padding: var(--space-2) calc(var(--space-3) - var(--border-width));
+  resize: vertical;
+}
 .control::placeholder,
 .bare::placeholder {
   color: var(--faint);
