@@ -1,4 +1,5 @@
 export { AuthCallbackPage } from './ui/AuthCallbackPage';
+export { AuthActions, SignInButton } from './ui/AuthActions';
 export { AuthProvider, useAuth } from './ui/AuthProvider';
 export { RequireAuth } from './ui/RequireAuth';
 export { createBrowserAuth } from './infrastructure/browserAuth';

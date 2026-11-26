@@ -65,4 +65,26 @@ describe('routes', () => {
     expect(auth.service.signIn).not.toHaveBeenCalled();
     expect(auth.service.getAccessToken).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['anônimo', { status: 'anonymous' } as const, ['Entrar', 'Criar conta']],
+    [
+      'com sessão',
+      { status: 'authenticated', user: { sub: 'u1', email: null } } as const,
+      ['Sair'],
+    ],
+  ])('a barra do editor, %s, tem os botões da conta', (_name, snapshot, names) => {
+    const auth = fakeAuth(snapshot);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ApiProvider api={api}>
+          <AuthProvider service={auth.service}>
+            <RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />
+          </AuthProvider>
+        </ApiProvider>
+      </QueryClientProvider>,
+    );
+    for (const name of names) expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument();
+  });
 });

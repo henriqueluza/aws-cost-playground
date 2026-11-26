@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { PricingPanel, usePriceCatalog } from '../../pricing';
 import { WorkloadPanel } from '../../workload';
 import { useHistoryShortcuts } from '../hooks/historyShortcuts';
+import { useRestoreDesignDraft } from '../hooks/designDraftSync';
 import { useDesignStore } from '../hooks/useDesignStore';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { catalogStamp } from '../model/estimateNotice';
@@ -24,6 +25,7 @@ function HistoryShortcuts(): null {
 
 /** `actions`: botões de outras features para a barra superior (o app os injeta). */
 export function EditorPage({ actions }: { actions?: ReactNode } = {}) {
+  useRestoreDesignDraft();
   const wide = useMediaQuery('(min-width: 1024px)', true);
   const design = useDesignStore((s) => s.document);
   const selection = useDesignStore((s) => s.selection);

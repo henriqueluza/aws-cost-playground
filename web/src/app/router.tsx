@@ -1,13 +1,23 @@
 import type { RouteObject } from 'react-router';
 import { AccountPage } from '../features/account';
-import { AuthCallbackPage, RequireAuth } from '../features/auth';
+import { AuthActions, AuthCallbackPage, RequireAuth, SignInButton } from '../features/auth';
 import { ComparePage } from '../features/compare';
 import { DesignsPage, SaveControls } from '../features/designs';
-import { EditorPage } from '../features/editor';
+import { EditorPage, keepDesignForLogin } from '../features/editor';
 import { PrivacyPage, TermsPage } from '../features/legal';
 
+/** O app compõe a barra do editor: salvar (designs) e a conta (auth); o editor não conhece nenhum dos dois. */
 function EditorRoute() {
-  return <EditorPage actions={<SaveControls />} />;
+  return (
+    <EditorPage
+      actions={
+        <>
+          <SaveControls signInAction={<SignInButton beforeSignIn={keepDesignForLogin} />} />
+          <AuthActions beforeSignIn={keepDesignForLogin} />
+        </>
+      }
+    />
+  );
 }
 
 export const routes: RouteObject[] = [
