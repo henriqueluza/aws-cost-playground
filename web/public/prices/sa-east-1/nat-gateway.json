@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "service": "nat-gateway",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "nat-gateway-data-processed",
+      "description": "Dados processados",
+      "unit": "GB",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.093"
+        }
+      ]
+    },
+    {
+      "sku": "nat-gateway-hours",
+      "description": "Horas do gateway",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.093"
+        }
+      ]
+    }
+  ]
+}

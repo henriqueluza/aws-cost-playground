@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "service": "route53",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "route53-hosted-zones",
+      "description": "Zonas hospedadas",
+      "unit": "hosted zone-month",
+      "tiers": [
+        {
+          "upTo": "25",
+          "unitPrice": "0.5"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.1"
+        }
+      ]
+    },
+    {
+      "sku": "route53-queries",
+      "description": "Consultas DNS padrão",
+      "unit": "query",
+      "tiers": [
+        {
+          "upTo": "1000000000",
+          "unitPrice": "0.0000004"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.0000002"
+        }
+      ]
+    }
+  ]
+}

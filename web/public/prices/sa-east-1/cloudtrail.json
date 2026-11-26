@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "service": "cloudtrail",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "cloudtrail-data-events",
+      "description": "Eventos de dados",
+      "unit": "event",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.000001"
+        }
+      ]
+    },
+    {
+      "sku": "cloudtrail-management-events",
+      "description": "Eventos de gerenciamento (cópias adicionais)",
+      "unit": "event",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.00002"
+        }
+      ]
+    }
+  ]
+}

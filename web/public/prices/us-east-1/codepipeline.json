@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "service": "codepipeline",
+  "region": "us-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "codepipeline-action-minutes",
+      "description": "Minutos de execução de ações (V2)",
+      "unit": "minute",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.002"
+        }
+      ],
+      "freeTier": {
+        "quantity": "100"
+      }
+    },
+    {
+      "sku": "codepipeline-active-pipelines",
+      "description": "Pipelines ativos (V1)",
+      "unit": "pipeline-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "1"
+        }
+      ],
+      "freeTier": {
+        "quantity": "1"
+      }
+    }
+  ]
+}

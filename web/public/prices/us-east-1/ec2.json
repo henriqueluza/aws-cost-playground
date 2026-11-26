@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "service": "ec2",
+  "region": "us-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "ec2-ebs-gp3",
+      "description": "Volume EBS gp3",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.08"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-c5.large",
+      "description": "Instância c5.large (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.085"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-m5.large",
+      "description": "Instância m5.large (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.096"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-m5.xlarge",
+      "description": "Instância m5.xlarge (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.192"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-r5.large",
+      "description": "Instância r5.large (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.126"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-t3.large",
+      "description": "Instância t3.large (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0832"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-t3.medium",
+      "description": "Instância t3.medium (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0416"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-t3.micro",
+      "description": "Instância t3.micro (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0104"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-t3.small",
+      "description": "Instância t3.small (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0208"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-t4g.medium",
+      "description": "Instância t4g.medium (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0336"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-t4g.micro",
+      "description": "Instância t4g.micro (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0084"
+        }
+      ]
+    },
+    {
+      "sku": "ec2-instance-t4g.small",
+      "description": "Instância t4g.small (Linux)",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0168"
+        }
+      ]
+    }
+  ]
+}

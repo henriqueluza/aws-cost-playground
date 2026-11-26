@@ -1,0 +1,48 @@
+/* Barra de ações do editor (DESIGN.md, "A casca do editor"): controles de 32px e só tokens. */
+.group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* a conta se separa das ações do design: --space-2 dentro do grupo, --space-4 fora (proximidade) */
+  margin-inline-start: var(--space-4);
+}
+
+/* O primeiro botão do grupo (Entrar) mantém a largura de "Abrindo…": a barra não anda quando o texto troca */
+.group > button:first-child {
+  min-width: 88px;
+}
+
+.who {
+  display: block;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: var(--fs-body);
+  /* a altura do alvo (--hit-min) vem da linha, porque a reticência só funciona em bloco */
+  line-height: var(--hit-min);
+  text-decoration: underline;
+  text-decoration-thickness: var(--border-width);
+  text-underline-offset: var(--focus-offset);
+}
+
+.who:hover {
+  text-decoration-thickness: var(--focus-width);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

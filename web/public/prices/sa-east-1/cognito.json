@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "service": "cognito",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "cognito-mau-essentials",
+      "description": "Usuários ativos mensais (Essentials)",
+      "unit": "MAU",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.015"
+        }
+      ],
+      "freeTier": {
+        "quantity": "10000",
+        "pool": "cognito-mau"
+      }
+    },
+    {
+      "sku": "cognito-mau-lite",
+      "description": "Usuários ativos mensais (Lite)",
+      "unit": "MAU",
+      "tiers": [
+        {
+          "upTo": "90000",
+          "unitPrice": "0.0055"
+        },
+        {
+          "upTo": "990000",
+          "unitPrice": "0.0046"
+        },
+        {
+          "upTo": "9990000",
+          "unitPrice": "0.00325"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.0025"
+        }
+      ],
+      "freeTier": {
+        "quantity": "10000",
+        "pool": "cognito-mau"
+      }
+    },
+    {
+      "sku": "cognito-mau-plus",
+      "description": "Usuários ativos mensais (Plus)",
+      "unit": "MAU",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.02"
+        }
+      ]
+    }
+  ]
+}

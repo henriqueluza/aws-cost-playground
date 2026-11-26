@@ -1,4 +1,7 @@
-import type { BlockPricer } from '../blockContract';
+import { zeroCostPricer } from '../zeroCost';
 
-/** `aws.iam`: preço provisório, sem cobranças. As regras reais chegam na #41. */
-export const priceIam: BlockPricer = () => [];
+/**
+ * `aws.iam`: custo zero. A AWS não cobra por usuários, grupos, papéis nem políticas do IAM, que é
+ * o que o bloco representa. Não tem SKU nem arquivo de preço.
+ */
+export const priceIam = zeroCostPricer({ kind: 'no-direct-cost' });

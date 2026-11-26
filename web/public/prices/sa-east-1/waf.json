@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "service": "waf",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "waf-requests",
+      "description": "Requisições inspecionadas",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0000006"
+        }
+      ]
+    },
+    {
+      "sku": "waf-rules",
+      "description": "Regras das web ACLs",
+      "unit": "rule-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "1"
+        }
+      ]
+    },
+    {
+      "sku": "waf-web-acls",
+      "description": "Web ACLs",
+      "unit": "web ACL-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "5"
+        }
+      ]
+    }
+  ]
+}

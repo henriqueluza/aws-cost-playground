@@ -4,7 +4,7 @@
 
 - **Origem:** [ADR-0001](ADR-0001-stack.md) e o PRD (F2, F10 a F12). O design que referencia estes tipos está em [design-document.md](design-document.md); o catálogo de preços, em [price-catalog.md](price-catalog.md); o resultado do motor, em [cost-estimate.md](cost-estimate.md).
 - **Onde mora:** os dados em `contracts/blocks.json` e `contracts/edges.json`; os schemas zod (`blocksFileSchema`, `edgesFileSchema`), `PRD_BLOCK_LEVELS`, `BLOCK_TYPES`, `BLOCK_CATEGORIES`, `BLOCK_CONTRACT_LIMITS`, os tipos (`BlockDefinition`, `AttributeDefinition`, `UsageKeyDefinition`, `EdgeKindDefinition`) e a assinatura da função de preço (`BlockPricer`, `BlockPriceInput`, `BlockCharge`) em `web/src/features/pricing/model/blockContract.ts`; o registro (`BLOCKS`, `blockDefinition`, `blockPricer`, `edgeKindsFor`) em `blockRegistry.ts` e as funções de preço em `blocks/<bloco>.ts`. Se este texto e o código divergirem, vale o código.
-- **Estado:** a #175 (parte 1 de #9) traz `edges.json` e o contrato em código. A #176 (parte 2 de #9) traz o registro de blocos e os 11 blocos de nível A em `blocks.json`. A #177 (parte 3 de #9) traz os 9 de nível B e C: os 20 blocos do PRD estão em `blocks.json` e a #9 fecha.
+- **Estado:** a #175 (parte 1 de #9) traz `edges.json` e o contrato em código. A #176 (parte 2 de #9) traz o registro de blocos e os 11 blocos de nível A em `blocks.json`. A #177 (parte 3 de #9) traz os 9 de nível B e C: os 20 blocos do PRD estão em `blocks.json` e a #9 fecha. A #200 (parte 1 de #10) faz a API ler os dois arquivos (`api/app/contracts.py`).
 
 ## `contracts/blocks.json`
 
@@ -69,7 +69,16 @@ Raiz: `{ "schemaVersion": 1, "kinds": [...] }`. Cada tipo de aresta (`data`, `ru
 
 `edgeKindsFor` devolve lista vazia quando origem ou destino é um tipo fora do contrato. Com `aws.ecs` em `blocks.json`, `edgeKindsFor('aws.ecs', 'aws.ec2')` devolve `['data', 'runs-on']`.
 
-`BLOCK_PRICERS` é `Readonly<Record<BlockType, BlockPricer>>`, completo: o compilador recusa bloco do PRD sem função de preço. As funções dos 20 blocos são provisórias e devolvem `[]`; as regras reais chegam nas Issues de preço (#30 a #41).
+`BLOCK_PRICERS` é `Readonly<Record<BlockType, BlockPricer>>`, completo: o compilador recusa bloco do PRD sem função de preço. A função começa provisória (devolve `[]`) e a Issue de preço do bloco (#30 a #41) a troca pela regra real, descrita no TSDoc de `blocks/<bloco>.ts`. Os blocos de nível C usam `zeroCostPricer` no arquivo do bloco; o significado de custo zero está em [cost-estimate.md](cost-estimate.md#casos-especiais).
+
+### Arestas tipadas no editor (#46, parte 1)
+
+`web/src/features/editor/model/edgeKinds.ts` aplica o contrato de arestas no editor (TypeScript puro, sem React):
+
+- `inferKind(kinds)`: entre os tipos permitidos (`allowedKinds`, que embrulha `edgeKindsFor`), escolhe o que o contrato aceita em menos pares origem/destino; empate, a ordem de `edges.json`. Por isso ECS para EC2 vira `runs-on` e não `data`.
+- `setEdgeKind(doc, id, kind)` (`designActions.ts`, exposta na store do design): troca o tipo da aresta. Falha com `unknown-edge` se a aresta não existe e com `kind-not-allowed` se o contrato não permite o tipo para o par de blocos (o documento não muda).
+- `retargetUsage(edge, kind)`: ao trocar o tipo, `usage.values` e `overrides` mantêm só as chaves que o novo tipo tem em `edges.json`, cada uma limitada à faixa do novo tipo (inteiros arredondados). `runs-on` não tem `gbPerMonth`, então o uso e o override somem; `usage.source` não muda.
+- Canvas: as arestas usam o tipo React Flow customizado `typed` (`ui/TypedEdge.tsx`), com traçado por tipo (`EDGE_STYLE`): `data` contínuo, `runs-on` tracejado, `logs` pontilhado, além da cor e do ícone na etiqueta. `ui/EdgeLegend.tsx` mostra a legenda no canto inferior esquerdo quando há blocos. O inspetor de aresta e o "Conectar a…" ficam para a parte 2.
 
 Para acrescentar um bloco:
 
@@ -119,7 +128,7 @@ Valores copiados de `contracts/blocks.json`. Atributo sem `default` é opcional.
 | `aws.ec2` | `hoursPerMonth` | hours | `730` | `0` | `744` | não |
 | `aws.ec2` | `rootVolumeGb` | GB | `30` | `8` | `16384` | sim |
 | `aws.rds` | `storageGb` | GB | `20` | `20` | `65536` | sim |
-| `aws.rds` | `backupStorageGb` | GB | `20` | `0` | `1000000` | não |
+| `aws.rds` | `backupStorageGb` | GB | `0` | `0` | `1000000` | não |
 | `aws.elasticache` | `nodeCount` | nodes | `1` | `1` | `500` | sim |
 | `aws.cloudfront` | `requestsPerMonth` | requests | `1000000` | `0` | `100000000000` | sim |
 | `aws.alb` | `newConnectionsPerSecond` | connections/s | `10` | `0` | `1000000` | não |
@@ -132,13 +141,15 @@ Valores copiados de `contracts/blocks.json`. Atributo sem `default` é opcional.
 | `aws.cloudwatch` | `alarms` | alarms | `10` | `0` | `100000` | sim |
 | `aws.nat-gateway` | `processedGbPerMonth` | GB | `100` | `0` | `100000000` | não |
 
+`backupStorageGb` do `aws.rds` é só o backup além do incluído (o campo "Additional backup storage" da AWS Pricing Calculator), cobrado inteiro por GB-mês: o backup gratuito, até 100% do armazenamento provisionado na região, não entra na chave. O padrão é `0`: um RDS recém-criado não tem backup pago (#241).
+
 ## Blocos de nível B e C
 
 Valores copiados de `contracts/blocks.json`, no mesmo formato. Atributo sem `default` é opcional. Blocos de B e C sem atributo (`aws.waf`, `aws.secrets-manager`, `aws.cloudtrail`, `aws.route53`, `aws.iam`, `aws.cloudformation`) não aparecem na tabela de atributos.
 
-- Os três de nível C (`aws.iam`, `aws.cloudformation`, `aws.ecs`) custam zero e não têm chave de uso.
+- Os três de nível C (`aws.iam`, `aws.cloudformation`, `aws.ecs`) custam zero (via `zeroCostPricer`, veja [cost-estimate.md](cost-estimate.md#casos-especiais)) e não têm chave de uso.
 - `aws.ecs` leva só o atributo opcional `az` (`a`, `b`, `c`, sem padrão). O custo dele vem do EC2 ligado pela aresta `runs-on`.
-- Em `aws.codepipeline`, as chaves `activePipelines` e `executionMinutesPerMonth` convivem no bloco. Qual delas cada tipo de pipeline usa é definido pela função de preço (#40), não por este contrato.
+- Em `aws.codepipeline`, as chaves `activePipelines` e `executionMinutesPerMonth` convivem no bloco. A função de preço (#40) lê só a chave do `pipelineType` do bloco: `V1` usa `activePipelines` e `V2` usa `executionMinutesPerMonth`; a chave do outro tipo é ignorada e não gera cobrança.
 - Em `aws.cloudtrail`, `trails` é o número de trilhas: a cobrança dos eventos de gerenciamento "além da primeira trilha" (#40) sai dele.
 
 ### Atributos
@@ -197,7 +208,9 @@ Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInp
 - **Uso:** o efetivo (override vence). Só as chaves do contrato; chave ausente recebe o padrão; valor fora da faixa é limitado a `min`/`max`; chave `integer` com fração é arredondada para cima.
 - **Atributos:** só os do contrato; ausente recebe o padrão, se houver (`az` ausente fica ausente). Valor fora das opções não chega à função: o bloco sai `unavailable`.
 
-O motor (#26) aplica mínimo, franquia e faixas às `BlockCharge` e monta as `CostLine`, como descrito em [cost-estimate.md](cost-estimate.md#algoritmo). As funções dos 20 blocos continuam provisórias (devolvem `[]`) até as #30 a #41.
+O motor (#26) aplica mínimo, franquia e faixas às `BlockCharge` e monta as `CostLine`, como descrito em [cost-estimate.md](cost-estimate.md#algoritmo). Função provisória devolve `[]`; as regras de cada bloco (SKUs, quantidade, o que fica de fora) ficam no TSDoc do arquivo do bloco.
+
+`web/src/features/pricing/model/blockSeedCatalog.test.ts` confere, para todo bloco, região e combinação de atributos, que todo SKU emitido existe na semente da região (`web/public/prices/<region>/`). A Issue de um bloco não precisa editá-lo: basta a função e a semente.
 
 ## Convenções
 

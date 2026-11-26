@@ -14,7 +14,7 @@ const sameFeature = {
 const shared = { element: { type: 'shared' } };
 
 const pureTsMessage =
-  'ADR-0001: application/, model/, shared/lib/design, shared/lib/api e shared/lib/money.ts são TypeScript puro (sem React, React Flow ou HTTP).';
+  'ADR-0001: application/, model/, shared/lib/design, shared/lib/api e shared/lib/money.ts são TypeScript puro (sem React, React Flow, TanStack Query, Zustand ou HTTP).';
 
 export default defineConfig([
   globalIgnores(['dist', 'coverage', 'playwright-report', 'test-results']),
@@ -59,6 +59,8 @@ export default defineConfig([
       'src/shared/lib/api/**',
       'src/shared/lib/money.ts',
     ],
+    // O provider React das portas (#185) é o único módulo de shared/lib/api fora do bloco.
+    ignores: ['src/shared/lib/api/ApiProvider.tsx'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -66,6 +68,7 @@ export default defineConfig([
           paths: [
             { name: 'react', message: pureTsMessage },
             { name: 'react-dom', message: pureTsMessage },
+            { name: 'zustand', message: pureTsMessage },
           ],
           patterns: [
             {
@@ -73,6 +76,8 @@ export default defineConfig([
                 'react/*',
                 'react-dom/*',
                 '@xyflow/*',
+                '@tanstack/*',
+                'zustand/*',
                 // Qualquer módulo http, inclusive '../http' a partir de shared/lib.
                 '**/http',
                 '**/http/*',

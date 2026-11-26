@@ -73,11 +73,11 @@ infra/{modules,envs/{staging,production},bootstrap}/
 docs/
 ```
 
-Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `model/`, com `api/` como adapter. `features/pricing/{application,model}` é TypeScript puro: não importa React, React Flow nem `fetch`.
+Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `model/`, com `api/` como adapter. `features/pricing/{application,model}` é TypeScript puro: não importa React, React Flow nem `fetch`. Store Zustand (inclusive `zustand/vanilla`) fica em `hooks/`: guarda o estado de tela (layout, seleção) e delega toda mudança de documento às ações puras de `model/`/`application/`.
 
 ### Teste de arquitetura
 
-- `web/`: `eslint-plugin-boundaries` (feature só importa outra pelo `index.ts`) mais `no-restricted-imports` proibindo `react`, `@xyflow/*` e `shared/lib/http` dentro de `**/application/**` e `**/model/**`.
+- `web/`: `eslint-plugin-boundaries` (feature só importa outra pelo `index.ts`) mais `no-restricted-imports` proibindo `react`, `react-dom`, `@xyflow/*`, `@tanstack/*`, `zustand` e módulos `http` (`shared/lib/http`) nas camadas TypeScript puro: `**/application/**`, `**/model/**`, `shared/lib/design/**`, `shared/lib/api/**` e `shared/lib/money.ts`.
 - `api/`: `import-linter` com um contrato `forbidden`: módulos `router` não importam `boto3` nem `anthropic`. É a garantia mínima do nível `simple` (regra fora do controller, acesso a dados atrás de função nomeada).
 
 ### Comandos de qualidade
@@ -155,9 +155,12 @@ Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `mod
 - Listagem: `Query` em `PK` com `begins_with(SK, "DESIGN#")`, projetando tudo menos `doc`.
 - Limites validados na API: 50 designs por usuário, `doc` até 350 KB, 100 blocos por design.
 - O ponteiro para S3 previsto no discovery fica fora do MVP: um design de 20 blocos tem poucos KB. Acima de 350 KB a API responde 413. O ponteiro vira Issue quando alguém bater no limite.
-- Consistência forte só na quota. Os dois contadores sobem numa `TransactWriteItems` com `ADD count :1` e `ConditionExpression count < :limite` em cada item: ou os dois incrementam, ou a chamada é recusada com 429. Sem leitura antes da escrita.
+- Consistência forte só na quota. Os dois contadores sobem numa `TransactWriteItems` com `ADD count :1` e `ConditionExpression count < :limite` em cada item: ou os dois incrementam, ou a chamada é recusada com 429. Sem leitura antes da escrita. A condição implementada é `attribute_not_exists(count) OR count < :limite` (o item nasce no primeiro `Update` do dia) e o `ttl` entra por `if_not_exists`.
 - `ttl` de 35 dias nos itens de quota, para sobrar histórico do gatilho de revisão (100 estimativas/mês por não-autor).
 - Exclusão de conta: apaga a partição `USER#<sub>` inteira e depois o usuário no Cognito.
+  - Apaga: todos os itens de `USER#<sub>` (designs e contadores de quota) e o usuário no Cognito (e-mail e refresh tokens).
+  - Não apaga: a quota global (`PK = GLOBAL`); backups de PITR (só produção, 35 dias pelo padrão do DynamoDB, depois somem sozinhos; o dado apagado continua recuperável nessa janela); logs do CloudWatch até a retenção de 7 dias (o log da aplicação não tem e-mail nem `sub`; o log de acesso do API Gateway registra o `sub`, pseudônimo, em toda requisição, inclusive nesta); o que já foi enviado à Anthropic.
+  - Janela do token: o access token vale até 15 min após a exclusão e uma escrita nesse intervalo recria itens de `USER#<sub>`. Sem revogação; mitigação no cliente (descartar os tokens após o 204). Decisão pendente do autor (#284).
 
 ### Fluxo da estimativa de carga
 

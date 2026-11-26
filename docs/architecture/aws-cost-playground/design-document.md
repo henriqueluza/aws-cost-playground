@@ -1,6 +1,6 @@
 # Contrato do documento do design
 
-O documento do design é o JSON que o anônimo baixa e o logado salva. A API (#10, Pydantic) e o frontend validam o mesmo contrato. Quem mudar um dos lados muda o outro junto.
+O documento do design é o JSON que o anônimo baixa e o logado salva. A API (#10, Pydantic) e o frontend validam o mesmo contrato. Quem mudar um dos lados muda o outro junto. Os modelos da API estão em `api/app/design_document.py`; os dois lados leem os exemplos de `contracts/examples/design/` e precisam dar o mesmo veredito.
 
 - **Origem:** [ADR-0001, "Modelo de dados"](ADR-0001-stack.md#modelo-de-dados). O formato e o exemplo são os do ADR, e este documento só detalha a validação.
 - **Onde mora:** `web/src/shared/lib/design/` (schema zod, tipos, `DESIGN_LIMITS` e `effectiveUsage`). Importe pelo `index.ts`. Se este texto e o código divergirem, vale o código.
@@ -33,4 +33,7 @@ O documento do design é o JSON que o anônimo baixa e o logado salva. A API (#1
 - `schemaVersion` muda quando o formato muda de modo incompatível.
 - `scenarios` ganha conteúdo na release 3. Publique primeiro um leitor que o aceite e só depois a escrita: o build anterior recusa `scenarios` não vazio, e descartar o conteúdo em silêncio perderia dado.
 - Não mostre crua na UI a mensagem de erro do schema: a chave recusada aparece no `path`. A #50 mostra mensagem própria.
-- O limite de tamanho `maxDocBytes` (350 KB, o mesmo da API) entra com a #50.
+- O limite de tamanho `maxDocBytes` (350 KB, o mesmo da API) vale para o arquivo aberto na UI (#50): arquivo maior é recusado sem ser lido.
+- Abrir e baixar (#50, `features/editor/model/designFile.ts`): o tamanho do `File` é conferido contra `maxDocBytes` antes de `text()`; acima do teto o arquivo nem é lido. Depois vêm `JSON.parse`, a migração por `schemaVersion` e o schema. Falha vira uma de cinco categorias (`too-large`, `unreadable`, `not-json`, `not-design`, `unsupported-version`), cada uma com frase fixa na UI; nada do arquivo (trecho, caminho, mensagem do zod) é exibido.
+- Migração: `migrateDesign` roda sobre o JSON cru, antes do schema, e só lê `schemaVersion` (inteiro). Há um passo por versão de origem (hoje vazio, só a 1 existe); versão desconhecida, futura, sem passo ou com passo que não avança é recusada como `unsupported-version`.
+- Baixar: `serializeDesign` grava só as chaves do contrato, com chaves de `attributes`, `usage.values` e `overrides` em ordem alfabética, 2 espaços e quebra de linha final, e devolve `null` se o documento não valida ou passa do teto. O nome do arquivo é fixo (`aws-cost-playground-design.json`), porque o documento não tem nome de design.
