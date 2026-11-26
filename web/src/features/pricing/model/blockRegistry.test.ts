@@ -144,6 +144,7 @@ describe('contracts/edges.json', () => {
     ['aws.cloudwatch', 'aws.lambda', []],
     ['aws.cloudwatch', 'aws.cloudwatch', []],
     ['aws.iam', 'aws.s3', []],
+    ['aws.s3', 'aws.cloudwatch', ['logs']],
     ['aws.iam', 'aws.cloudwatch', ['logs']],
     ['aws.lambda', 'aws.eks', []],
     ['aws.eks', 'aws.s3', []],

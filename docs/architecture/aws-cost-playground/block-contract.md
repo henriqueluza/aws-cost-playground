@@ -138,7 +138,7 @@ Valores copiados de `contracts/blocks.json`, no mesmo formato. Atributo sem `def
 
 - Os três de nível C (`aws.iam`, `aws.cloudformation`, `aws.ecs`) custam zero e não têm chave de uso.
 - `aws.ecs` leva só o atributo opcional `az` (`a`, `b`, `c`, sem padrão). O custo dele vem do EC2 ligado pela aresta `runs-on`.
-- Em `aws.codepipeline`, as chaves dos dois tipos convivem: `activePipelines` vale para V1 e `executionMinutesPerMonth` para V2. A função de preço ignora a chave do tipo não selecionado.
+- Em `aws.codepipeline`, as chaves `activePipelines` e `executionMinutesPerMonth` convivem no bloco. Qual delas cada tipo de pipeline usa é definido pela função de preço (#40), não por este contrato.
 - Em `aws.cloudtrail`, `trails` é o número de trilhas: a cobrança dos eventos de gerenciamento "além da primeira trilha" (#40) sai dele.
 
 ### Atributos
