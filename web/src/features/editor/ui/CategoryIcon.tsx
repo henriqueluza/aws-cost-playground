@@ -1,10 +1,7 @@
 import type { ReactElement } from 'react';
 import type { CanvasCategory } from '../model/canvasModel';
 
-/**
- * Ícones próprios, no estilo do Lucide (traço de 1,5px na grade de 16). O DESIGN.md pede o Lucide;
- * enquanto o pacote não é dependência do web, estes seis fazem o papel (sem ícone oficial da AWS).
- */
+/** Ícones próprios no estilo do Lucide (DESIGN.md); sem o pacote como dependência, e sem ícone da AWS. */
 export type IconName = CanvasCategory | 'globe';
 
 const SHAPES: Record<IconName, ReactElement> = {

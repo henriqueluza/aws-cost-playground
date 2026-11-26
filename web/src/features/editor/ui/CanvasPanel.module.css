@@ -20,10 +20,6 @@
   --xy-attribution-background-color: transparent;
 }
 
-.canvas :global(.react-flow__edge.selected .react-flow__edge-path) {
-  stroke-width: 2;
-}
-
 .canvas :global(.react-flow__attribution) {
   margin: var(--space-2);
   font-size: var(--fs-small);
@@ -55,10 +51,6 @@
   box-shadow:
     0 0 0 calc(var(--focus-offset-node) + var(--focus-width)) var(--surface),
     0 0 0 calc(var(--focus-offset-node) + 2 * var(--focus-width)) var(--focus);
-}
-
-.canvas :global(.react-flow__node.dragging) > .block {
-  box-shadow: var(--shadow-float);
 }
 
 .block {
