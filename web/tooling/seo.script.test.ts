@@ -94,12 +94,12 @@ describe('public/seo.js', () => {
     },
   );
 
-  it.each(['/comparar', '/designs-publicos', '/qualquer'])(
-    '%s (fora das públicas) fica sem canonical, sem og:url e sem noindex',
+  it.each(['/comparar', '/designs-publicos', '/qualquer', '/Privacidade', '/index.html'])(
+    '%s (fora das públicas) recebe noindex, sem canonical nem og:url',
     (path) => {
       expect(run(path)).toMatchObject({
         title: HOME_TITLE,
-        robots: undefined,
+        robots: 'noindex',
         canonical: undefined,
         ogUrl: undefined,
       });

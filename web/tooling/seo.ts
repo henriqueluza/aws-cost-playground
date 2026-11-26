@@ -22,11 +22,12 @@ export const PAGE_META: Readonly<Record<string, PageMeta>> = {
   },
 };
 
-/** Rotas indexáveis: entram no sitemap e ganham canonical e `og:url` (com `VITE_SITE_URL`). */
+/**
+ * Únicas rotas indexáveis: entram no sitemap e ganham canonical e `og:url` (com `VITE_SITE_URL`).
+ * Qualquer outra (`/designs`, `/conta`, `/auth/callback`, `/comparar`, caminho inexistente) leva
+ * `noindex`: o CloudFront devolve o `index.html` com 200 para todo caminho.
+ */
 export const PUBLIC_ROUTES: readonly string[] = ['/', ...Object.keys(PAGE_META)];
-
-/** Rotas privadas: `noindex` e sem canonical (a rota e tudo abaixo dela). */
-export const NOINDEX_ROUTES: readonly string[] = ['/designs', '/conta', '/auth/callback'];
 
 /** Id do bloco JSON (não executável, fora do alcance da CSP) que `public/seo.js` lê. */
 export const ROUTES_ELEMENT_ID = 'seo-routes';
@@ -68,10 +69,10 @@ export const sitemapXml = (origin: string | null): string => {
 /**
  * Tags do fim do `<head>`: o bloco JSON das rotas e, depois dele, `seo.js`, que roda ao ser lido.
  * Canonical e `og:url` não vão no HTML: ele é o mesmo para toda rota da SPA, então `seo.js` os
- * cria só nas rotas públicas, com a origem do bloco.
+ * cria só nas rotas públicas, com a origem do bloco, e põe `noindex` nas demais.
  */
 export function seoTags(origin: string | null): HtmlTagDescriptor[] {
-  const routes = { origin, public: PUBLIC_ROUTES, noindex: NOINDEX_ROUTES, pages: PAGE_META };
+  const routes = { origin, public: PUBLIC_ROUTES, pages: PAGE_META };
   return [
     {
       tag: 'script',

@@ -6,8 +6,8 @@ import { parseSiteUrl, sitemapXml } from './seo.ts';
 type Asset = Extract<Rollup.RollupOutput['output'][number], { type: 'asset' }>;
 
 async function emit(siteUrl?: string) {
-  if (siteUrl === undefined) delete process.env.VITE_SITE_URL;
-  else process.env.VITE_SITE_URL = siteUrl;
+  // Vazia em vez de apagada: process.env vence um VITE_SITE_URL de `.env*` local.
+  process.env.VITE_SITE_URL = siteUrl ?? '';
   const result = await build({ logLevel: 'silent', build: { write: false } });
   if (Array.isArray(result) || !('output' in result)) throw new Error('saída inesperada');
   const text = (name: string) => {
