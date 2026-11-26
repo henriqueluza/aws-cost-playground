@@ -69,6 +69,9 @@ describe('seletor de região', () => {
     const before = designStore.getState().document;
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Região' }), 'sa-east-1');
     expect(designStore.getState().document).toEqual({ ...before, region: 'sa-east-1' });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Região alterada para sa-east-1. Preços recalculados.',
+    );
     await waitFor(() => expect(regionsQueried()).toContain('sa-east-1'));
   });
 });
@@ -103,7 +106,7 @@ describe('Novo design', () => {
     await user.click(screen.getByRole('button', { name: 'Novo design' }));
     await user.click(
       within(await screen.findByRole('dialog')).getByRole('button', {
-        name: 'Descartar e criar novo',
+        name: 'Descartar e criar novo design',
       }),
     );
     expect(screen.queryByRole('dialog')).toBeNull();

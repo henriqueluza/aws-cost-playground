@@ -33,7 +33,8 @@ export function ActionBar() {
   };
   const onRegion = (event: ChangeEvent<HTMLSelectElement>) => {
     const next = parseRegion(event.target.value);
-    if (next) void setRegion(next);
+    if (next && setRegion(next).ok)
+      setAnnouncement(`Região alterada para ${next}. Preços recalculados.`);
   };
 
   return (
@@ -66,7 +67,7 @@ export function ActionBar() {
         <div className={styles.dialogActions}>
           <Button onClick={() => setConfirming(false)}>Cancelar</Button>
           <Button variant="destructive" onClick={create}>
-            Descartar e criar novo
+            Descartar e criar novo design
           </Button>
         </div>
       </Dialog>
