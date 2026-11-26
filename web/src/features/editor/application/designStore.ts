@@ -7,6 +7,7 @@ import {
 } from '../../../shared/lib/design';
 import * as act from '../model/designActions';
 import {
+  DEFAULT_EDGE_USAGE,
   EMPTY_STATE,
   type ActionErrorCode,
   type BlockPatch,
@@ -100,12 +101,7 @@ export function createDesignStore(
       editBlock: (id, patch) => apply(act.editBlock(doc(), id, patch), undefined),
       connect: (edge) => {
         const id = ids.edgeId();
-        const full = {
-          usage: { source: 'default', values: {} } as Usage,
-          ...edge,
-          id,
-          overrides: {},
-        };
+        const full = { ...edge, usage: edge.usage ?? DEFAULT_EDGE_USAGE, id, overrides: {} };
         return apply(act.connect(doc(), full), id);
       },
       removeEdge: (id) => apply(act.removeEdge(doc(), id), undefined, prune),

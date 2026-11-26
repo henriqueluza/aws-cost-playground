@@ -106,6 +106,7 @@ describe('connect', () => {
 
   it.each<[string, Edge, ActionErrorCode]>([
     ['source inexistente', { ...newEdge, source: 'blk_nada' }, 'unknown-block'],
+    ['client como source', { ...newEdge, source: 'client' }, 'unknown-block'],
     ['target inexistente', { ...newEdge, target: 'blk_nada' }, 'unknown-block'],
     ['laço no mesmo bloco', { ...newEdge, target: 'blk_fn_api' }, 'self-loop'],
     ['logs para o client', { ...newEdge, target: 'client', kind: 'logs' }, 'client-edge-kind'],

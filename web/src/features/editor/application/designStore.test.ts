@@ -31,7 +31,9 @@ describe('designStore: caminho feliz das 12 ações', () => {
     expect(s.getState().layout.blk_t1).toEqual({ x: 9, y: 8 });
     const docBefore = s.getState().document;
     expect(s.getState().moveBlock('client', { x: 7, y: 7 }).ok).toBe(true);
+    expect(s.getState().moveBlock('blk_assets', { x: 6, y: 5 }).ok).toBe(true);
     expect(s.getState().layout.client).toEqual({ x: 7, y: 7 });
+    expect(s.getState().layout.blk_assets).toEqual({ x: 6, y: 5 });
     expect(s.getState().document).toBe(docBefore);
   });
 
@@ -61,7 +63,7 @@ describe('designStore: caminho feliz das 12 ações', () => {
     expect(s.getState().selection).toBeNull();
     expect(s.getState().select(block).ok).toBe(true);
     expect(s.getState().select(null).ok).toBe(true);
-    expect(s.getState().removeBlock('blk_fn_api').ok).not.toBe(false);
+    expect(s.getState().removeBlock('blk_fn_api').ok).toBe(true);
     expect(s.getState().document.blocks.map((b) => b.id)).toEqual(['blk_assets']);
   });
 
@@ -102,6 +104,33 @@ describe('designStore: ação recusada não altera o estado', () => {
     [
       'moveBlock desconhecido',
       (s: ReturnType<typeof setup>) => s.getState().moveBlock('blk_x', { x: 0, y: 0 }),
+    ],
+    [
+      'moveBlock com posição infinita',
+      (s: ReturnType<typeof setup>) => s.getState().moveBlock('blk_assets', { x: 0, y: Infinity }),
+    ],
+    [
+      'editBlock desconhecido',
+      (s: ReturnType<typeof setup>) => s.getState().editBlock('blk_x', { label: 'N' }),
+    ],
+    [
+      'removeBlock desconhecido',
+      (s: ReturnType<typeof setup>) => s.getState().removeBlock('blk_x'),
+    ],
+    ['removeEdge desconhecida', (s: ReturnType<typeof setup>) => s.getState().removeEdge('edg_x')],
+    [
+      'setUsage em aresta inexistente',
+      (s: ReturnType<typeof setup>) =>
+        s.getState().setUsage({ kind: 'edge', id: 'edg_x' }, { source: 'default', values: {} }),
+    ],
+    [
+      'setOverride com __proto__',
+      (s: ReturnType<typeof setup>) => s.getState().setOverride(block, '__proto__', 1),
+    ],
+    [
+      'replaceDocument com região inválida',
+      (s: ReturnType<typeof setup>) =>
+        s.getState().replaceDocument({ ...doc, region: 'eu-west-1' } as unknown as typeof doc),
     ],
   ])('%s', (_nome, run) => {
     const s = setup();

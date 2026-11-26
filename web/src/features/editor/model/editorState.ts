@@ -40,7 +40,7 @@ export type Result<T> =
 export type NewBlock = Pick<Block, 'type' | 'label' | 'attributes' | 'usage'>;
 /** `attributes` substitui o record inteiro; `id` e `type` não mudam. */
 export type BlockPatch = { readonly label?: string; readonly attributes?: Block['attributes'] };
-/** Aresta nova, antes de ganhar id. Sem `usage`, começa com `{ source: 'default', values: {} }`. */
+/** Aresta nova, antes de ganhar id. Sem `usage`, começa com `DEFAULT_EDGE_USAGE`. */
 export type NewEdge = Pick<Edge, 'source' | 'target' | 'kind'> & { readonly usage?: Usage };
 
 export const EMPTY_DESIGN: DesignDocument = {
@@ -53,3 +53,5 @@ export const EMPTY_DESIGN: DesignDocument = {
 };
 
 export const EMPTY_STATE: EditorState = { document: EMPTY_DESIGN, layout: {}, selection: null };
+
+export const DEFAULT_EDGE_USAGE: Usage = { source: 'default', values: {} };
