@@ -26,7 +26,7 @@ As regras de import do ADR-0001 são verificadas pelo `npx eslint .` (config em 
 
 - Uma feature só importa outra feature pelo `index.ts` dela.
 - `app/` e as features podem importar `shared/`; `shared/` não importa feature nem `app/`.
-- `**/application/**`, `**/model/**`, `src/shared/lib/design/**`, `src/shared/lib/api/**` e `src/shared/lib/money.ts` não importam `react`, `react-dom`, `@xyflow/*` nem módulo `http` (padrão `**/http`, que inclui `shared/lib/http`). O motor de preço, o contrato do design, as portas da API e o dinheiro ficam em TypeScript puro.
+- `**/application/**`, `**/model/**`, `src/shared/lib/design/**`, `src/shared/lib/api/**` e `src/shared/lib/money.ts` não importam `react`, `react-dom`, `@xyflow/*`, `@tanstack/*`, `zustand` (nem `zustand/*`) nem módulo `http` (padrão `**/http`, que inclui `shared/lib/http`). O motor de preço, o contrato do design, as portas da API e o dinheiro ficam em TypeScript puro.
 
 ## Configuração de runtime (`/config.json`)
 
