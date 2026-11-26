@@ -11,14 +11,15 @@ const isApple = (): boolean => /Mac|iPhone|iPad/.test(globalThis.navigator?.plat
 export function HistoryButtons(): ReactElement {
   const canUndo = useDesignStore((s) => s.history.past.length > 0);
   const canRedo = useDesignStore((s) => s.history.future.length > 0);
-  const mod = isApple() ? '⌘' : 'Ctrl+';
-  const redoKeys = isApple() ? '⇧⌘Z' : 'Ctrl+Shift+Z ou Ctrl+Y';
+  const apple = isApple();
+  const mod = apple ? '⌘' : 'Ctrl+';
+  const redoKeys = apple ? '⇧⌘Z' : 'Ctrl+Shift+Z ou Ctrl+Y';
   return (
     <div role="group" aria-label="Histórico" className={styles.history}>
       <IconButton
         aria-label="Desfazer"
         title={canUndo ? `Desfazer (${mod}Z)` : 'Nada para desfazer'}
-        aria-keyshortcuts="Control+Z Meta+Z"
+        aria-keyshortcuts={apple ? 'Meta+Z' : 'Control+Z'}
         disabled={!canUndo}
         onClick={undoAndAnnounce}
       >
@@ -27,7 +28,7 @@ export function HistoryButtons(): ReactElement {
       <IconButton
         aria-label="Refazer"
         title={canRedo ? `Refazer (${redoKeys})` : 'Nada para refazer'}
-        aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y"
+        aria-keyshortcuts={apple ? 'Meta+Shift+Z' : 'Control+Shift+Z Control+Y'}
         disabled={!canRedo}
         onClick={redoAndAnnounce}
       >

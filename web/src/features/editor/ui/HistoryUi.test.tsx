@@ -85,6 +85,8 @@ describe('desfazer e refazer: botões, atalhos e anúncio', () => {
     expect(region()).toBe('sa-east-1');
     await user.keyboard('{Control>}z{/Control}{Control>}y{/Control}');
     expect(region()).toBe('sa-east-1');
+    await user.keyboard('{Control>}z{/Control}{Meta>}y{/Meta}'); // Cmd+Y não é atalho de refazer
+    expect(region()).toBe('us-east-1');
   });
 
   it('Ctrl+Z dentro de um campo de texto não desfaz o design', async () => {
