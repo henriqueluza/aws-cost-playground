@@ -3,5 +3,70 @@
   "service": "dynamodb",
   "region": "sa-east-1",
   "currency": "USD",
-  "prices": []
+  "prices": [
+    {
+      "sku": "dynamodb-read-capacity",
+      "description": "Capacidade de leitura provisionada",
+      "unit": "RCU-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.000195"
+        }
+      ],
+      "freeTier": {
+        "quantity": "18600"
+      }
+    },
+    {
+      "sku": "dynamodb-read-requests",
+      "description": "Leituras sob demanda",
+      "unit": "read request unit",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0000001875"
+        }
+      ]
+    },
+    {
+      "sku": "dynamodb-storage",
+      "description": "Armazenamento (Standard)",
+      "unit": "GB-month",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.375"
+        }
+      ],
+      "freeTier": {
+        "quantity": "25"
+      }
+    },
+    {
+      "sku": "dynamodb-write-capacity",
+      "description": "Capacidade de escrita provisionada",
+      "unit": "WCU-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.000975"
+        }
+      ],
+      "freeTier": {
+        "quantity": "18600"
+      }
+    },
+    {
+      "sku": "dynamodb-write-requests",
+      "description": "Escritas sob demanda",
+      "unit": "write request unit",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0000009375"
+        }
+      ]
+    }
+  ]
 }
