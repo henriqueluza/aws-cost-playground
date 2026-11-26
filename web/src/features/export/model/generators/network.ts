@@ -197,6 +197,7 @@ function securityGroupNodes(input: GeneratorInput): HclNode[] {
   }
   if (roles.includes('app')) {
     // Saída da aplicação: HTTPS (APIs da AWS e atualizações) e os bancos e caches ligados a ela.
+    // Sem bloco de NAT Gateway as sub-redes privadas não têm rota, e esta regra não alcança nada.
     nodes.push(rule('egress', 'app_https', 'app', 443, { cidr: ANY_IPV4 }, 'HTTPS para fora'));
   }
   const stores = [
