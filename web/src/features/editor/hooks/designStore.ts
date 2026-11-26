@@ -47,6 +47,10 @@ export type DesignActions = {
   setOverride(target: ElementRef, key: string, value: number | null): Result<void>;
   select(selection: Selection): Result<void>;
   setRegion(region: Region): Result<void>;
+  /** Descrição da carga; digitação em sequência é um passo só (como as setas do canvas). */
+  setDescription(description: string): Result<void>;
+  /** Documento com o `usage` novo vindo da estimativa, gravado como UM passo desfazível. */
+  applyEstimate(next: DesignDocument): Result<void>;
   loadDesign(raw: unknown): Result<void>;
   replaceDocument(doc: DesignDocument): Result<void>;
   /** Troca o design inteiro pelo template inicial (PRD F5); o confirmar antes é de quem chama. */
@@ -60,9 +64,18 @@ export type DesignActions = {
   beginGesture(): void;
   endGesture(): void;
 };
-/** Fora de `EditorState` (o que se desenha): o histórico e `baseline`, o último documento carregado ou salvo. */
+/**
+ * Fora de `EditorState` (o que se desenha): o histórico, `baseline` (o último documento carregado
+ * ou salvo) e `replacements`, que sobe a cada troca do design INTEIRO (abrir, "Novo design", e
+ * desfazer ou refazer uma delas). Quem guarda um vínculo com o documento (o design salvo no
+ * servidor) o solta quando o contador muda: o vínculo vale só para o documento que o originou.
+ */
 export type DesignStoreState = EditorState &
-  DesignActions & { readonly history: History; readonly baseline: DesignDocument };
+  DesignActions & {
+    readonly history: History;
+    readonly baseline: DesignDocument;
+    readonly replacements: number;
+  };
 export type DesignStore = StoreApi<DesignStoreState>;
 
 /** Ids aleatórios no formato do schema. */
@@ -105,12 +118,13 @@ export function createDesignStore(
       value: T,
       kind: StepKind,
       extra: (s: EditorState, doc: DesignDocument) => Partial<DesignStoreState> = () => ({}),
+      group?: Grouping,
     ): Result<T> => {
       if (!r.ok) return r;
       set((s) => ({
         document: r.value,
         ...extra(s, r.value),
-        history: record(s.history, s, kind),
+        history: record(s.history, s, kind, group),
       }));
       return ok(value);
     };
@@ -126,6 +140,7 @@ export function createDesignStore(
         layout: move.snapshot.layout,
         selection: keepSelection(move.snapshot.document, s.selection),
         history: move.history,
+        replacements: s.replacements + (move.kind === 'replace-design' ? 1 : 0),
       }));
       return move.kind;
     };
@@ -137,6 +152,7 @@ export function createDesignStore(
     return {
       ...initial,
       baseline: initial.document,
+      replacements: 0,
       history: EMPTY_HISTORY,
       addBlock: (block, position) => {
         if (!finite(position)) return fail('invalid-position');
@@ -183,16 +199,25 @@ export function createDesignStore(
         return ok(undefined);
       },
       setRegion: (region) => apply(act.setRegion(doc(), region), undefined, 'set-region'),
+      setDescription: (text) => {
+        const r = act.setDescription(doc(), text);
+        if (r.ok && text === doc().workload.description) return ok(undefined);
+        const group = { key: 'description', now: clock(), windowMs: NUDGE_WINDOW_MS };
+        return apply(r, undefined, 'set-description', () => ({}), group);
+      },
+      applyEstimate: (next) => apply(act.parseDesign(next), undefined, 'apply-estimate', prune),
       loadDesign: (raw) =>
         apply(act.parseDesign(raw), undefined, 'replace-design', (_, loaded) => ({
           selection: null,
           layout: {},
           baseline: loaded,
+          replacements: get().replacements + 1,
         })),
       replaceDocument: (next) =>
         apply(act.parseDesign(next), undefined, 'replace-design', (s, replaced) => ({
           ...prune(s, replaced),
           baseline: replaced,
+          replacements: get().replacements + 1,
         })),
       markSaved: (saved = get().document) => set({ baseline: saved }),
       newDesign: () => {
@@ -202,6 +227,7 @@ export function createDesignStore(
           baseline: template,
           layout: referenceLayout(),
           selection: null,
+          replacements: s.replacements + 1,
           history: record(s.history, s, 'replace-design'),
         }));
       },

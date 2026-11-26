@@ -64,6 +64,14 @@ const MUTATIONS: Record<string, (s: DesignStore) => void> = {
   setOverride: (s) =>
     void s.getState().setOverride({ kind: 'block', id: 'blk_fn_api' }, 'requestsPerMonth', 7),
   setRegion: (s) => void s.getState().setRegion('sa-east-1'),
+  setDescription: (s) => void s.getState().setDescription('Nova carga'),
+  applyEstimate: (s) =>
+    void s.getState().applyEstimate({
+      ...doc,
+      blocks: doc.blocks.map((b) =>
+        b.id === 'blk_assets' ? { ...b, usage: { source: 'llm', values: { storageGb: 9 } } } : b,
+      ),
+    }),
   loadDesign: (s) =>
     void s.getState().loadDesign({ ...doc, workload: { description: 'Carregado' } }),
   replaceDocument: (s) =>
@@ -187,5 +195,75 @@ describe('histórico: agrupamento, seleção e substituição', () => {
       s.getState().setRegion(i % 2 ? 'us-east-1' : 'sa-east-1');
     }
     expect(past(s)).toBe(HISTORY_LIMIT);
+  });
+});
+
+describe('troca do design inteiro (replacements)', () => {
+  it('sobe ao abrir, trocar e ao desfazer/refazer uma troca; os outros passos não mexem', () => {
+    const s = setup();
+    const count = () => s.getState().replacements;
+    expect(count()).toBe(0);
+    s.getState().addBlock(newBlock, { x: 1, y: 1 });
+    s.getState().moveBlock('blk_assets', { x: 9, y: 9 });
+    expect(count()).toBe(0);
+    s.getState().newDesign();
+    expect(count()).toBe(1);
+    s.getState().loadDesign(doc);
+    s.getState().replaceDocument(doc);
+    expect(count()).toBe(3);
+    s.getState().undo(); // desfaz replaceDocument
+    s.getState().redo();
+    expect(count()).toBe(5);
+    s.getState().loadDesign({ schemaVersion: 9 }); // recusado: nada muda
+    expect(count()).toBe(5);
+    s.getState().undo();
+    s.getState().undo();
+    s.getState().undo(); // desfaz newDesign: três trocas desfeitas no total
+    expect(count()).toBe(8);
+    s.getState().undo(); // add-block e move-block: não contam
+    s.getState().undo();
+    expect(count()).toBe(8);
+  });
+});
+
+describe('descrição da carga e estimativa', () => {
+  it('digitar em sequência é um passo só; depois da pausa, outro', () => {
+    let now = 0;
+    const s = setup(() => now);
+    for (const text of ['a', 'ab', 'abc']) s.getState().setDescription(text);
+    expect(past(s)).toBe(1);
+    now = 5_000;
+    s.getState().setDescription('abcd');
+    expect(past(s)).toBe(2);
+  });
+
+  it('texto igual ao atual e acima de 2.000 caracteres não entram', () => {
+    const s = setup();
+    s.getState().setDescription(doc.workload.description);
+    expect(s.getState().setDescription('x'.repeat(2001))).toMatchObject({ ok: false });
+    expect(past(s)).toBe(0);
+    expect(s.getState().document.workload.description).toBe(doc.workload.description);
+  });
+
+  it('applyEstimate recusa documento fora do schema e não cria passo', () => {
+    const s = setup();
+    const bad = {
+      ...doc,
+      blocks: doc.blocks.map((b) => ({ ...b, usage: { source: 'llm', values: { x: -1 } } })),
+    };
+    expect(s.getState().applyEstimate(bad as never)).toMatchObject({ ok: false });
+    expect(past(s)).toBe(0);
+  });
+
+  it('aplicar a estimativa muda só o que o documento trazia e desfaz de uma vez', () => {
+    const s = setup();
+    MUTATIONS['applyEstimate']?.(s);
+    const next = s.getState().document;
+    expect(next.blocks.find((b) => b.id === 'blk_fn_api')?.overrides).toEqual({
+      avgDurationMs: 80,
+    });
+    expect(next.blocks.find((b) => b.id === 'blk_assets')?.usage.source).toBe('llm');
+    s.getState().undo();
+    expect(s.getState().document).toEqual(doc);
   });
 });

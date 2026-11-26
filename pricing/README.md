@@ -2,7 +2,7 @@
 
 Script Python executado no CI que vai gerar o catálogo de preços (`web/public/prices/<region>/<service>.json`) a partir da AWS Price List API. Stack e decisões: `docs/architecture/aws-cost-playground/ADR-0001-stack.md`. Nível de arquitetura: `simple`.
 
-O gerador está completo (Issue #28, partes #195, #202, #196 e #214): cliente da Price List Query API (`GetProducts`, região `us-east-1`, credenciais da cadeia padrão do ambiente: variáveis `AWS_*`, perfil ou role do CI), registro dos 18 serviços, serialização, schema em Python, checagens, geração, gravação e CLI. Os filtros reais de cada serviço entram nas Issues de bloco (#30 a #42); o workflow semanal é a #29.
+O gerador está completo (Issue #28, partes #195, #202, #196 e #214): cliente da Price List Query API (`GetProducts`, região `us-east-1`, credenciais da cadeia padrão do ambiente: variáveis `AWS_*`, perfil ou role do CI), registro dos 18 serviços, serialização, schema em Python, checagens, geração, gravação e CLI. Os filtros reais de cada serviço entram nas Issues de bloco (#30 a #42); o workflow semanal (#29, #222) está em `.github/workflows/prices.yml`.
 
 ## Pré-requisitos
 
@@ -27,7 +27,7 @@ uv run python -m app seed
 
 ## Resumo do PR e publicação do catálogo (#29)
 
-O workflow semanal (parte 2, #222) encadeia dois passos. Esta parte entrega os dois, sem o workflow.
+O workflow semanal `.github/workflows/prices.yml` (#222) encadeia dois passos e o script de publicação. A mesma sequência roda na sua máquina:
 
 ```bash
 # em pricing/
@@ -40,7 +40,20 @@ bash scripts/prices-pr.sh body.md
 - `app.summary` lê o relatório do `generate` no stdin e escreve o corpo do PR em Markdown: `## SKUs adicionados`, `## SKUs removidos`, `## Variações acima de 30%` e `## Outros`, mais o rodapé (merge humano; o PR do `GITHUB_TOKEN` não dispara o CI, então feche e reabra). Seção vazia mostra `Nenhum.`; mais de 100 itens viram `e mais N`. Nenhuma linha do relatório entra crua: só entram linhas no formato conhecido, com SKU validado por `is_sku` e arquivo por `file_key`; o resto vira contagem em `Outros`. Sempre sai com exit 0.
 - `scripts/prices-pr.sh <body-file>` mantém um único PR, da branch `prices/catalogo` para `main`, e precisa de `git` e `gh` autenticado (`GH_TOKEN`). O commit tem a árvore de `main` mais o catálogo novo e, como segundo pai, a ponta anterior da branch: o push é fast-forward, nunca `--force`. O `manifest.json` não entra na comparação (a data muda a cada execução), mas vai no commit quando há mudança nos preços. PR vindo de fork com o mesmo nome de branch é ignorado.
 - Saída (uma linha no stdout): `sem mudança`, `pr criado`, `pr atualizado` ou `pr fechado`. Quando o catálogo volta a ser igual ao de `main`, o PR aberto é fechado com um comentário.
-- Os testes do script ficam em `infra/tools/tests/test_prices_pr_script.py` e usam um `origin` descartável, sem rede.
+- Os testes do script ficam em `infra/tools/tests/test_prices_pr_script.py` e os do workflow em `infra/tools/tests/test_workflow_prices.py`; ambos rodam sem rede.
+
+### O workflow `prices.yml`
+
+- **Gatilhos:** `schedule` (segunda-feira, 09:17 UTC) e `workflow_dispatch`. Só roda em `main` e sem `environment:`, compatível com o trust do papel `acp-ci-prices` (`infra/bootstrap/README.md`, "Papel `prices`").
+- **Job `generate`** (`contents: read` e `id-token: write`): `uv sync --locked` antes das credenciais; assume o papel por OIDC (`vars.AWS_PRICES_ROLE_ARN`, `us-east-1`, sessão de 900 s); roda `python -m app` e `python -m app.summary`; quando o relatório traz `nenhum serviço com consulta: nada a gravar`, avisa (`::warning::`) e o `publish` não roda (o script veria um catálogo igual ao de `main` e fecharia o PR aberto); sobe o artefato `catalog` (`prices/` e `body.md`, retenção de 1 dia).
+- **Job `publish`** (`contents: write` e `pull-requests: write`, sem AWS): baixa o artefato, recusa artefato sem `body.md` ou `prices/manifest.json`, com link simbólico ou com arquivo em `prices/` que não seja `.json`, substitui `web/public/prices` inteiro e roda `scripts/prices-pr.sh` com o `GITHUB_TOKEN` só nesse passo. Nenhum passo tem credencial AWS e token de escrita ao mesmo tempo.
+- **Sem a variável `AWS_PRICES_ROLE_ARN`:** aviso e run verde; `publish` é pulado. Também é preciso ligar "Allow GitHub Actions to create and approve pull requests" no repositório. Primeira execução: `docs/runbooks/setup-aws.md`, seção 8.
+
+### Validação e merge do PR do catálogo
+
+- **O CI não roda sozinho.** PR aberto pelo `GITHUB_TOKEN` não dispara os workflows de `pull_request` (`validate`, `security`, `pr-size`, `review-pr`). Passo manual do autor: fechar e reabrir o PR (o evento `reopened` feito por uma pessoa dispara todos, inclusive a revisão automática) ou empurrar um commit vazio na branch `prices/catalogo` com a própria conta. Cada atualização semanal do bot (push novo) também não dispara o CI: repita o passo antes de juntar.
+- **Sem token pessoal nem GitHub App:** seria segredo novo. Decisão do autor, registrada e não implementada.
+- **Revisão:** o workflow não aplica label (nem `skip-review`, nem aprovação) e não junta o PR. `web/public/prices/**` não conta no `pr-size` (`.github/pr-size-ignore`) e o CODEOWNERS é o autor. O autor confere o corpo (SKUs adicionados, removidos, variações acima de 30%), que o diff só mexe em `web/public/prices/` e que o CI ficou verde depois do reabrir, e decide o merge (ADR-0001: merge humano dos preços).
 
 ## Qualidade
 

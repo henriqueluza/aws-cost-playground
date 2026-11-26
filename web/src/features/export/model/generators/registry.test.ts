@@ -14,18 +14,7 @@ describe('registro dos geradores', () => {
    */
   it('lista os blocos que ainda estão no gerador provisório', () => {
     expect([...PROVISIONAL_BLOCK_TYPES].sort()).toEqual(
-      [
-        'aws.cloudfront',
-        'aws.cloudtrail',
-        'aws.codepipeline',
-        'aws.cognito',
-        'aws.dynamodb',
-        'aws.ecs',
-        'aws.lambda',
-        'aws.s3',
-        'aws.sqs',
-        'aws.waf',
-      ].sort(),
+      ['aws.cloudtrail', 'aws.codepipeline', 'aws.cognito', 'aws.ecs', 'aws.waf'].sort(),
     );
   });
 });

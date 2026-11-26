@@ -132,6 +132,33 @@ Regras normativas; o revisor recusa o que fugir delas.
 5. Versões fixadas iguais às de `infra/`: Terraform `~> 1.16.0` e provider AWS `~> 6.73`. A região vem da variável `aws_region`, com o padrão tirado do design, e o provider leva `default_tags`.
 6. Saída determinística: nada de data, valor aleatório ou ordem de inserção de `Map` vinda do usuário.
 
+## Blocos sem VPC: S3 e CloudFront (#65)
+
+Geradores em `model/generators/s3.ts` e `cloudfront.ts`.
+
+### S3
+
+- **Recursos:** `aws_s3_bucket` (com `bucket_prefix` derivado do nome, até 36 caracteres; o provider completa com sufixo único), `aws_s3_bucket_public_access_block`, `aws_s3_bucket_ownership_controls`, `aws_s3_bucket_server_side_encryption_configuration`, `data "aws_iam_policy_document"` e `aws_s3_bucket_policy`. Com `storageClass = STANDARD_IA`, também `aws_s3_bucket_lifecycle_configuration` com transição para Standard-IA aos 30 dias.
+- **Do design:** só o atributo `storageClass`. O uso mensal não vira recurso.
+- **Padrões seguros:** os quatro bloqueios de acesso público ligados, ACLs desligadas (`BucketOwnerEnforced`), criptografia AES256 e política que nega `s3:*` no bucket e nos objetos quando a chamada não usa TLS.
+- **Aresta `data` CloudFront → S3:** a política do bucket ganha uma declaração que libera `s3:GetObject` nos objetos só para `cloudfront.amazonaws.com`, condicionada a `AWS:SourceArn` igual ao ARN da distribuição. Uma declaração por distribuição ligada.
+- **Sem aresta:** o bucket fica só com a negação sem TLS.
+
+### CloudFront
+
+- **Recursos:** `aws_cloudfront_distribution`, `data "aws_cloudfront_cache_policy"` (`Managed-CachingOptimized`) e, com bucket ligado, `aws_cloudfront_origin_access_control` (`s3`, `always`, `sigv4`).
+- **Do design:** nada. O bloco não tem atributos.
+- **Padrões seguros:** `redirect-to-https`, métodos `GET` e `HEAD`, certificado padrão do CloudFront, sem restrição geográfica.
+- **Aresta `data` CloudFront → S3:** cada bucket ligado vira uma origem privada na distribuição, lida pelo Origin Access Control. O comportamento padrão aponta para a primeira origem e a distribuição ganha `default_root_object = "index.html"`.
+- **Sem aresta:** a origem é o domínio informado em `var.<nome>__origin_domain` (variável sem padrão), só HTTPS e TLS 1.2.
+
+### Limites assumidos
+
+- Versionamento não é ligado: o design não o descreve e ele muda o custo.
+- Com o certificado padrão do CloudFront a AWS fixa o TLS mínimo do visitante. Exigir `TLSv1.2_2021` pede certificado próprio.
+- Origem que não é S3 (Lambda, ALB) não é gerada.
+- Uso mensal não vira recurso.
+
 ## Como conferir
 
 - **Testes do vitest** (`hcl.test.ts`, `names.test.ts`): rodam no `npm test` e no CI. Incluem a bateria de cargas de injeção (`test/injectionPayloads.ts`) em valor, chave, comentário e nome.
@@ -149,3 +176,45 @@ Regras normativas; o revisor recusa o que fugir delas.
   ```
 
 - **Export inteiro:** a validação nos 3 cenários, com o provider da AWS, é o job da #68.
+
+## Blocos sem VPC: Lambda, SQS e DynamoDB (#65)
+
+Geradores em `model/generators/lambda.ts`, `sqs.ts` e `dynamodb.ts`.
+
+### Lambda
+
+- **Recursos:** `aws_lambda_function`, `aws_iam_role` (rótulo do papel de assunção em `<nome>__assume`), `aws_iam_role_policy`, `aws_cloudwatch_log_group`, a variável `<nome>__package` e um `aws_lambda_event_source_mapping` (`<nome>__sqs_N`) por fila que aponta para a função.
+- **Do design:** `architecture`, `memoryMb` e o tempo limite: `timeout` = 3 × `avgDurationMs`, arredondado para cima em segundos, entre 3 s e 900 s.
+- **Padrões seguros:** papel de menor privilégio (só `logs:CreateLogStream` e `logs:PutLogEvents` no grupo de logs, mais o que as arestas pedem), grupo de logs com retenção de 30 dias e nenhuma variável de ambiente.
+
+### SQS
+
+- **Recursos:** `aws_sqs_queue`, `data "aws_iam_policy_document"` e `aws_sqs_queue_policy`.
+- **Do design:** `queueType`. Fila `fifo` leva `fifo_queue = true` e o nome termina em `.fifo`.
+- **Padrões seguros:** `sqs_managed_sse_enabled = true` e política que nega `sqs:*` quando a chamada não usa TLS.
+- **Visibilidade:** 6 × o tempo limite da função que consome a fila (a maior, se forem várias), com teto de 43.200 s. Sem função consumidora, o atributo não é escrito.
+
+### DynamoDB
+
+- **Recursos:** `aws_dynamodb_table`.
+- **Do design:** `capacityMode`. `provisioned` vira `PROVISIONED` com `read_capacity` e `write_capacity` tirados de `provisionedReadUnits` e `provisionedWriteUnits` do uso, com mínimo 1; o outro modo vira `PAY_PER_REQUEST`.
+- **Padrões seguros:** criptografia em repouso, recuperação pontual e `deletion_protection_enabled = true`.
+
+### O que cada aresta cria
+
+Só a aresta `data` dá permissão, nas ações abaixo e no ARN do par (no S3, sobre os objetos: `<arn>/*`). A tabela é o `GRANTS` de `lambda.ts`.
+
+| Aresta                  | Cria                                                                                               |
+| ----------------------- | -------------------------------------------------------------------------------------------------- |
+| fila SQS → função       | `aws_lambda_event_source_mapping` e leitura da fila: `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:GetQueueAttributes` |
+| função → fila SQS       | `sqs:SendMessage`                                                                                  |
+| função → tabela DynamoDB | `dynamodb:GetItem`, `Query`, `PutItem`, `UpdateItem` e `DeleteItem`                               |
+| função → bucket S3      | `s3:GetObject` e `s3:PutObject` nos objetos                                                        |
+| bucket S3 → função      | só `s3:GetObject` nos objetos                                                                      |
+| aresta de logs, tabela → função | nada                                                                                       |
+
+### Pontos de partida
+
+- O código não existe no design: o pacote .zip vem de `var.<nome>__package`, sem valor padrão. Runtime `nodejs22.x` e handler `index.handler` são fixos e precisam de ajuste.
+- O esquema de chaves da tabela é de exemplo: `pk` e `sk`, ambas string.
+- Gatilho de bucket para função (notificação de evento do S3) não é gerado.
