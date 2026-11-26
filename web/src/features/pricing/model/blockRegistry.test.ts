@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { adrExampleDesign } from '../../../test/designFixtures';
-import { PRD_BLOCK_LEVELS } from './blockContract';
+import { BLOCK_TYPES, PRD_BLOCK_LEVELS } from './blockContract';
 import {
   BLOCKS,
   EDGE_KIND_DEFINITIONS,
@@ -9,17 +9,18 @@ import {
   edgeKindsFor,
 } from './blockRegistry';
 
-/** PRD F10. Lista escrita à mão de propósito: não deriva do código testado. */
-const levelA = 'ec2 lambda rds dynamodb elasticache s3 sqs cloudfront alb cloudwatch nat-gateway'
-  .split(' ')
-  .map((name) => `aws.${name}`);
-const vpcBlocks = ['aws.ec2', 'aws.rds', 'aws.elasticache'];
+/** PRD F2, na ordem do texto. Lista escrita à mão de propósito: não deriva do código testado. */
+const prdBlocks =
+  'route53 cloudfront waf alb ec2 ecs lambda elasticache rds dynamodb s3 sqs cognito iam secrets-manager cloudwatch cloudtrail codepipeline cloudformation nat-gateway'
+    .split(' ')
+    .map((name) => `aws.${name}`);
+const vpcBlocks = ['aws.ec2', 'aws.ecs', 'aws.rds', 'aws.elasticache'];
 
 /**
- * Cópia das tabelas da #176, na ordem: `tipo; nome; categoria; atributo=opções:padrão; chave[unidade]padrão/mín/máx/tipo`.
+ * Cópia das tabelas da #176 (nível A) e da #177 (níveis B e C), na ordem: `tipo; nome; categoria; atributo=opções:padrão; chave[unidade]padrão/mín/máx/tipo`.
  * Mudar `contracts/blocks.json` exige mudar aqui: o contrato é lido pelo motor, pelo editor e pela API.
  */
-const levelATables = [
+const blockTables = [
   'aws.lambda; Lambda; compute; architecture=x86_64|arm64:arm64 memoryMb=128|256|512|1024|2048|4096|8192|10240:512; requestsPerMonth[requests]1000000/0/100000000000/int avgDurationMs[ms]120/1/900000/int',
   'aws.s3; S3; storage; storageClass=STANDARD|STANDARD_IA:STANDARD; storageGb[GB]50/0/10000000/dec putRequestsPerMonth[requests]100000/0/100000000000/int getRequestsPerMonth[requests]1000000/0/100000000000/int',
   'aws.sqs; SQS; integration; queueType=standard|fifo:standard; requestsPerMonth[requests]1000000/0/100000000000/int',
@@ -31,6 +32,15 @@ const levelATables = [
   'aws.alb; ALB; networking; ; newConnectionsPerSecond[connections/s]10/0/1000000/dec activeConnectionsPerMinute[connections/min]1000/0/100000000/dec processedGbPerMonth[GB]100/0/100000000/dec ruleEvaluationsPerSecond[evaluations/s]0/0/10000000/dec',
   'aws.cloudwatch; CloudWatch; management; ; logsIngestedGbPerMonth[GB]5/0/10000000/dec logsStoredGb[GB]5/0/100000000/dec customMetrics[metrics]10/0/1000000/int alarms[alarms]10/0/100000/int',
   'aws.nat-gateway; NAT Gateway; networking; ; processedGbPerMonth[GB]100/0/100000000/dec',
+  'aws.waf; WAF; security; ; webAcls[web ACLs]1/1/100/int rules[rules]5/0/10000/int requestsPerMonth[requests]1000000/0/100000000000/int',
+  'aws.cognito; Cognito; security; tier=lite|essentials|plus:essentials; monthlyActiveUsers[users]1000/0/100000000/int',
+  'aws.secrets-manager; Secrets Manager; security; ; secrets[secrets]5/0/100000/int apiCallsPerMonth[requests]100000/0/100000000000/int',
+  'aws.cloudtrail; CloudTrail; management; ; trails[trails]1/1/5/int managementEventsPerMonth[events]100000/0/100000000000/int dataEventsPerMonth[events]0/0/100000000000/int',
+  'aws.route53; Route 53; networking; ; hostedZones[hosted zones]1/1/500/int queriesPerMonth[queries]1000000/0/100000000000/int',
+  'aws.codepipeline; CodePipeline; devtools; pipelineType=V1|V2:V2; activePipelines[pipelines]1/0/1000/int executionMinutesPerMonth[minutes]500/0/10000000/dec',
+  'aws.iam; IAM; security; ; ',
+  'aws.cloudformation; CloudFormation; management; ; ',
+  'aws.ecs; ECS; compute; az=a|b|c:; ',
 ];
 const signature = (block: (typeof BLOCKS)[number]) =>
   [
@@ -44,13 +54,19 @@ const signature = (block: (typeof BLOCKS)[number]) =>
   ].join('; ');
 
 describe('contracts/blocks.json', () => {
-  it('traz os 11 blocos de nível A do PRD (F10); os níveis B e C entram na continuação', () => {
-    expect(BLOCKS.map((block) => block.type).sort()).toEqual([...levelA].sort());
-    for (const block of BLOCKS) expect(PRD_BLOCK_LEVELS[block.type]).toBe('A');
+  it('traz os 20 blocos do PRD, sem faltar nem sobrar', () => {
+    expect(BLOCKS.map((block) => block.type).sort()).toEqual([...prdBlocks].sort());
+    expect([...BLOCK_TYPES].sort()).toEqual([...prdBlocks].sort());
   });
 
-  it('cada bloco tem os atributos, opções, padrões, unidades e faixas da tabela da #176', () => {
-    expect(BLOCKS.map(signature)).toEqual(levelATables);
+  it('segue os níveis do PRD: 11 blocos A, 6 B e 3 C de custo zero', () => {
+    const count = (level: string) => BLOCKS.filter((block) => block.level === level).length;
+    expect([count('A'), count('B'), count('C')]).toEqual([11, 6, 3]);
+    expect(PRD_BLOCK_LEVELS['aws.ecs']).toBe('C');
+  });
+
+  it('cada bloco tem os atributos, opções, padrões, unidades e faixas das tabelas da #176 e da #177', () => {
+    expect(BLOCKS.map(signature)).toEqual(blockTables);
   });
 
   it('a mesma chave de uso tem a mesma unidade em todos os blocos', () => {
@@ -121,12 +137,15 @@ describe('contracts/edges.json', () => {
   });
 
   it.each([
-    ['aws.ecs', 'aws.ec2', []],
+    ['aws.ecs', 'aws.ec2', ['data', 'runs-on']],
+    ['aws.ec2', 'aws.ecs', ['data']],
     ['aws.alb', 'aws.ec2', ['data']],
     ['aws.lambda', 'aws.cloudwatch', ['logs']],
     ['aws.cloudwatch', 'aws.lambda', []],
     ['aws.cloudwatch', 'aws.cloudwatch', []],
+    ['aws.iam', 'aws.s3', []],
     ['aws.s3', 'aws.cloudwatch', ['logs']],
+    ['aws.iam', 'aws.cloudwatch', ['logs']],
     ['aws.lambda', 'aws.eks', []],
     ['aws.eks', 'aws.s3', []],
     ['client', 'aws.cloudfront', []],
@@ -140,5 +159,14 @@ describe('contracts/edges.json', () => {
       ['aws.alb', 'aws.cloudfront', 'aws.ec2', 'aws.s3'].sort(),
     );
     expect(edgeKindsFor('aws.s3', 'client')).toEqual(['data']);
+  });
+
+  it('runs-on só existe de ECS para EC2', () => {
+    const pairs = BLOCKS.flatMap((source) =>
+      BLOCKS.filter((target) => edgeKindsFor(source.type, target.type).includes('runs-on')).map(
+        (target) => [source.type, target.type],
+      ),
+    );
+    expect(pairs).toEqual([['aws.ecs', 'aws.ec2']]);
   });
 });
