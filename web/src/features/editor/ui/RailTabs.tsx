@@ -55,6 +55,7 @@ export function RailTabs(props: { label: string; tabs: readonly Tab[] }): ReactE
           role="tabpanel"
           id={`${base}-panel-${tab.id}`}
           aria-labelledby={`${base}-tab-${tab.id}`}
+          tabIndex={0}
           hidden={i !== active}
           className={styles.panel}
         >

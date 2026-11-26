@@ -1,6 +1,4 @@
 .shell {
-  --sidebar-width: 232px;
-  --rail-width: 360px;
   display: grid;
   grid-template: var(--topbar-height) minmax(0, 1fr) / var(--sidebar-width) minmax(0, 1fr) var(
       --rail-width
@@ -74,8 +72,25 @@
 
 .narrow {
   max-width: var(--measure-read);
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-4);
+  margin: var(--space-6) auto;
+  padding: var(--card-pad);
+  background-color: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sheet);
+}
+
+/* DESIGN.md "Links": --accent com sublinhado permanente de 1px, 2px no hover. */
+.narrow a {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.narrow a:hover {
+  text-decoration-thickness: 2px;
 }
 
 .narrow h1 {
@@ -84,7 +99,7 @@
   line-height: var(--lh-title);
 }
 
-.narrow p {
+.narrow h1 + p {
   margin: 0 0 var(--space-4);
   font-size: var(--fs-read);
   line-height: var(--lh-read);

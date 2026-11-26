@@ -11,7 +11,8 @@ import { InspectorPanel } from './InspectorPanel';
 import { PalettePanel } from './PalettePanel';
 import { RailTabs } from './RailTabs';
 
-// A #174 (usePriceCatalog) troca esta constante pelos dados do manifest.
+// Fica em `unavailable` até a store do design (parte 1 de #12) entrar; quem ligar a store
+// passa o estado de `usePriceCatalog` (pricing), mapeando idle/error para unavailable.
 const CATALOG_STAMP: CatalogStamp = { status: 'unavailable' };
 
 const RAIL_TABS = [
@@ -25,12 +26,12 @@ export function EditorPage() {
 
   if (!wide) {
     return (
-      <div className={styles.narrow}>
+      <main className={styles.narrow}>
         <h1>Editor</h1>
         <p>A edição precisa de uma tela com pelo menos 1024 px de largura.</p>
         <Link to="/designs">Meus designs</Link>
         <EstimateNotice stamp={CATALOG_STAMP} />
-      </div>
+      </main>
     );
   }
 
@@ -47,7 +48,7 @@ export function EditorPage() {
         <CanvasPanel />
       </main>
       <aside aria-label="Painéis" className={styles.rail}>
-        <RailTabs label="Painéis" tabs={RAIL_TABS} />
+        <RailTabs label="Painéis do design" tabs={RAIL_TABS} />
         <EstimateNotice stamp={CATALOG_STAMP} />
       </aside>
     </div>
