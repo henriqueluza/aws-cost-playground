@@ -16,12 +16,6 @@ class Settings(BaseSettings):
 
     table_name: str = Field(min_length=3, max_length=255)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
-    # Proxy da LLM (#61). Sem `LLM_ENABLED=true` e sem o nome do parâmetro, nada é chamado.
-    llm_enabled: bool = False
-    llm_model: str = Field(default="claude-haiku-5-5", pattern=r"^claude-[a-z0-9-]{1,60}$")
-    anthropic_api_key_parameter: str | None = Field(
-        default=None, pattern=r"^/[A-Za-z0-9/_.-]{1,255}$"
-    )
 
 
 @lru_cache(maxsize=1)
