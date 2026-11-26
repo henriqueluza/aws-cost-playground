@@ -95,11 +95,6 @@ def test_recusa_contrato_quebrado(tmp_path: Path, mutate: Mutation) -> None:
         load_contracts(_write(tmp_path, mutate))
 
 
-def test_diretorio_sem_contratos_levanta_runtime_error(tmp_path: Path) -> None:
-    with pytest.raises(RuntimeError, match=r"contracts/blocks\.json"):
-        load_contracts(tmp_path)
-
-
 @pytest.mark.parametrize("damage", [Path.unlink, lambda p: p.write_text("{")])
 @pytest.mark.parametrize("name", ["blocks.json", "edges.json"])
 def test_arquivo_ausente_ou_cortado_falha_fechado(tmp_path: Path, name: str, damage: Any) -> None:
