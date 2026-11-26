@@ -55,17 +55,6 @@ describe('CanvasPanel', () => {
     expect(await screen.findByLabelText(/^Lambda, Outra,/)).toBeInTheDocument();
   });
 
-  it('com o design vazio, orienta e mantém só o client', async () => {
-    designStore.setState(EMPTY_STATE);
-    const { container } = render(
-      <QueryClientProvider client={new QueryClient()}>
-        <CanvasPanel />
-      </QueryClientProvider>,
-    );
-    expect(await screen.findByText(/Adicione um bloco pela paleta/)).toBeVisible();
-    expect(container.querySelectorAll('.react-flow__node')).toHaveLength(1);
-  });
-
   it('não tem violação de acessibilidade', async () => {
     const { container } = renderCanvas();
     await screen.findByLabelText(/^S3,/);

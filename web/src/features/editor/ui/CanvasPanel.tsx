@@ -74,9 +74,6 @@ function Canvas(): ReactElement {
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
       </ReactFlow>
-      {document.blocks.length === 0 && (
-        <p className={styles.empty}>Adicione um bloco pela paleta para começar o desenho.</p>
-      )}
     </div>
   );
 }
