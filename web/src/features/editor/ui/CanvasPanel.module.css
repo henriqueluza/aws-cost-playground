@@ -238,3 +238,14 @@
     stroke: Highlight;
   }
 }
+
+/* "Pode soltar": o bloco da paleta está sobre o canvas. Contorno por dentro, sem sombra. */
+.canvas[data-dropping]::after {
+  content: '';
+  position: absolute;
+  inset: var(--space-2);
+  z-index: 5;
+  border: var(--focus-width) dashed var(--accent);
+  border-radius: calc(var(--radius-sheet) - var(--space-2));
+  pointer-events: none;
+}

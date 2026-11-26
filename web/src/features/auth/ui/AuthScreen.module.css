@@ -1,0 +1,94 @@
+/* A moldura inteira em --ground e uma folha de 1px no meio: a mesma gramática do editor. Só tokens. */
+.page {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-height: 100dvh;
+  padding: var(--space-4);
+  background-color: var(--ground);
+  color: var(--text);
+}
+
+.sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 440px;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background-color: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sheet);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  font-weight: var(--fw-semibold);
+  text-wrap: balance;
+}
+
+.sheet p {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Barra de espera: trilho --raised e um trecho em --text que anda só em transform. */
+.bar {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  background-color: var(--raised);
+}
+
+.bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background-color: var(--text);
+  animation: slide 1200ms var(--ease-out) infinite;
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar::after {
+    width: 100%;
+    animation: none;
+  }
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-min);
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-medium);
+  text-decoration: underline;
+  text-decoration-thickness: var(--border-width);
+  text-underline-offset: var(--focus-offset);
+}
+
+.link:hover {
+  text-decoration-thickness: var(--focus-width);
+}

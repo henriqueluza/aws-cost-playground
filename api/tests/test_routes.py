@@ -86,7 +86,7 @@ ROUTES = [
 IDS = [f"{m} {p}" for m, p, *_ in ROUTES]
 PROBLEM = "application/problem+json"
 NOT_IMPLEMENTED = {"type": "about:blank", "title": "Not Implemented", "status": 501}
-TESTED_ELSEWHERE = {("DELETE", "/me")}
+TESTED_ELSEWHERE = {("DELETE", "/me"), ("GET", "/quota")}
 """Rotas que já saíram do 501 e dependem de mocks próprios; testadas no arquivo do módulo."""
 
 

@@ -1,4 +1,7 @@
 export { AuthCallbackPage } from './ui/AuthCallbackPage';
+export { AuthProvider, useAuth } from './ui/AuthProvider';
+export { RequireAuth } from './ui/RequireAuth';
+export { createBrowserAuth } from './infrastructure/browserAuth';
 export { createAuthService } from './application/authService';
 export {
   createCognitoProvider,
