@@ -209,6 +209,20 @@ describe('InspectorPanel', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('atributo com valor fora do contrato avisa e não escolhe opção em silêncio', () => {
+    designStore.setState({
+      document: {
+        ...doc,
+        edges: [],
+        blocks: [{ ...doc.blocks[0]!, attributes: { architecture: 'sparc', memoryMb: 512 } }],
+      },
+    });
+    select(FN);
+    render(<InspectorPanel />);
+    expect(screen.getByLabelText('Arquitetura')).toHaveValue('');
+    expect(screen.getByRole('alert')).toHaveTextContent('Valor fora do contrato');
+  });
+
   it('sem violações de acessibilidade, com e sem erro', async () => {
     const user = userEvent.setup();
     select(FN);

@@ -45,6 +45,7 @@ function AttributeSelect({ block, field }: { block: Block; field: AttributeField
     <SelectField
       label={label}
       value={current}
+      error={field.known ? undefined : 'Valor fora do contrato. Escolha uma das opções.'}
       onChange={(e) => {
         const next = withAttribute(block.attributes, field, e.target.value);
         if (next) editBlock(block.id, { attributes: next });
