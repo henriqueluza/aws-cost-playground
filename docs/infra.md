@@ -1,6 +1,6 @@
 # Infra e deploy
 
-Terraform e módulos: ver [`infra/README.md`](../infra/README.md). Este documento descreve o pipeline de deploy de staging (#22) e o que o autor precisa cadastrar para ligá-lo. Produção e rollback ficam na #23.
+Terraform e módulos: ver [`infra/README.md`](../infra/README.md). Este documento descreve o pipeline de deploy de staging (#22), o de produção (#23) e o que o autor precisa cadastrar para ligá-los. Rollback: [`runbooks/rollback.md`](runbooks/rollback.md).
 
 ## O que o pipeline faz
 
@@ -62,11 +62,76 @@ gh secret set TF_VAR_ALARM_EMAIL --repo henriqueluza/aws-cost-playground   # ped
 
 Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 
-1. #210: runtime `python3.14` nas Lambdas. Sem ela o zip não carrega, e o smoke não percebe.
-2. #166, #167 e #169: permissões de escrita do apply. Além do Terraform, o deploy precisa de `s3:PutObject`/`s3:GetObject` no bucket de artefatos, de objetos do bucket do site, de `lambda:GetFunctionConfiguration` e de `cloudfront:CreateInvalidation`/`cloudfront:GetInvalidation`.
-3. #209: bucket de artefatos.
-4. #77: bootstrap aplicado, Environment `staging` restrito a `main` e primeiro apply manual.
-5. As variáveis da seção anterior.
+O runtime `python3.14` das Lambdas já está resolvido (#307): o módulo `functions` acompanha `api/.python-version` e um teste reprova a divergência. Sem isso o zip não carregaria, e o smoke não perceberia.
+
+1. #166, #167 e #169: permissões de escrita do apply. Além do Terraform, o deploy precisa de `s3:PutObject`/`s3:GetObject` no bucket de artefatos, de objetos do bucket do site, de `lambda:GetFunctionConfiguration` e de `cloudfront:CreateInvalidation`/`cloudfront:GetInvalidation`.
+2. #209: bucket de artefatos.
+3. #77: bootstrap aplicado, Environment `staging` restrito a `main` e primeiro apply manual.
+4. As variáveis da seção anterior.
+
+## Produção
+
+Workflow `deploy-production.yml`. Só roda por `workflow_dispatch`, disparado por um humano, com o campo `sha`: o SHA completo de um commit de `main` que já foi publicado em staging. Nada é reconstruído.
+
+- **Concorrência** `deploy-production`, sem cancelar o que está rodando.
+- **Título do run:** `Deploy production <sha>`, com o SHA pedido. É por ele que o runbook de rollback acha o deploy anterior.
+- **Job `check`** (sem Environment e sem credencial AWS). As recusas ficam em `infra/tools/release_gate.py`; `scripts/find-staging-release.sh` consulta a API do GitHub:
+  1. o SHA tem 40 hexadecimais minúsculos, o workflow roda em `refs/heads/main` e o commit é ancestral de `origin/main`;
+  2. existe um run de `deploy-staging.yml` desse SHA (`push` em `main`) concluído com sucesso, e nele o job `deploy (staging)` e o passo `Smoke test` terminaram com sucesso. Um run verde com o deploy pulado (staging sem configuração) não conta;
+  3. o artefato `release-<sha>` desse run é baixado e confere com o `SHA256SUMS`;
+  4. `site/prices/manifest.json` tem `source: price-list`. Com `source: seed` o deploy é recusado.
+- **Job `deploy`** (Environment `production`): baixa o mesmo artefato do mesmo run, confere de novo e publica com os mesmos comandos de staging. Só segue se o `SHA256SUMS` baixado tiver o hash que o `check` registrou. Os dois jobs consultam o run de staging de novo depois do download e exigem o mesmo run e a mesma tentativa: um "Re-run all jobs" de staging troca o artefato, e o deploy de produção para. O teste `test_workflow_deploy_production.py` compara os passos dos dois workflows.
+
+O mesmo artefato vale para os dois ambientes: o zip das funções vai para `functions/<sha>.zip` no bucket de artefatos de produção, sem sobrescrever, e as funções só passam se o `CodeSha256` for o desse zip.
+
+## Ordem do job `deploy` de produção
+
+| Passo (id) | O que faz |
+|---|---|
+| `gate` | Confere a configuração. Falta de qualquer valor falha fechada (produção nunca é pulada em silêncio) |
+| `source` | Checkout do SHA publicado em `release-src/`, só para o Terraform |
+| `download` | Baixa o artefato `release-<sha>` do run de staging |
+| `verify` | Hash do `SHA256SUMS` igual ao do `check`, `sha256sum -c SHA256SUMS`, origem dos preços e o mesmo run de staging |
+| `aws` | OIDC no papel `acp-ci-apply-production`, sem chave estática |
+| `package` | Igual a staging, no bucket de artefatos de produção |
+| `terraform` | `init`, `plan`, plan-guard e `apply` do plano salvo de `infra/envs/production` no SHA publicado. O plan-guard é o do commit do disparo |
+| `functions` | Espera as funções atualizarem e confere o `CodeSha256` |
+| `site` | Sobe `assets/` antes, sem apagar o que é antigo e sem o `config.json` do bundle |
+| `config` | Publica `/config.json` a partir da saída `site_config` |
+| `invalidate` | Invalida `/*` no CloudFront |
+| `smoke` | `scripts/smoke-test.sh`: site responde; `/config.json` igual ao publicado; `/prices/manifest.json` igual ao do release; `GET /quota` sem token devolve 401 |
+| `summary` | Commit publicado, run de staging de origem, pacote e `code_sha256` |
+
+## Variáveis de produção que o autor cria
+
+| Nome | Onde | Tipo | Origem |
+|---|---|---|---|
+| `AWS_APPLY_ROLE_ARN` | Environment `production` | variável | Saída `github_environment_variables` do bootstrap (papel `acp-ci-apply-production`) |
+| `TF_VAR_PACKAGE_BUCKET` | Environment `production` | variável | Bucket de artefatos de produção, criado pela #209 |
+| `TF_STATE_BUCKET_PRODUCTION` | repositório | variável | Saída `github_variables` do bootstrap (já usada pelo job `plan`) |
+| `TF_VAR_ZONE_NAME` | repositório | variável | A mesma de staging |
+| `TF_VAR_ALARM_EMAIL` | repositório | secret | O mesmo de staging |
+
+```bash
+gh variable set AWS_APPLY_ROLE_ARN --env production --body "<arn>" --repo henriqueluza/aws-cost-playground
+gh variable set TF_VAR_PACKAGE_BUCKET --env production --body "<bucket>" --repo henriqueluza/aws-cost-playground
+```
+
+O Environment `production` tem de aceitar só o branch `main` (Settings → Environments → Deployment branches). O trust do papel exige `environment:production`, `ref` igual a `refs/heads/main` e `aud` `sts.amazonaws.com`; o release-gate recusa qualquer outro `ref` antes disso. As permissões de escrita do papel dependem da #167 e da #169, e o bucket de artefatos da #209, como em staging.
+
+## Limites de produção
+
+- Enquanto o catálogo de preços do repositório for a semente (`source: seed`), todo deploy de produção é recusado.
+- Depois de 90 dias o artefato expira e o SHA deixa de ser publicável por este workflow (ver o runbook de rollback).
+- O release-gate identifica o deploy de staging pelo nome do job (`deploy (staging)`) e do passo (`Smoke test`). Renomear um deles em `deploy-staging.yml` exige ajustar `release_gate.py`; o teste trava isso.
+- O Terraform de um SHA antigo pode pedir para apagar o que commits mais novos criaram. O plan-guard para o deploy nesse caso.
+- O Terraform do SHA publicado roda com o papel de produção. Um `local-exec` ou uma fonte `external` nesse código executaria com essa credencial; hoje não há nenhum, e a revisão de PR de `infra/` é a barreira.
+- O GitHub guarda só um run pendente por grupo de concorrência. Um terceiro disparo, com outro deploy rodando e um na fila, substitui o da fila.
+- O job `check` roda as ferramentas do branch de onde o workflow foi disparado, sem credencial. Só o `deploy` recebe o papel, e só a partir de `main`.
+
+## Workflow de preços
+
+Workflow `prices.yml` (#222, parte da #29), por `schedule` (segunda-feira, 09:17 UTC) e `workflow_dispatch`. Só roda em `main` e não usa `environment:`, como exige o trust do papel `acp-ci-prices`. O job `generate` assume o papel por OIDC (variável de repositório `AWS_PRICES_ROLE_ARN`) e gera o catálogo; o job `publish`, sem AWS, abre ou atualiza o PR único da branch `prices/catalogo`. Sem a variável, o workflow avisa e termina verde. O PR do `GITHUB_TOKEN` não roda o CI: o autor fecha e reabre antes de juntar. Passo a passo e validação: [`docs/runbooks/setup-aws.md`](runbooks/setup-aws.md), seção 8.
 
 ## Limites conhecidos
 
@@ -76,4 +141,3 @@ Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 - A invalidação `/*` conta como 1 caminho na cota grátis de 1000/mês.
 - O workflow está em `.github/workflows/deploy-staging.yml` e roda a cada merge em `main`. Sem a variável `AWS_APPLY_ROLE_ARN` no Environment `staging`, o job de deploy só avisa e termina verde.
 - Os ajustes de `validate.yml` e `terraform.yml` ficam na #211.
-- Produção e rollback ficam na #23.
