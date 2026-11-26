@@ -70,6 +70,23 @@ export type Quota = z.infer<typeof quotaSchema>;
 export type EstimateRequest = z.infer<typeof estimateRequestSchema>;
 export type EstimateResponse = z.infer<typeof estimateResponseSchema>;
 
+/**
+ * Schemas de entrada das portas de designs. A entrada chega como `unknown` em runtime (os tipos
+ * não validam nada): o fake e o adaptador HTTP validam com eles antes de gravar ou de enviar.
+ */
+export const createDesignInputSchema = z.object({
+  name: designNameSchema,
+  doc: designDocumentSchema,
+});
+export const updateDesignInputSchema = z
+  .object({
+    expectedVersion: z.number().int().min(1),
+    name: designNameSchema.optional(),
+    doc: designDocumentSchema.optional(),
+  })
+  .refine((input) => input.name !== undefined || input.doc !== undefined);
+export const duplicateDesignInputSchema = z.object({ name: designNameSchema });
+
 export type CreateDesignInput = { name: string; doc: DesignDocument };
 /** Ao menos um de `name` e `doc`: renomear é um `update` só com `name`. */
 export type UpdateDesignInput = { expectedVersion: number } & (
