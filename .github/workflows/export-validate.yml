@@ -1,0 +1,74 @@
+name: Export validate
+
+# Critério 3 do MVP (#68): o Terraform exportado dos cenários de `contracts/scenarios/` passa
+# em `terraform init -backend=false` e `terraform validate`. Só leitura e sem AWS: o provider
+# é baixado do registro e validado; nenhuma credencial, nenhum backend, nenhum plano.
+# Gatilho `pull_request` (nunca `pull_request_target`). Por causa do filtro de `paths`, este
+# check NÃO deve ser marcado como obrigatório na proteção da branch (docs/infra.md).
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/src/features/export/**"
+      - "contracts/**"
+      - "infra/tools/export_validate_report.py"
+      - ".github/workflows/export-validate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: export-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_VERSION: "1.16.0" # a de `infra/` e a do `required_version` do export (`~> 1.16.0`)
+
+jobs:
+  export-validate:
+    name: terraform validate dos cenários exportados
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - name: Sem variável da AWS no ambiente
+        run: |
+          # Falha fechada e sem imprimir valor: só os nomes aparecem.
+          names=$(env | cut -d= -f1 | grep '^AWS_' || true)
+          if [ -n "$names" ]; then
+            echo "::error::este job não usa a AWS, mas o ambiente tem: $(echo "$names" | tr '\n' ' ')"
+            exit 1
+          fi
+      - name: Dependências do web
+        working-directory: web
+        run: npm ci --ignore-scripts
+      # O teste exporta cada cenário com o mesmo `exportDesign` do produto e roda `fmt -check`,
+      # `init -backend=false` e `validate` num diretório temporário. O cache de plugins faz o
+      # provider da AWS ser baixado uma vez para todos os cenários.
+      - name: Exporta os cenários e roda terraform init e validate
+        working-directory: web
+        env:
+          EXPORT_TERRAFORM_CHECK: "1"
+          EXPORT_TERRAFORM_AWS: "1"
+        run: |
+          export TF_PLUGIN_CACHE_DIR="$RUNNER_TEMP/tf-plugin-cache"
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          npx vitest run src/features/export/test/terraform.local.test.ts \
+            --reporter=default --reporter=json \
+            --outputFile.json="$RUNNER_TEMP/export-validate.json"
+      # Um teste pulado também termina verde: aqui se exige um teste aprovado por arquivo de
+      # `contracts/scenarios/` e nenhum pulado ou reprovado.
+      - name: Confere que todo cenário foi validado
+        run: python3 infra/tools/export_validate_report.py "$RUNNER_TEMP/export-validate.json" contracts/scenarios
