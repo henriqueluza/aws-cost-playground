@@ -1,0 +1,64 @@
+.tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.list {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.tab {
+  min-height: var(--control-height);
+  /* DESIGN.md "Abas": o sublinhado de 2px passa 8px de cada lado do rótulo, sobre a régua de 1px. */
+  margin-bottom: calc(var(--border-width) * -1);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition:
+    color var(--t-ui) var(--ease-out),
+    border-color var(--t-ui) var(--ease-out);
+}
+
+.tab:hover,
+.tab[aria-selected='true'] {
+  color: var(--text);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--accent);
+  font-weight: var(--fw-semibold);
+  border-bottom-color: var(--accent);
+}
+
+.tab:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+  border-radius: var(--radius-control);
+}
+
+.panel {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding-top: var(--space-4);
+}
+
+.panel:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: calc(var(--focus-offset) * -1);
+  border-radius: var(--radius-control);
+}
+
+.panel[hidden] {
+  display: none;
+}

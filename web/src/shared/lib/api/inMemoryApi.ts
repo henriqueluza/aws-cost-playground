@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { designDocumentSchema, type DesignDocument } from '../design';
+import { type DesignDocument } from '../design';
 import { ApiError, type ApiErrorKind, type QuotaScope } from './errors';
 import {
-  designNameSchema,
+  createDesignInputSchema,
+  duplicateDesignInputSchema,
   estimateRequestSchema,
   estimateResponseSchema,
   type Api,
@@ -11,6 +12,7 @@ import {
   type EstimateRequest,
   type EstimateResponse,
   type Quota,
+  updateDesignInputSchema,
 } from './ports';
 
 /**
@@ -38,17 +40,6 @@ export type InMemoryApiOptions = {
    */
   estimate?: (request: EstimateRequest) => Pick<EstimateResponse, 'blocks' | 'edges'>;
 };
-
-/** A entrada chega como `unknown` em runtime: os tipos das portas não validam nada. */
-const createInputSchema = z.object({ name: designNameSchema, doc: designDocumentSchema });
-const updateInputSchema = z
-  .object({
-    expectedVersion: z.number().int().min(1),
-    name: designNameSchema.optional(),
-    doc: designDocumentSchema.optional(),
-  })
-  .refine((input) => input.name !== undefined || input.doc !== undefined);
-const duplicateInputSchema = z.object({ name: designNameSchema });
 
 const encoder = new TextEncoder();
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -156,7 +147,7 @@ export function createInMemoryApi(options: InMemoryApiOptions): Api {
       },
 
       async create(input) {
-        const { name, doc } = parse(createInputSchema, input);
+        const { name, doc } = parse(createDesignInputSchema, input);
         const derived = derive(doc);
         if (derived.sizeBytes > maxDocBytes) fail('too-large');
         if (store.size >= maxDesigns) fail('design-limit');
@@ -173,7 +164,7 @@ export function createInMemoryApi(options: InMemoryApiOptions): Api {
       },
 
       async update(id, input) {
-        const { expectedVersion, name, doc } = parse(updateInputSchema, input);
+        const { expectedVersion, name, doc } = parse(updateDesignInputSchema, input);
         const current = find(id);
         if (expectedVersion !== current.version) fail('version-conflict');
         const nextDoc = doc ?? current.doc;
@@ -190,7 +181,7 @@ export function createInMemoryApi(options: InMemoryApiOptions): Api {
       },
 
       async duplicate(id, input) {
-        const { name } = parse(duplicateInputSchema, input);
+        const { name } = parse(duplicateDesignInputSchema, input);
         const original = find(id);
         if (store.size >= maxDesigns) fail('design-limit');
         const timestamp = now().toISOString();
