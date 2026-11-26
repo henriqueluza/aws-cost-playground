@@ -110,7 +110,9 @@ describe.each([
     renderPage(matches);
     await userEvent.click(screen.getByRole('tab', { name: 'Bloco' }));
     expect(
-      within(screen.getByRole('tabpanel')).getByRole('heading', { name: 'Bloco' }),
+      within(screen.getByRole('tabpanel')).getByRole('heading', {
+        name: 'Nenhum bloco selecionado',
+      }),
     ).toBeVisible();
     expect(screen.getByRole('note')).toHaveTextContent(NOTICE);
   });
