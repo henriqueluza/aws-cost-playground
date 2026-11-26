@@ -34,7 +34,7 @@ export function applyNodeChanges(
     }
   }
   applySelection(changes, 'block', actions, selection, say);
-  if (removed) say('Bloco removido'); // por último: vale mais que "Seleção removida"
+  if (removed) say('Bloco removido'); // por último: vale mais que "Seleção limpa"
 }
 
 /** Traduz `onEdgesChange` em ações da store. */
@@ -71,7 +71,7 @@ function applySelection(
   const dropped = picks.some((c) => selection?.kind === kind && c.id === selection.id);
   if (dropped) {
     actions.select(null);
-    say('Seleção removida');
+    say('Seleção limpa');
   }
 }
 

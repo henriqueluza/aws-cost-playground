@@ -151,7 +151,7 @@ describe('anúncios (say)', () => {
       'client',
       say,
     );
-    expect(say.mock.calls.map(([m]) => m)).toEqual(['Seleção removida', 'Bloco removido']);
+    expect(say.mock.calls.map(([m]) => m)).toEqual(['Seleção limpa', 'Bloco removido']);
     const refused = vi.fn();
     const b = {
       ...actions(),
@@ -161,7 +161,7 @@ describe('anúncios (say)', () => {
     expect(refused).not.toHaveBeenCalled();
   });
 
-  it('remover aresta diz "Conexão removida"; limpar a seleção diz "Seleção removida"', () => {
+  it('remover aresta diz "Conexão removida"; limpar a seleção diz "Seleção limpa"', () => {
     const say = vi.fn();
     applyEdgeChanges([{ type: 'remove', id: 'edg_1' }], actions(), null, say);
     expect(say).toHaveBeenCalledExactlyOnceWith('Conexão removida');
@@ -173,6 +173,6 @@ describe('anúncios (say)', () => {
       'client',
       clear,
     );
-    expect(clear).toHaveBeenCalledExactlyOnceWith('Seleção removida');
+    expect(clear).toHaveBeenCalledExactlyOnceWith('Seleção limpa');
   });
 });

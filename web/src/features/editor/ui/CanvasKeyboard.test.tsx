@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { designDocumentSchema } from '../../../shared/lib/design';
@@ -10,6 +10,7 @@ import { EMPTY_STATE } from '../model/editorState';
 import { EMPTY_HISTORY } from '../model/history';
 import { BLOCK_DRAG_MIME } from '../model/palette';
 import { CanvasPanel } from './CanvasPanel';
+import { FLOW_ARIA_LABELS } from './flowA11y';
 
 const doc = designDocumentSchema.parse(fixture);
 const layout = {
@@ -90,7 +91,7 @@ describe('canvas por teclado', () => {
     fireEvent.keyDown(node, { key: 'Enter' });
     fireEvent.keyDown(node, { key: 'Escape' });
     expect(designStore.getState().selection).toBeNull();
-    expect(said()).toBe('Seleção removida');
+    expect(said()).toBe('Seleção limpa');
   });
 
   it('o aviso de "pode soltar" liga ao arrastar um bloco da paleta e desliga ao sair ou soltar', async () => {
@@ -105,8 +106,18 @@ describe('canvas por teclado', () => {
     fireEvent.dragOver(flow, over);
     fireEvent.drop(flow, { dataTransfer: { types: ['text/plain'], getData: () => '' } });
     expect(canvas).not.toHaveAttribute('data-dropping');
+    fireEvent.dragOver(flow, over);
+    fireEvent.dragEnd(document.body); // arrasto cancelado: apaga o aviso
+    await waitFor(() => expect(canvas).not.toHaveAttribute('data-dropping'));
     fireEvent.dragOver(flow, { dataTransfer: { types: ['text/plain'] } });
     expect(canvas).not.toHaveAttribute('data-dropping'); // arrasto de outra coisa não acende
+  });
+
+  it('o anúncio de movimento do React Flow nomeia a direção em pt-BR', () => {
+    const say = FLOW_ARIA_LABELS['node.a11yDescription.ariaLiveMessage']!;
+    expect(say({ direction: 'left', x: 8, y: 16 })).toBe(
+      'Bloco movido para a esquerda. Nova posição, x: 8, y: 16',
+    );
   });
 
   it('o texto de ajuda e o anúncio de movimento do React Flow estão em pt-BR', async () => {

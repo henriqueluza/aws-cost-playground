@@ -119,6 +119,17 @@ function Canvas(): ReactElement {
         : { source: from, target: to };
     setRefusal(refusalMessage(designStore.getState().document, ends));
   }, []);
+  // Arrasto cancelado (Esc) ou solto fora do canvas: o aviso de "pode soltar" não fica aceso.
+  useEffect(() => {
+    if (!dropping) return;
+    const off = () => setDropping(false);
+    window.addEventListener('dragend', off);
+    window.addEventListener('drop', off);
+    return () => {
+      window.removeEventListener('dragend', off);
+      window.removeEventListener('drop', off);
+    };
+  }, [dropping]);
   // Quem usa teclado dispensa o aviso com Esc.
   useEffect(() => {
     if (!refusal) return;
