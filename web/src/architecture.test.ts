@@ -74,6 +74,15 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     expect(rules).not.toContain('no-restricted-imports');
   });
 
+  it('permite react só no ApiProvider de shared/lib/api', async () => {
+    const allowed = await errorRules(reactImport, './shared/lib/api/ApiProvider.tsx');
+    expect(allowed).not.toContain('no-restricted-imports');
+    for (const file of ['ApiProvider.ts', 'ApiProviders.tsx', 'x.tsx', 'sub/ApiProvider.tsx']) {
+      const rules = await errorRules(reactImport, `./shared/lib/api/${file}`);
+      expect(rules, file).toContain('no-restricted-imports');
+    }
+  });
+
   it('permite zod em shared/lib/api', async () => {
     const code = "import { z } from 'zod';\nexport const s = z.string();\n";
     const rules = await errorRules(code, apiLib);
