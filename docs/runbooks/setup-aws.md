@@ -1,4 +1,4 @@
-# Runbook — configuração da AWS pelo autor
+# Runbook: configuração da AWS pelo autor
 
 Guia único da parte que só o autor faz, do domínio ao primeiro staging no ar, na ordem de execução. Nenhum agente executa estes passos: agentes não aplicam infra, não leem segredos e não tocam em `infra/bootstrap/` ([ADR-0001](../architecture/aws-cost-playground/ADR-0001-stack.md), "Hospedagem e ambientes" e "Travas contra destruição da infra").
 
@@ -17,6 +17,7 @@ Cada passo cita o arquivo do repositório de onde saiu. Se o arquivo e este runb
 | `<DOMINIO>` | Domínio do produto, igual ao nome da zona pública do Route 53 |
 | `<EMAIL_DE_TESTE>` | E-mail de uma conta de teste de staging |
 | `<USER_POOL_ID>` | Id do User Pool de staging |
+| `<BUCKET_DE_ARTEFATOS_STAGING>` | Bucket de artefatos de staging, criado pelo bootstrap depois da #209 |
 | `<RUN_ID>` | Id de uma execução do GitHub Actions |
 
 ### Ordem e Issues do autor
@@ -141,6 +142,8 @@ Antes do bootstrap, de [guardrails de custo](guardrails-de-custo.md) só vale a 
    terraform -chdir=infra/bootstrap apply bootstrap.tfplan
    ```
 
+   Como conferir: a última linha da saída é `Apply complete!`, com zero recursos alterados e zero destruídos na primeira aplicação. Os itens 4 a 7 conferem recurso por recurso.
+
 4. Confira os buckets de estado (`infra/bootstrap/state.tf`). Repita com `acp-prod-tfstate-<ACCOUNT_ID>`.
 
    ```bash
@@ -175,6 +178,8 @@ Antes do bootstrap, de [guardrails de custo](guardrails-de-custo.md) só vale a 
 
 8. Guarde uma cópia de `infra/bootstrap/terraform.tfstate` fora do repositório, em local cifrado, e apague o `bootstrap.tfplan`. O arquivo de estado não tem segredo, mas tem o id da conta e os ARNs.
 
+   Como conferir: `git status --short infra/bootstrap` não lista nenhum arquivo, e a cópia abre no local onde você a guardou.
+
 ## 4. GitHub Environments, variáveis e segredo (#77)
 
 A lista abaixo foi conferida nos workflows de `main`. Só `terraform.yml` e `deploy-staging.yml` leem variáveis ou segredos de infra; `validate.yml` não lê nenhum.
@@ -190,11 +195,17 @@ A lista abaixo foi conferida nos workflows de `main`. Só `terraform.yml` e `dep
 | `AWS_APPLY_ROLE_ARN` | variável | Environment `staging` | Saída `github_environment_variables` do bootstrap | `deploy-staging.yml` (liga o deploy) |
 | `AWS_APPLY_ROLE_ARN` | variável | Environment `production` | Saída `github_environment_variables` do bootstrap | Nenhum workflow ainda (produção é a #23) |
 
-Os três valores de repositório precisam ficar no repositório, e não no Environment: o job `plan` roda sem `environment:` e não enxerga variável de Environment (`infra/README.md`, "Variáveis do job plan"). O Environment `production` só recebe as demais variáveis quando o workflow de produção existir (#23).
+Os cinco valores de repositório precisam ficar no repositório, e não no Environment: o job `plan` roda sem `environment:` e não enxerga variável de Environment (`infra/README.md`, "Variáveis do job plan"). O Environment `production` só recebe as demais variáveis quando o workflow de produção existir (#23).
 
 A ordem importa. `AWS_PLAN_ROLE_ARN` liga o job `plan`, que falha fechado se faltar domínio ou e-mail. `AWS_APPLY_ROLE_ARN` liga o deploy, que falha fechado se faltar qualquer outro valor (`docs/infra.md`, "Ordem para ligar o pipeline").
 
 1. Crie os Environments `staging` e `production`. GitHub → Settings → Environments → New environment.
+
+   ```bash
+   gh api repos/henriqueluza/aws-cost-playground/environments --jq '.environments[].name'
+   ```
+
+   Como conferir: a lista traz `staging` e `production`.
 
 2. Restrinja os dois ao branch `main`, antes de cadastrar qualquer variável neles. Em cada Environment: Deployment branches and tags → Selected branches and tags → Add deployment branch or tag rule → `main`. O trust dos papéis `apply` já fixa `refs/heads/main` no IAM; esta regra é a segunda camada (`infra/bootstrap/README.md`, "Papéis `apply`"). Repita a conferência com `production`.
 
@@ -261,6 +272,14 @@ A ordem importa. `AWS_PLAN_ROLE_ARN` liga o job `plan`, que falha fechado se fal
 
    Como conferir: `AWS_APPLY_ROLE_ARN` e `TF_VAR_PACKAGE_BUCKET`.
 
+10. Confira o Environment `production`.
+
+    ```bash
+    gh variable list --env production --repo henriqueluza/aws-cost-playground --json name --jq '.[].name'
+    ```
+
+    Como conferir: `AWS_APPLY_ROLE_ARN`.
+
 ## 5. Chave da Claude API no SSM (#75 e #77)
 
 O parâmetro `/acp/<env>/anthropic-api-key` é criado à mão, fora do Terraform (decisão da #126). O procedimento está em [rotação de segredos](rotacao-de-segredos.md), seção "Criar o parâmetro pela primeira vez". Não o repita de memória: siga aquela seção.
@@ -280,6 +299,8 @@ O parâmetro `/acp/<env>/anthropic-api-key` é criado à mão, fora do Terraform
 4. Deixe a LLM desligada. `llm_enabled` é `false` nos dois `terraform.tfvars` e só muda por PR (`infra/README.md`, "Primeiro apply"). Ligar gasta dinheiro: faça depois dos guardrails da #78.
 
 5. O parâmetro de produção segue o mesmo roteiro, com a chave do workspace `acp-production`. [Guardrails de custo](guardrails-de-custo.md) pede os guardrails de produção antes de gravar a chave real de produção.
+
+   Como conferir: o comando do item 3, com `production` no lugar de `staging`.
 
 ## 6. Primeiro deploy de staging (#77)
 
@@ -403,11 +424,15 @@ O workflow semanal ainda não existe em `.github/workflows/` (#222 e #29 abertas
    (cd pricing && uv run python -m app generate > report.txt)
    ```
 
+   Como conferir: o comando sai com 0, e `git status --short web/public/prices` lista os arquivos regravados. Se a última linha de `pricing/report.txt` for `nenhum serviço com consulta: nada a gravar`, nada foi atualizado.
+
 3. Monte o corpo do PR.
 
    ```bash
    (cd pricing && uv run python -m app.summary < report.txt > body.md)
    ```
+
+   Como conferir: `pricing/body.md` tem as seções `## SKUs adicionados`, `## SKUs removidos` e `## Variações acima de 30%`.
 
 4. Publique. O script cria ou atualiza um único PR, da branch `prices/catalogo` para `main`, sem force push e sem push em `main`.
 
@@ -423,7 +448,7 @@ O workflow semanal ainda não existe em `.github/workflows/` (#222 e #29 abertas
    gh pr list --head prices/catalogo --repo henriqueluza/aws-cost-playground --json number,state,url
    ```
 
-   Como conferir: o PR só mexe em `web/public/prices/`, o corpo lista SKUs adicionados, removidos e variações acima de 30%, o CI está verde e, depois do merge, `web/public/prices/manifest.json` em `main` traz `"source": "price-list"`.
+   Como conferir: o PR só mexe em `web/public/prices/`, o corpo lista SKUs adicionados, removidos e variações acima de 30%, o CI está verde e, depois do merge, `web/public/prices/manifest.json` em `main` traz `"source": "price-list"`. Enquanto algum serviço registrado for provisório (sem consulta), o gerador grava `"source": "seed"` (`pricing/README.md`, "Serviço provisório e gravação"): nesse caso, anote na #77 quais serviços faltam.
 
 ### O que passa a valer quando o workflow entrar (#222 e #125)
 
@@ -470,7 +495,7 @@ Runtime em uso:
 aws lambda get-function-configuration --function-name acp-stg-api --query Runtime --output text
 ```
 
-Como conferir: a versão é a de `api/.python-version`.
+Como conferir: `python3.14`, a versão de `api/.python-version`. Enquanto a #307 estiver aberta, o comando responde `python3.13`.
 
 O roteiro completo de validação do produto (salvar design, re-estimar, exportar, excluir a conta) é da #80.
 
