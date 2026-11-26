@@ -33,7 +33,7 @@
     },
     {
       "path": "sa-east-1/ec2.json",
-      "sha256": "d648eef1570784362451e7f38f49eae73a2aa6de2440616b6759daf306807b6d"
+      "sha256": "e44ebd6f4962fa8e446a9babdc7071b78637ac8e4299ba405ab6408c22490e11"
     },
     {
       "path": "sa-east-1/elasticache.json",
@@ -101,7 +101,7 @@
     },
     {
       "path": "us-east-1/ec2.json",
-      "sha256": "9645151e3bbbacb1a1f639466e2358d0e9dcefb7feb61e7e63c92e81d745137b"
+      "sha256": "a2fda58b16a48a74f1a2f36cf2dbd59a780837127aaa4360e5c30074d0c68624"
     },
     {
       "path": "us-east-1/elasticache.json",
