@@ -36,13 +36,13 @@ export function DeleteAccountDialog(props: DeleteAccountDialogProps) {
 
 function DeleteForm({ pending, failure, onCancel, onConfirm, onSignIn }: DeleteAccountDialogProps) {
   const [typed, setTyped] = useState('');
-  const confirmRef = useRef<HTMLButtonElement>(null);
+  const actionRef = useRef<HTMLButtonElement>(null);
   const ready = confirmationMatches(typed);
   const expired = failure === 'unauthenticated';
 
-  // O botão desabilitado em "excluindo" perde o foco; ao falhar, ele volta para onde a ação está.
+  // O botão desabilitado em "excluindo" perde o foco; ao falhar, ele volta à ação (Entrar ou repetir).
   useEffect(() => {
-    if (failure !== null) confirmRef.current?.focus();
+    if (failure !== null) actionRef.current?.focus();
   }, [failure]);
 
   function submit(event: FormEvent) {
@@ -63,7 +63,7 @@ function DeleteForm({ pending, failure, onCancel, onConfirm, onSignIn }: DeleteA
         e voltará ao editor, sem conta.
       </p>
       <TextField
-        label={`Digite ${CONFIRM_WORD} para confirmar`}
+        label={`Digite ${CONFIRM_WORD}, em maiúsculas, para confirmar`}
         density="form"
         value={typed}
         onChange={(event) => setTyped(event.target.value)}
@@ -73,21 +73,19 @@ function DeleteForm({ pending, failure, onCancel, onConfirm, onSignIn }: DeleteA
         disabled={pending}
       />
       {failure !== null && <Notice tone="negative" message={accountErrorMessage(failure)} />}
-      {pending && (
-        <p role="status" className={styles.text}>
-          Excluindo a conta…
-        </p>
-      )}
+      <p role="status" className={pending ? styles.text : styles.srOnly}>
+        {pending ? 'Excluindo a conta…' : ''}
+      </p>
       <div className={styles.dialogActions}>
         <Button onClick={onCancel} disabled={pending}>
           Cancelar
         </Button>
         {expired ? (
-          <Button variant="primary" onClick={onSignIn}>
+          <Button ref={actionRef} variant="primary" onClick={onSignIn}>
             Entrar
           </Button>
         ) : (
-          <Button ref={confirmRef} variant="destructive" type="submit" disabled={!ready || pending}>
+          <Button ref={actionRef} variant="destructive" type="submit" disabled={!ready || pending}>
             {failure !== null && isRetryable(failure) ? 'Tentar de novo' : 'Excluir conta'}
           </Button>
         )}

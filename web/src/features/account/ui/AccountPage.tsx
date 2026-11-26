@@ -51,7 +51,7 @@ export function AccountPage() {
   } else {
     quotaBody = (
       <>
-        <p className={styles.figure}>
+        <p className={styles.figure} aria-hidden="true">
           <b>{quota.data.remaining}</b> de {quota.data.limit}
         </p>
         <p className={styles.text}>{quotaSummary(quota.data.remaining, quota.data.limit)}.</p>
@@ -88,7 +88,7 @@ export function AccountPage() {
           <h2 id="conta-quota" className={styles.heading}>
             Estimativas de uso por IA
           </h2>
-          {quotaBody}
+          <div className={styles.quota}>{quotaBody}</div>
         </section>
 
         <section className={styles.section} aria-labelledby="conta-excluir">

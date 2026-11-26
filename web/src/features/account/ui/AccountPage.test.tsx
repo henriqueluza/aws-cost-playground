@@ -111,7 +111,7 @@ describe('AccountPage', () => {
       expect(dialog).toHaveTextContent('contador das suas estimativas');
       expect(dialog).toHaveTextContent('conta de login');
       expect(dialog).toHaveTextContent('Não há volta');
-      const field = within(dialog).getByRole('textbox', { name: /Digite EXCLUIR/ });
+      const field = within(dialog).getByRole('textbox', { name: /Digite EXCLUIR, em maiúsculas/ });
       expect(field).toHaveValue('');
       expect(field).toHaveFocus();
       const confirm = within(dialog).getByRole('button', { name: 'Excluir conta' });
@@ -176,7 +176,6 @@ describe('AccountPage', () => {
         await user.click(within(dialog).getByRole('button', { name: 'Excluir conta' }));
 
         expect(await within(dialog).findByRole('alert')).toBeInTheDocument();
-        expect(dialog).not.toHaveTextContent('Error');
         expect(auth.service.signOut).not.toHaveBeenCalled();
         expect(router.state.location.pathname).toBe('/conta');
         const retry = within(dialog).getByRole('button', { name: 'Tentar de novo' });
@@ -201,6 +200,16 @@ describe('AccountPage', () => {
       expect(within(dialog).queryByRole('button', { name: /Excluir conta|Tentar/ })).toBeNull();
       await user.click(within(dialog).getByRole('button', { name: 'Entrar' }));
       expect(auth.service.signIn).toHaveBeenCalledWith({ returnTo: '/conta' });
+    });
+
+    it('erro que não é da API vira frase própria, sem o texto do erro', async () => {
+      const user = userEvent.setup();
+      const deleteAccount = () => Promise.reject(new Error('segredo interno'));
+      mount({ ...newApi(), account: { deleteAccount } });
+      const dialog = await open(user);
+      await user.type(within(dialog).getByRole('textbox'), 'EXCLUIR');
+      await user.click(within(dialog).getByRole('button', { name: 'Excluir conta' }));
+      expect(await within(dialog).findByRole('alert')).not.toHaveTextContent('segredo');
     });
 
     it('não envia duas vezes, mesmo com cliques repetidos', async () => {
