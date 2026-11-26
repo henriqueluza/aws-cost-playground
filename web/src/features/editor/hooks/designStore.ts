@@ -32,6 +32,7 @@ import {
   type Result,
   type Selection,
 } from '../model/editorState';
+import { referenceDesign, referenceLayout } from '../model/template/referenceTemplate';
 
 export type IdSource = { blockId(): string; edgeId(): string };
 export type DesignActions = {
@@ -46,8 +47,16 @@ export type DesignActions = {
   setOverride(target: ElementRef, key: string, value: number | null): Result<void>;
   select(selection: Selection): Result<void>;
   setRegion(region: Region): Result<void>;
+  /** Descrição da carga; digitação em sequência é um passo só (como as setas do canvas). */
+  setDescription(description: string): Result<void>;
+  /** Documento com o `usage` novo vindo da estimativa, gravado como UM passo desfazível. */
+  applyEstimate(next: DesignDocument): Result<void>;
   loadDesign(raw: unknown): Result<void>;
   replaceDocument(doc: DesignDocument): Result<void>;
+  /** Troca o design inteiro pelo template inicial (PRD F5); o confirmar antes é de quem chama. */
+  newDesign(): void;
+  /** Marca `saved` (por omissão, o documento atual) como salvo: zera o aviso de alteração pendente. */
+  markSaved(saved?: DesignDocument): void;
   /** Desfaz o último passo; devolve o que foi desfeito, ou `null` se não havia. */
   undo(): StepKind | null;
   redo(): StepKind | null;
@@ -55,8 +64,9 @@ export type DesignActions = {
   beginGesture(): void;
   endGesture(): void;
 };
-/** Estado do histórico fica na store, fora de `EditorState` (que é o que se desenha). */
-export type DesignStoreState = EditorState & DesignActions & { readonly history: History };
+/** Fora de `EditorState` (o que se desenha): o histórico e `baseline`, o último documento carregado ou salvo. */
+export type DesignStoreState = EditorState &
+  DesignActions & { readonly history: History; readonly baseline: DesignDocument };
 export type DesignStore = StoreApi<DesignStoreState>;
 
 /** Ids aleatórios no formato do schema. */
@@ -98,13 +108,14 @@ export function createDesignStore(
       r: Result<DesignDocument>,
       value: T,
       kind: StepKind,
-      extra: (s: EditorState, doc: DesignDocument) => Partial<EditorState> = () => ({}),
+      extra: (s: EditorState, doc: DesignDocument) => Partial<DesignStoreState> = () => ({}),
+      group?: Grouping,
     ): Result<T> => {
       if (!r.ok) return r;
       set((s) => ({
         document: r.value,
         ...extra(s, r.value),
-        history: record(s.history, s, kind),
+        history: record(s.history, s, kind, group),
       }));
       return ok(value);
     };
@@ -130,6 +141,7 @@ export function createDesignStore(
     const doc = (): DesignDocument => get().document;
     return {
       ...initial,
+      baseline: initial.document,
       history: EMPTY_HISTORY,
       addBlock: (block, position) => {
         if (!finite(position)) return fail('invalid-position');
@@ -176,12 +188,35 @@ export function createDesignStore(
         return ok(undefined);
       },
       setRegion: (region) => apply(act.setRegion(doc(), region), undefined, 'set-region'),
+      setDescription: (text) => {
+        const r = act.setDescription(doc(), text);
+        if (r.ok && text === doc().workload.description) return ok(undefined);
+        const group = { key: 'description', now: clock(), windowMs: NUDGE_WINDOW_MS };
+        return apply(r, undefined, 'set-description', () => ({}), group);
+      },
+      applyEstimate: (next) => apply(act.parseDesign(next), undefined, 'apply-estimate', prune),
       loadDesign: (raw) =>
-        apply(act.parseDesign(raw), undefined, 'replace-design', () => ({
+        apply(act.parseDesign(raw), undefined, 'replace-design', (_, loaded) => ({
           selection: null,
           layout: {},
+          baseline: loaded,
         })),
-      replaceDocument: (next) => apply(act.parseDesign(next), undefined, 'replace-design', prune),
+      replaceDocument: (next) =>
+        apply(act.parseDesign(next), undefined, 'replace-design', (s, replaced) => ({
+          ...prune(s, replaced),
+          baseline: replaced,
+        })),
+      markSaved: (saved = get().document) => set({ baseline: saved }),
+      newDesign: () => {
+        const template = referenceDesign();
+        set((s) => ({
+          document: template,
+          baseline: template,
+          layout: referenceLayout(),
+          selection: null,
+          history: record(s.history, s, 'replace-design'),
+        }));
+      },
       undo: () => goto(undoStep(get().history, get())),
       redo: () => goto(redoStep(get().history, get())),
       beginGesture: () => {
@@ -194,5 +229,9 @@ export function createDesignStore(
   });
 }
 
-/** Store única do editor no app. */
-export const designStore: DesignStore = createDesignStore();
+/** Store única do editor no app. Sem design aberto, ela começa no template inicial. */
+export const designStore: DesignStore = createDesignStore({
+  document: referenceDesign(),
+  layout: referenceLayout(),
+  selection: null,
+});

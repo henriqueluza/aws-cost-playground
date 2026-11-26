@@ -2,7 +2,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations } from '../../../test/axe';
 import { catalogOf } from '../../../test/catalogFixtures';
 import { adrExampleDesign } from '../../../test/designFixtures';
@@ -63,6 +63,8 @@ function renderPage(matches: boolean | null, client?: QueryClient) {
   };
 }
 
+beforeEach(() => designStore.setState(EMPTY_STATE));
+
 afterEach(() => {
   vi.unstubAllGlobals();
   designStore.setState(EMPTY_STATE);
@@ -99,11 +101,19 @@ describe.each([
     const tabs = within(screen.getByRole('tablist', { name: 'Custo, bloco e carga' })).getAllByRole(
       'tab',
     );
-    expect(tabs.map((t) => t.textContent)).toEqual(['Custo', 'Bloco', 'Carga']);
+    expect(tabs.map((t) => t.textContent)).toEqual(['Custo', 'Bloco', 'Carga', 'Exportar']);
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
     expect(
       within(screen.getByRole('tabpanel')).getByRole('heading', { name: 'Preço' }),
     ).toBeVisible();
+  });
+
+  it('traz o painel de exportação na aba Exportar', async () => {
+    renderPage(matches);
+    await userEvent.click(screen.getByRole('tab', { name: 'Exportar' }));
+    const panel = screen.getByRole('tabpanel');
+    expect(within(panel).getByRole('heading', { name: 'Exportar' })).toBeVisible();
+    expect(within(panel).getByRole('button', { name: 'Exportar Terraform' })).toBeVisible();
   });
 
   it('troca de aba por clique e mantém o aviso', async () => {
@@ -126,11 +136,11 @@ describe.each([
     expect(bloco).toHaveAttribute('aria-selected', 'true');
     expect(bloco).toHaveFocus();
     await user.keyboard('{End}');
-    expect(screen.getByRole('tab', { name: 'Carga' })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: 'Exportar' })).toHaveFocus();
     await user.keyboard('{Home}');
     expect(screen.getByRole('tab', { name: 'Custo' })).toHaveFocus();
     await user.keyboard('{ArrowLeft}');
-    expect(screen.getByRole('tab', { name: 'Carga' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Exportar' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('Tab a partir da aba ativa foca o tabpanel visível', async () => {
