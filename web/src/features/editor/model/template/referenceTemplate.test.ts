@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import referenceJson from './referenceTemplate.json';
+import referenceJson from '../../../../../../contracts/templates/reference.json';
 import {
   CLIENT_NODE_ID,
   DESIGN_LIMITS,

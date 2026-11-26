@@ -4,7 +4,7 @@ import {
   type DesignDocument,
 } from '../../../../shared/lib/design';
 import type { Layout } from '../editorState';
-import referenceTemplate from './referenceTemplate.json';
+import referenceTemplate from '../../../../../../contracts/templates/reference.json';
 
 /** Passo entre colunas e entre linhas do diagrama, em px (o bloco tem 216 de largura). */
 const STEP = { x: 264, y: 128 } as const;
