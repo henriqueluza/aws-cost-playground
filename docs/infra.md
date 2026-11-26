@@ -133,6 +133,13 @@ O Environment `production` tem de aceitar só o branch `main` (Settings → Envi
 
 Workflow `prices.yml` (#222, parte da #29), por `schedule` (segunda-feira, 09:17 UTC) e `workflow_dispatch`. Só roda em `main` e não usa `environment:`, como exige o trust do papel `acp-ci-prices`. O job `generate` assume o papel por OIDC (variável de repositório `AWS_PRICES_ROLE_ARN`) e gera o catálogo; o job `publish`, sem AWS, abre ou atualiza o PR único da branch `prices/catalogo`. Sem a variável, o workflow avisa e termina verde. O PR do `GITHUB_TOKEN` não roda o CI: o autor fecha e reabre antes de juntar. Passo a passo e validação: [`docs/runbooks/setup-aws.md`](runbooks/setup-aws.md), seção 8.
 
+## Workflow export-validate
+
+Workflow `export-validate.yml` (#68), job `export-validate` (check `terraform validate dos cenários exportados`). Roda em `pull_request` para `main` só quando o PR muda `web/src/features/export/**`, `contracts/**`, `infra/tools/export_validate_report.py` ou o próprio workflow. Instala o Terraform 1.16.0 e roda `terraform.local.test.ts` com o provider da AWS nos 3 cenários de `contracts/scenarios/`, com cache de plugins em `$RUNNER_TEMP`. `permissions: contents: read`; não usa AWS, OIDC nem segredo, e um passo recusa qualquer variável `AWS_*`. Detalhes do teste: [`terraform-export.md`](architecture/aws-cost-playground/terraform-export.md), seção "Como conferir".
+
+- **Proteção de branch:** não marque esse check como obrigatório. Por causa do filtro de `paths`, um PR que não toca esses caminhos ficaria esperando para sempre um check que nunca é criado. Quando roda e reprova, o status vermelho já barra o auto-merge, que exige verde. Se o autor quiser torná-lo obrigatório, tire o filtro de `paths` e faça o job rodar sempre, com um passo que compara os arquivos alterados e termina verde cedo. A proteção de branch é configurada à mão pelo autor.
+- **Limite:** o filtro segue a Issue (export e contracts). Mudança só em `web/src/shared/lib/design` ou em `web/src/features/pricing`, de onde o export importa schema e tipos, não dispara o job.
+
 ## Limites conhecidos
 
 - O smoke 401 vem do authorizer JWT do API Gateway e não invoca a Lambda (não há rota pública). Um zip que não importa passa verde.

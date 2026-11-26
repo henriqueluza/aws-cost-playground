@@ -106,4 +106,14 @@ describe('CompareTable e SummaryStrip', () => {
     expect(screen.getByRole('group', { name: 'Fixo' }).querySelector('svg')).not.toBeNull();
     expect(screen.getByRole('group', { name: 'Variável' }).querySelector('pattern')).not.toBeNull();
   });
+
+  it('tipo que só um lado tem e custa zero diz "só no A" ou "só no B", não "igual"', () => {
+    const cmp = compareEstimates(
+      estimateOf([block('aws.iam', '0')]),
+      estimateOf([block('aws.sqs', '0')]),
+    );
+    render(<CompareTable comparison={cmp} />);
+    expect(screen.getByRole('row', { name: /IAM/ })).toHaveTextContent('US$ 0,00só no A');
+    expect(screen.getByRole('row', { name: /SQS/ })).toHaveTextContent('US$ 0,00só no B');
+  });
 });

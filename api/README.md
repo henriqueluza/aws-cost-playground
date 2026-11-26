@@ -2,7 +2,7 @@
 
 API em Python + FastAPI + Pydantic v2, executada em AWS Lambda atrás do API Gateway HTTP API. Stack e decisões: `docs/architecture/aws-cost-playground/ADR-0001-stack.md`. Nível de arquitetura: `simple`.
 
-As nove rotas do contrato estão declaradas, com corpo e resposta validados. Criar, ler e listar designs (#53), `GET /quota` (#60), `DELETE /me` (#55) e `POST /estimates` (#62) estão implementadas; as outras três respondem 501 até as Issues de cada uma (seção Rotas). O OpenAPI (`/docs`, `/redoc`, `/openapi.json`) está desligado.
+As nove rotas do contrato estão declaradas, com corpo e resposta validados. Todas estão implementadas: designs (#53 e #54), `GET /quota` (#60), `DELETE /me` (#55) e `POST /estimates` (#62) (seção Rotas). O OpenAPI (`/docs`, `/redoc`, `/openapi.json`) está desligado.
 
 ## Pré-requisitos
 
@@ -164,7 +164,7 @@ Toda falha é um `EstimateError` com `code` e mensagem fixos; os tokens vêm pre
 
 ## Rotas
 
-Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo em camelCase; `design_id` é ULID (fora do formato: 422). Todas exigem identidade. As três da #53, `GET /quota` (#60), `DELETE /me` (#55) e `POST /estimates` (#62) estão implementadas; as outras respondem 501 em problem details.
+Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo em camelCase; `design_id` é ULID (fora do formato: 422). Todas exigem identidade e estão implementadas.
 
 | Método e caminho | Corpo | Sucesso | Issue |
 |---|---|---|---|
@@ -174,16 +174,19 @@ Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo
 | `PATCH /designs/{design_id}` | `{expectedVersion, name?, doc?}` | 200, design | #54 |
 | `DELETE /designs/{design_id}` | — | 204 | #54 |
 | `POST /designs/{design_id}/duplicate` | `{name}` | 201, design | #54 |
-| `POST /estimates` | `{region, description, blocks, edges}` | 200, estimativa (implementada) | #62 |
-| `GET /quota` | — | 200, quota (implementada) | #60 |
-| `DELETE /me` | — | 204 (implementada) | #55 |
+| `POST /estimates` | `{region, description, blocks, edges}` | 200, estimativa | #62 |
+| `GET /quota` | — | 200, quota | #60 |
+| `DELETE /me` | — | 204 | #55 |
 
 - `PATCH` exige ao menos um entre `name` e `doc` e recusa `null` explícito nos dois: omita a chave para não alterar.
-- 409: `design-limit` já vale em `POST /designs`; em duplicate virá com a #54, junto de `version-conflict` no update.
+- 409 `Design limit reached` (`design-limit` no cliente) em `POST /designs` e em duplicate; 409 `Version conflict` (`version-conflict`) no `PATCH`. Nos dois casos, nada fica gravado.
+- `PATCH`: 404 se o design não existe na partição do usuário (também quando é de outro usuário), sem criar item; 409 se `expectedVersion` não é a `version` gravada. Renomear é mandar só `name`. Na resposta, `version` avança 1 e `updatedAt` muda; `createdAt` fica.
+- Duplicate: 404 se a origem não existe na partição do usuário, conferido antes do limite de 50. A cópia tem id novo, `version` 1, datas novas e o `doc` da origem.
+- `DELETE /designs/{design_id}`: 204 sem corpo e idempotente, também para id inexistente ou de outro usuário (nada é apagado fora da partição do `sub`).
 - `DELETE /me`: 204 sem corpo; 401 sem `sub` ou `username` válido; 503 `Account deletion incomplete, retry` com `Retry-After: 5`. Detalhes em "Exclusão de conta".
 - As rotas de designs ainda não estão no API Gateway (`infra/envs/*/main.tf`): é outra Issue.
 
-Ordem das respostas: 401 (sem `sub`) → 413 (corpo cru acima de 1 MiB, ou `doc` acima de 350.000 bytes) → 400 (JSON que o parser recusa, como inteiro com mais de 4.300 dígitos ou aninhamento extremo) / 422 (validação) → handler (resposta da rota, ou 501 nas ainda não implementadas). A `ProtectedRoute` garante que o 401 saia sem olhar o corpo e que o 413 do corpo cru saia antes de o JSON ser decodificado. O limite de 350.000 bytes do `doc` é medido depois do parse completo do documento (sem as chaves desconhecidas) e tem precedência sobre o 422: se algum erro de validação for `doc_too_large`, a resposta é 413 mesmo que haja outros campos inválidos.
+Ordem das respostas: 401 (sem `sub`) → 413 (corpo cru acima de 1 MiB, ou `doc` acima de 350.000 bytes) → 400 (JSON que o parser recusa, como inteiro com mais de 4.300 dígitos ou aninhamento extremo) / 422 (validação) → handler (resposta da rota). A `ProtectedRoute` garante que o 401 saia sem olhar o corpo e que o 413 do corpo cru saia antes de o JSON ser decodificado. O limite de 350.000 bytes do `doc` é medido depois do parse completo do documento (sem as chaves desconhecidas) e tem precedência sobre o 422: se algum erro de validação for `doc_too_large`, a resposta é 413 mesmo que haja outros campos inválidos.
 
 ## Designs no DynamoDB
 
@@ -193,10 +196,28 @@ Item na tabela única (`app/designs/repository.py`):
 - Atributos: `name`, `region`, `schemaVersion`, `blockCount`, `sizeBytes`, `createdAt`, `updatedAt`, `version` e `doc` (JSON compacto, em string).
 - O id é um ULID gerado no servidor: 48 bits de tempo e 80 bits de `secrets`. Datas em UTC, com milissegundos e `Z`.
 - Leituras usam `ConsistentRead`. A listagem é uma `Query` com `begins_with(SK, "DESIGN#")` e projeção sem `doc`, que percorre todas as páginas e ordena por `updatedAt` decrescente e depois `id` decrescente, com no máximo 50 resumos.
-- Só `GetItem`, `PutItem`, `DeleteItem` e `Query`, as ações da política do papel da função. Nunca `Scan`.
+- Só `GetItem`, `PutItem`, `UpdateItem`, `DeleteItem` e `Query`, as ações da política do papel da função (`UpdateItem` entrou com a #54). Nunca `Scan`.
 - Design de outro usuário responde 404, igual a inexistente: a chave sempre leva o `sub` do JWT.
 
-**Limite de 50 designs por usuário.** Sem transação, `POST /designs` conta (`Query` com `Select=COUNT`), grava com `attribute_not_exists(PK)`, conta de novo e, se passou de 50, apaga o que gravou e responde 409. Se a recontagem falhar, também apaga e devolve o erro (o cliente não recebeu o id). Duas criações simultâneas no limite podem ser ambas recusadas, nunca ambas aceitas. Resíduo: se a função morrer entre a gravação e a remoção, ou se a remoção falhar, pode sobrar 1 item acima do limite; a listagem continua devolvendo no máximo 50.
+**Limite de 50 designs por usuário.** Sem transação, `POST /designs` (e o duplicate, pelo mesmo caminho) conta (`Query` com `Select=COUNT`), grava com `attribute_not_exists(PK)`, conta de novo e, se passou de 50, apaga o que gravou e responde 409. Se a recontagem falhar, também apaga e devolve o erro (o cliente não recebeu o id). Duas criações simultâneas no limite podem ser ambas recusadas, nunca ambas aceitas. Resíduo: se a função morrer entre a gravação e a remoção, ou se a remoção falhar, pode sobrar 1 item acima do limite; a listagem continua devolvendo no máximo 50.
+
+**Trava otimista.** O `PATCH` é um único `UpdateItem` com `ConditionExpression` `attribute_exists(PK) AND version = :esperada`, sem leitura antes (ADR-0001). Na recusa, o item antigo devolvido pela condição (`ReturnValuesOnConditionCheckFailure`) só decide entre 409 (existe, versão outra) e 404 (não existe); `attribute_exists(PK)` impede que o `UpdateItem` crie item. Os nomes de atributo vêm do serviço, nunca do corpo, e `PK`, `SK` e `version` não podem ser alterados por ele.
+
+```http
+PATCH /designs/01JD0000000000000000000000
+Content-Type: application/json
+
+{"expectedVersion": 3, "name": "API de pedidos"}
+```
+
+Com `version` 3 gravada: 200 com o design e `"version": 4`. Com outra versão gravada (outra aba salvou antes):
+
+```http
+HTTP/1.1 409 Conflict
+Content-Type: application/problem+json
+
+{"type": "about:blank", "title": "Conflict", "status": 409, "detail": "Version conflict", "requestId": "<id da requisição>"}
+```
 
 **Custo de leitura.** `Select=COUNT` e a projeção não reduzem a leitura cobrada: o DynamoDB cobra os itens inteiros, com o `doc`. Uma partição cheia (50 designs de 350 KB) custa cerca de 4.400 unidades de leitura por listagem ou contagem. Separar o `doc` dos metadados ou limitar a taxa por usuário é decisão de ADR (#277).
 

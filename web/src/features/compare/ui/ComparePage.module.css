@@ -118,3 +118,10 @@
   flex-direction: column;
   gap: var(--space-3);
 }
+
+/* Abaixo de 640px as duas escolhas empilham, como a faixa de totais. */
+@media (max-width: 639px) {
+  .pickers {
+    grid-template-columns: 1fr;
+  }
+}

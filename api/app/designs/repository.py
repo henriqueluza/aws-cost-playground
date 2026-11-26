@@ -1,9 +1,9 @@
 """Itens de design na tabela única (ADR-0001): `PK = USER#<sub>`, `SK = DESIGN#<ulid>`.
 
-Toda chave sai de `_key`/`_pk`, a partir do `sub` do JWT. Só `GetItem`, `PutItem`, `DeleteItem` e
-`Query`, as ações que a política do papel da função concede (`infra/modules/functions/iam.tf`);
-nunca `Scan`. Falha do DynamoDB vira `StoreUnavailable`/`StoreFailure` e uma linha de log só com
-o código do erro.
+Toda chave sai de `_key`/`_pk`, a partir do `sub` do JWT. Só `GetItem`, `PutItem`, `UpdateItem`,
+`DeleteItem` e `Query`, as ações que a política do papel da função concede
+(`infra/modules/functions/iam.tf`); nunca `Scan`. Falha do DynamoDB vira
+`StoreUnavailable`/`StoreFailure` e uma linha de log só com o código do erro.
 """
 
 import logging
@@ -18,7 +18,13 @@ from botocore.exceptions import BotoCoreError, ClientError, HTTPClientError
 from botocore.exceptions import ConnectionError as BotoConnectionError
 
 from app.auth import SUB_PATTERN
-from app.designs.errors import DesignError, StoreFailure, StoreUnavailable
+from app.designs.errors import (
+    DesignError,
+    DesignNotFound,
+    StoreFailure,
+    StoreUnavailable,
+    VersionConflict,
+)
 from app.designs.schemas import DESIGN_ID_PATTERN
 from app.dynamo import get_table
 
@@ -125,7 +131,44 @@ def get(user_id: str, design_id: str) -> dict[str, Any] | None:
     return None if item is None else _record(item)
 
 
+def update(
+    user_id: str, design_id: str, expected_version: int, attributes: dict[str, Any]
+) -> dict[str, Any]:
+    """Grava `attributes` e `version + 1` só se a `version` gravada é `expected_version`.
+
+    Escrita condicional, sem ler antes: a condição decide. Na recusa, o item antigo que o
+    DynamoDB devolve só diz se ele existe (`VersionConflict`) ou não (`DesignNotFound`); a
+    condição `attribute_exists(PK)` impede que o `UpdateItem` crie um item novo. Os nomes dos
+    atributos vêm do serviço, nunca do corpo, e entram como `#aN` (nada de nome no texto).
+    """
+    if not attributes or attributes.keys() & {"PK", "SK", "version"}:
+        raise ValueError("invalid update attributes")
+    key = _key(user_id, design_id)
+    names = {f"#a{i}": name for i, name in enumerate(attributes)}
+    values = {f":a{i}": value for i, value in enumerate(attributes.values())}
+    sets = "".join(f"#a{i} = :a{i}, " for i in range(len(attributes)))
+    try:
+        response = get_table().update_item(
+            Key=key,
+            UpdateExpression=f"SET {sets}#version = :next",
+            ConditionExpression="attribute_exists(PK) AND #version = :expected",
+            ExpressionAttributeNames=names | {"#version": "version"},
+            ExpressionAttributeValues=values
+            | {":expected": expected_version, ":next": expected_version + 1},
+            ReturnValues="ALL_NEW",
+            ReturnValuesOnConditionCheckFailure="ALL_OLD",
+        )
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") != _CONDITION_FAILED:
+            raise _translate(exc) from None
+        raise (VersionConflict() if "Item" in exc.response else DesignNotFound()) from None
+    except BotoCoreError as exc:
+        raise _translate(exc) from None
+    return _record(response["Attributes"])
+
+
 def delete(user_id: str, design_id: str) -> None:
+    """Idempotente: apagar o que não existe na partição não é erro (nem toca outra partição)."""
     key = _key(user_id, design_id)
     with _store_errors():
         get_table().delete_item(Key=key)

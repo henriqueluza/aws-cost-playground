@@ -1,4 +1,4 @@
-"""Rotas de designs. Criar, ler e listar (Issue #53); as demais ainda respondem 501."""
+"""Rotas de designs: criar, ler e listar (Issue #53); atualizar, duplicar e apagar (Issue #54)."""
 
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
@@ -57,15 +57,15 @@ def get_design(user_id: CurrentUserId, design_id: DesignIdPath) -> DesignOut:
 
 
 @router.patch("/{design_id}", response_model=DesignOut, response_model_exclude_none=True)
-def update_design(user_id: CurrentUserId, design_id: DesignIdPath, body: DesignUpdate) -> None:
-    """Atualiza nome e/ou documento, com trava otimista (Issue #54)."""
-    raise HTTPException(status_code=501)
+def update_design(user_id: CurrentUserId, design_id: DesignIdPath, body: DesignUpdate) -> DesignOut:
+    """Atualiza nome e/ou documento (renomear é só o nome); 409 se a versão não é a atual."""
+    return service.update_design(user_id, design_id, body)
 
 
 @router.delete("/{design_id}", status_code=204)
 def delete_design(user_id: CurrentUserId, design_id: DesignIdPath) -> None:
-    """Apaga um design (Issue #54)."""
-    raise HTTPException(status_code=501)
+    """Apaga um design do usuário; idempotente (204 também quando não existe)."""
+    service.delete_design(user_id, design_id)
 
 
 @router.post(
@@ -76,6 +76,6 @@ def delete_design(user_id: CurrentUserId, design_id: DesignIdPath) -> None:
 )
 def duplicate_design(
     user_id: CurrentUserId, design_id: DesignIdPath, body: DesignDuplicate
-) -> None:
-    """Duplica um design com outro nome (Issue #54)."""
-    raise HTTPException(status_code=501)
+) -> DesignOut:
+    """Duplica um design do usuário com outro nome; 404 se não existe, 409 no limite."""
+    return service.duplicate_design(user_id, design_id, body)
