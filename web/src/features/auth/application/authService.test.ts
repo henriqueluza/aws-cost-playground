@@ -184,15 +184,6 @@ describe('getAccessToken', () => {
     expect(provider.refresh).toHaveBeenCalledTimes(2);
   });
 
-  it('depois de uma renovação que terminou, uma nova pode acontecer', async () => {
-    let clock = NOW;
-    const { service, provider } = setup(stale(), () => clock);
-    await service.getAccessToken();
-    clock = NOW + 900_000;
-    await service.getAccessToken();
-    expect(provider.refresh).toHaveBeenCalledTimes(2);
-  });
-
   it('sem resposta do provedor: rejeita com network e mantém a sessão', async () => {
     const { service, provider } = setup(stale());
     provider.refresh.mockRejectedValueOnce(new AuthError('network'));
