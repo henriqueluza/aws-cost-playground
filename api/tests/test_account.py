@@ -1,7 +1,10 @@
 """Exclusão de conta (`DELETE /me`): alvo, ordem, idempotência, erros e log."""
 
+import ast
 import json
+import logging
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -399,3 +402,29 @@ def test_item_que_so_sai_na_ultima_volta_ainda_termina_em_204(app: FastAPI, fake
     assert len(fakes.table.batches) == stuck + 1
     assert fakes.table.partition(SUB_A) == []
     assert len(fakes.identity.calls) == 1
+
+
+def test_registro_de_log_nao_carrega_identidade_nem_antes_do_formatador(
+    app: FastAPI, fakes: Fakes, caplog: pytest.LogCaptureFixture
+) -> None:
+    fakes.table.seed(SUB_A, 2)
+    fakes.identity.errors = [aws_error("InternalErrorException")]
+    with caplog.at_level(logging.INFO, logger="app.account"):
+        assert delete_me(app, username="nome-de-usuario")[0] == 503
+        assert delete_me(app, username="nome-de-usuario")[0] == 204
+    records = [r for r in caplog.records if r.name == "app.account"]
+    assert [r.getMessage() for r in records] == ["account deletion incomplete", "account deleted"]
+    for record in records:
+        assert not any(leak in repr(vars(record)) for leak in (SUB_A, "nome-de-usuario", POOL))
+
+
+def test_modulo_da_conta_nao_usa_scan_nem_print() -> None:
+    sources = Path(repository.__file__).parent.glob("*.py")
+    calls = {
+        getattr(node.func, "attr", getattr(node.func, "id", ""))
+        for source in sources
+        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Call)
+    }
+    assert {"query", "batch_write_item", "admin_delete_user"} <= calls
+    assert not calls & {"scan", "print", "delete_item", "put_item"}
