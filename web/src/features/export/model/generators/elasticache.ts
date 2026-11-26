@@ -33,7 +33,9 @@ function redis(input: GeneratorInput, id: string, shared: readonly HclNode[]): H
           hcl.attr('automatic_failover_enabled', hcl.bool(nodes > 1)),
         ]
       : [
-          hcl.attr('cluster_mode', hcl.string('enabled')),
+          // Modo cluster: grupo de parâmetros padrão com `cluster-enabled`, que é preso à versão 7.
+          hcl.attr('engine_version', hcl.string('7.1')),
+          hcl.attr('parameter_group_name', hcl.string('default.redis7.cluster.on')),
           hcl.attr('num_node_groups', hcl.number(nodes)),
           hcl.attr('replicas_per_node_group', hcl.number(0)),
           hcl.attr('automatic_failover_enabled', hcl.bool(true)),

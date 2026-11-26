@@ -35,6 +35,35 @@ describe('gerador de ElastiCache', () => {
     });
   });
 
+  it.each([
+    [6, { num_cache_clusters: '6' }, 'num_node_groups'],
+    [7, { num_node_groups: '7' }, 'num_cache_clusters'],
+    [500, { num_node_groups: '500', replicas_per_node_group: '0' }, 'preferred_cache_cluster_azs'],
+  ])('Redis com %i nós fica do lado certo do limite de 6', (nodeCount, expected, absent) => {
+    const nodes = generate(design([cache('c', { az: 'c' }, { nodeCount })]));
+    const found = attrs(named(nodes, 'aws_elasticache_replication_group', 'c'));
+    expect(found).toMatchObject({ ...expected, automatic_failover_enabled: 'true' });
+    expect(Object.keys(found)).not.toContain(absent);
+    if (nodeCount === 6) {
+      expect(found.preferred_cache_cluster_azs).toBe(
+        `[${['c', 'a', 'c', 'a', 'c', 'a'].map(zone).join(', ')}]`,
+      );
+    }
+  });
+
+  it('Memcached acima do limite de 40 nós mantém a quantidade e avisa; o grupo é de sub-redes privadas', () => {
+    const count = (nodeCount: number) =>
+      generate(design([cache('m', { engine: 'memcached' }, { nodeCount })]));
+    const warned = (nodes: ReturnType<typeof generate>) =>
+      nodes.some((node) => node.kind === 'comment' && node.text.includes('até 40 nós'));
+    expect(warned(count(40))).toBe(false);
+    expect(warned(count(41))).toBe(true);
+    expect(attrs(named(count(41), 'aws_elasticache_cluster', 'm')).num_cache_nodes).toBe('41');
+    expect(attrs(named(count(41), 'aws_elasticache_subnet_group', 'm')).subnet_ids).toBe(
+      '[aws_subnet.private_a.id, aws_subnet.private_b.id]',
+    );
+  });
+
   it('Redis de um nó não liga failover; acima de 6 nós usa modo cluster', () => {
     const nodes = generate(design([cache('um'), cache('muitos', {}, { nodeCount: 9 })]));
     expect(attrs(named(nodes, 'aws_elasticache_replication_group', 'um'))).toMatchObject({
@@ -46,7 +75,8 @@ describe('gerador de ElastiCache', () => {
     });
     const many = attrs(named(nodes, 'aws_elasticache_replication_group', 'muitos'));
     expect(many).toMatchObject({
-      cluster_mode: '"enabled"',
+      engine_version: '"7.1"',
+      parameter_group_name: '"default.redis7.cluster.on"',
       num_node_groups: '9',
       replicas_per_node_group: '0',
       automatic_failover_enabled: 'true',
