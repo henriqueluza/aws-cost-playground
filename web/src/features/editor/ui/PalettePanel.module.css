@@ -18,6 +18,10 @@
   clip-path: inset(50%);
 }
 
+.results {
+  margin-block-start: var(--space-3);
+}
+
 .group {
   margin-block-start: var(--space-5);
 }

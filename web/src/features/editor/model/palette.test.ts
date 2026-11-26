@@ -66,6 +66,7 @@ describe('busca', () => {
     expect(names('LAMBDA')).toEqual(['Lambda']);
     expect(names('conteineres')).toEqual(['ECS']);
     expect(names('aws.nat')).toEqual(['NAT Gateway']);
+    expect(names('seguranca')).toHaveLength(4);
   });
 
   it('busca vazia devolve tudo e sem resultado devolve nada', () => {

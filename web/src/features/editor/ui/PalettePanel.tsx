@@ -102,7 +102,7 @@ export function PalettePanel() {
       <p role="status" className={palette.status}>
         {notice}
       </p>
-      <div ref={listRef}>
+      <div ref={listRef} className={palette.results}>
         {groups.length === 0 ? (
           <EmptyState
             title="Nenhum bloco encontrado"

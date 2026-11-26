@@ -35,7 +35,12 @@ describe('PalettePanel', () => {
     const user = userEvent.setup();
     render(<PalettePanel />);
     await user.type(screen.getByLabelText('Buscar bloco'), 'SEGURANCA');
-    expect(screen.getByRole('heading', { name: 'Nenhum bloco encontrado' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Cognito',
+      'IAM',
+      'Secrets Manager',
+      'WAF',
+    ]);
     await user.clear(screen.getByLabelText('Buscar bloco'));
     await user.type(screen.getByLabelText('Buscar bloco'), 'dynamo');
     expect(screen.getAllByRole('button')).toHaveLength(1);

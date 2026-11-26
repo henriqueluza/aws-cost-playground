@@ -94,7 +94,7 @@ export function normalizeSearch(text: string): string {
     .trim();
 }
 
-/** Itens cujo nome, tipo ou descrição contêm a busca. Busca vazia devolve tudo. */
+/** Itens cujo nome, tipo, descrição ou grupo contêm a busca. Busca vazia devolve tudo. */
 export function filterPalette(groups: readonly PaletteGroup[], query: string): PaletteGroup[] {
   const needle = normalizeSearch(query);
   if (needle === '') return [...groups];
@@ -102,7 +102,7 @@ export function filterPalette(groups: readonly PaletteGroup[], query: string): P
     .map((group) => ({
       ...group,
       items: group.items.filter((item) =>
-        normalizeSearch(`${item.name} ${item.type} ${item.hint}`).includes(needle),
+        normalizeSearch(`${item.name} ${item.type} ${item.hint} ${group.label}`).includes(needle),
       ),
     }))
     .filter((group) => group.items.length > 0);
