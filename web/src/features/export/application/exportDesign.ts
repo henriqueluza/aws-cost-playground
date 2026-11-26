@@ -1,7 +1,9 @@
 import { designDocumentSchema } from '../../../shared/lib/design';
 import { buildExportModel } from '../model/exportBlocks';
 import { BLOCK_GENERATORS } from '../model/generators';
-import { hcl, renderHcl, type HclNode } from '../model/hcl';
+import type { BlockType } from '../../pricing';
+import type { BlockGenerator } from '../model/generator';
+import { HclError, hcl, renderHcl, type HclNode } from '../model/hcl';
 
 /** Caminhos que o export pode produzir. Lista fixa: nenhum caminho sai de dado do usuário. */
 export const EXPORT_PATHS = ['main.tf'] as const;
@@ -14,7 +16,7 @@ export interface ExportFile {
 
 export type ExportResult =
   | { readonly ok: true; readonly files: readonly ExportFile[] }
-  | { readonly ok: false; readonly error: 'invalid-design' };
+  | { readonly ok: false; readonly error: 'invalid-design' | 'generation-failed' };
 
 /** Mesmas versões de `infra/`: Terraform 1.16 e provider AWS 6.73 ou correção posterior da série 6. */
 export const TERRAFORM_VERSION = '~> 1.16.0';
@@ -90,8 +92,28 @@ function preamble(region: string): HclNode[] {
  * Export do design para Terraform (PRD F27): função pura e determinística, sem LLM, rede ou relógio.
  * Recebe o documento como dado não confiável e o valida de novo. Bloco sem gerador real, de tipo
  * desconhecido ou com atributo fora do contrato aparece como comentário e na lista do cabeçalho.
+ * Se um gerador devolver um nó que o construtor recusa, nada é escrito: `generation-failed`.
  */
-export function exportDesign(input: unknown): ExportResult {
+export function createExporter(
+  generators: Readonly<Record<BlockType, BlockGenerator>>,
+): (input: unknown) => ExportResult {
+  return (input) => {
+    try {
+      return exportWith(generators, input);
+    } catch (error) {
+      if (error instanceof HclError) return { ok: false, error: 'generation-failed' };
+      throw error;
+    }
+  };
+}
+
+/** O export ligado ao registro real dos geradores. */
+export const exportDesign = createExporter(BLOCK_GENERATORS);
+
+function exportWith(
+  generators: Readonly<Record<BlockType, BlockGenerator>>,
+  input: unknown,
+): ExportResult {
   const parsed = designDocumentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'invalid-design' };
   const design = parsed.data;
@@ -100,7 +122,7 @@ export function exportDesign(input: unknown): ExportResult {
   const sections: HclNode[] = [];
   const skipped: string[] = [];
   for (const block of model.blocks) {
-    const output = BLOCK_GENERATORS[block.type]({
+    const output = generators[block.type]({
       block,
       links: model.links.get(block.id) ?? [],
       blocks: model.blocks,
