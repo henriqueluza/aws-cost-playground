@@ -170,14 +170,33 @@ describe('estimate', () => {
     expect(catalog).toEqual(before);
   });
 
-  it('com o registro real e o exemplo do ADR, os blocos saem com preço e sem cobranças até a #30', () => {
-    const adr = designDocumentSchema.parse(adrExampleDesign);
-    const result = estimate(adr, catalog);
+  it('com o registro real e o exemplo do ADR, os blocos saem com preço e a Lambda com as cobranças dela', () => {
+    // Lambda arm64: (3.000.000 − 1.000.000) × US$ 0,0000002 = US$ 0,40; 3.000.000 × 0,080 s ×
+    // 0,5 GB = 120.000 GB-s, dentro da franquia de 400.000. O S3 ainda é provisório, sem cobranças.
+    const arm64 = catalogOf({
+      lambda: [
+        {
+          sku: 'lambda-requests-arm64',
+          tiers: [[null, '0.0000002']],
+          freeTier: { quantity: '1000000' },
+        },
+        {
+          sku: 'lambda-duration-arm64',
+          tiers: [[null, '0.0000133334']],
+          freeTier: { quantity: '400000' },
+        },
+      ],
+    });
+    const result = estimate(designDocumentSchema.parse(adrExampleDesign), arm64);
     expect(result.blocks.map((b) => [b.blockId, b.blockType, b.status, b.lines.length])).toEqual([
-      ['blk_fn_api', 'aws.lambda', 'priced', 0],
+      ['blk_fn_api', 'aws.lambda', 'priced', 2],
       ['blk_assets', 'aws.s3', 'priced', 0],
     ]);
-    expect(totals(result)).toEqual(ZEROS);
+    expect(lines(result.blocks[0]!)).toEqual([
+      'lambda-requests-arm64 2000000.000000 0.400000 variable',
+      'lambda-duration-arm64 0.000000 0.000000 variable',
+    ]);
+    expect(totals(result)).toEqual(['0.400000', '0.000000', '0.400000']);
     expect(blockPricer('aws.lambda')).toBeDefined();
   });
 });
