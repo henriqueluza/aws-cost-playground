@@ -74,33 +74,25 @@ def test_fallback_id_is_uuid_hex(capsys: pytest.CaptureFixture[str]) -> None:
     assert line["status"] == 204
 
 
-def test_error_before_response_is_logged_and_reraised(capsys: pytest.CaptureFixture[str]) -> None:
+@pytest.mark.parametrize("started", [False, True])
+def test_unhandled_error_is_logged_once(started: bool, capsys: pytest.CaptureFixture[str]) -> None:
     configure_logging("INFO")
 
     async def asgi(scope: Any, receive: Any, send: Any) -> None:
+        if started:  # ex.: falha no meio do corpo
+            await send({"type": "http.response.start", "status": 200, "headers": []})
         raise RuntimeError(EMAIL)
 
-    with pytest.raises(RuntimeError):
-        _run_asgi(asgi)
-    out = capsys.readouterr().out
-    assert EMAIL not in out
-    assert [x["error_type"] for x in _lines(out, "app.error")] == ["RuntimeError"]
-    assert [x["status"] for x in _lines(out, "app.request")] == [500]
-
-
-def test_error_after_response_started_is_logged(capsys: pytest.CaptureFixture[str]) -> None:
-    configure_logging("INFO")
-
-    async def asgi(scope: Any, receive: Any, send: Any) -> None:
-        await send({"type": "http.response.start", "status": 200, "headers": []})
-        raise RuntimeError(EMAIL)  # ex.: falha no meio do corpo
-
-    _run_asgi(asgi)  # absorvida: a resposta já começou
+    if started:
+        _run_asgi(asgi)  # absorvida: a resposta já começou
+    else:
+        with pytest.raises(RuntimeError):  # sem resposta: o Mangum trata
+            _run_asgi(asgi)
     out = capsys.readouterr().out
     assert EMAIL not in out
     [error] = _lines(out, "app.error")
     assert (error["level"], error["error_type"]) == ("ERROR", "RuntimeError")
-    assert [x["status"] for x in _lines(out, "app.request")] == [200]
+    assert [x["status"] for x in _lines(out, "app.request")] == [200 if started else 500]
 
 
 def test_formatter_drops_fields_outside_allowlist() -> None:
