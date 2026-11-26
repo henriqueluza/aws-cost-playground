@@ -25,7 +25,7 @@ Workflow `deploy-staging.yml`, disparado por `push` em `main`.
 | `download` | Baixa o artefato `release-<sha>` |
 | `verify` | `sha256sum -c SHA256SUMS` |
 | `aws` | OIDC no papel `acp-ci-apply-staging`, sem chave estática |
-| `package` | Sobe o zip para `functions/<sha>.zip` no bucket de artefatos, sem sobrescrever (`--if-none-match`). Se a chave já existe com outro conteúdo, o deploy falha fechado: a função só roda o zip conferido pelo `SHA256SUMS`. Para repetir um deploy, use "Re-run failed jobs", que reaproveita o artefato |
+| `package` | Sobe o zip para `functions/<sha>.zip` no bucket de artefatos, sem sobrescrever (`--if-none-match`). Se a chave já existe com outro conteúdo, o deploy falha fechado: a função só roda o zip conferido pelo `SHA256SUMS`. Para repetir um deploy, use "Re-run failed jobs", que reaproveita o artefato. Depois de um "Re-run all jobs" com zip diferente, a saída é um commit novo (outra chave) ou o autor apagar `functions/<sha>.zip` à mão com credencial de administrador, porque o papel apply não tem `s3:DeleteObject` |
 | `terraform` | `init`, `plan`, plan-guard e `apply` do plano salvo. O plan-guard aqui não tem liberação por label: `delete`, `replace` ou `forget` param o deploy |
 | `functions` | Espera as funções atualizarem e confere o `CodeSha256` |
 | `site` | Sobe `assets/` antes, sem apagar o que é antigo e sem o `config.json` do bundle |

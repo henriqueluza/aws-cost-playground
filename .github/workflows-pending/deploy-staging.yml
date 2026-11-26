@@ -62,6 +62,7 @@ jobs:
           cache-dependency-glob: api/uv.lock
       - name: Montar o release
         run: |
+          set -o pipefail
           mkdir -p "$RUNNER_TEMP/release"
           # O script imprime só o sha256 em hex; o SHA256SUMS abaixo é quem o registra.
           scripts/build-functions.sh "$RUNNER_TEMP/release/functions.zip" > /dev/null
@@ -168,7 +169,7 @@ jobs:
               exit 1
             fi
             if [ "$stored" != "$b64" ]; then
-              echo "::error::$key já existe com outro conteúdo; use Re-run failed jobs (reaproveita o artefato) ou um commit novo"
+              echo "::error::$key já existe com outro conteúdo; use um commit novo, ou Re-run failed jobs se o artefato original não tiver sido refeito"
               exit 1
             fi
           else
@@ -211,12 +212,17 @@ jobs:
           fi
           terraform apply -input=false "$RUNNER_TEMP/tfplan"
           terraform output -json > "$RUNNER_TEMP/outputs.json"
+          site_bucket=$(jq -er '.site_bucket_name.value' "$RUNNER_TEMP/outputs.json")
+          distribution_id=$(jq -er '.site_distribution_id.value' "$RUNNER_TEMP/outputs.json")
+          site_url=$(jq -er '.site_url.value' "$RUNNER_TEMP/outputs.json")
+          api_base_url=$(jq -er '.site_config.value.apiBaseUrl' "$RUNNER_TEMP/outputs.json")
+          function_names=$(jq -er '[.function_names.value[]] | join(" ")' "$RUNNER_TEMP/outputs.json")
           {
-            echo "site_bucket=$(jq -er '.site_bucket_name.value' "$RUNNER_TEMP/outputs.json")"
-            echo "distribution_id=$(jq -er '.site_distribution_id.value' "$RUNNER_TEMP/outputs.json")"
-            echo "site_url=$(jq -er '.site_url.value' "$RUNNER_TEMP/outputs.json")"
-            echo "api_base_url=$(jq -er '.site_config.value.apiBaseUrl' "$RUNNER_TEMP/outputs.json")"
-            echo "function_names=$(jq -er '[.function_names.value[]] | join(" ")' "$RUNNER_TEMP/outputs.json")"
+            echo "site_bucket=$site_bucket"
+            echo "distribution_id=$distribution_id"
+            echo "site_url=$site_url"
+            echo "api_base_url=$api_base_url"
+            echo "function_names=$function_names"
           } >> "$GITHUB_OUTPUT"
 
       - name: Conferir o código das funções
