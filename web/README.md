@@ -26,7 +26,7 @@ As regras de import do ADR-0001 são verificadas pelo `npx eslint .` (config em 
 
 - Uma feature só importa outra feature pelo `index.ts` dela.
 - `app/` e as features podem importar `shared/`; `shared/` não importa feature nem `app/`.
-- `**/application/**`, `**/model/**`, `src/shared/lib/design/**`, `src/shared/lib/api/**` e `src/shared/lib/money.ts` não importam `react`, `react-dom`, `@xyflow/*`, `@tanstack/*`, `zustand` (nem `zustand/*`) nem módulo `http` (padrão `**/http`, que inclui `shared/lib/http`). O motor de preço, o contrato do design, as portas da API e o dinheiro ficam em TypeScript puro.
+- `**/application/**`, `**/model/**`, `src/shared/lib/design/**`, `src/shared/lib/api/**` (exceto `ApiProvider.tsx`, o único módulo com React) e `src/shared/lib/money.ts` não importam `react`, `react-dom`, `@xyflow/*`, `@tanstack/*`, `zustand` (nem `zustand/*`) nem módulo `http` (padrão `**/http`, que inclui `shared/lib/http`). O motor de preço, o contrato do design, as portas da API e o dinheiro ficam em TypeScript puro.
 
 ## Configuração de runtime (`/config.json`)
 
@@ -40,11 +40,11 @@ O build é o mesmo em todos os ambientes. O que muda por ambiente é o arquivo `
 }
 ```
 
-| Campo              | Regra                                                            |
-| ------------------ | ---------------------------------------------------------------- |
-| `apiBaseUrl`       | URL da API; `https`, ou `http` apenas em `localhost`/`127.0.0.1` |
-| `cognitoAuthority` | URL do emissor OIDC do Cognito; mesma regra de URL               |
-| `cognitoClientId`  | 1 a 128 caracteres: letras, números, `_` e `-`                   |
+| Campo              | Regra                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| `apiBaseUrl`       | URL da API; `https`, ou `http` apenas em `localhost`/`127.0.0.1`; sem credenciais, query nem fragmento |
+| `cognitoAuthority` | URL do emissor OIDC do Cognito; mesma regra de URL                                                     |
+| `cognitoClientId`  | 1 a 128 caracteres: letras, números, `_` e `-`                                                         |
 
 Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de erro e não carrega. Não coloque segredos nele: é público.
 
@@ -71,7 +71,8 @@ Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de 
 - Todo erro sai como `ApiError`, só com `kind` e mensagem fixa (sem `cause`, sem texto do servidor).
 - O token vem de `getAccessToken`, chamado a cada requisição, e não é guardado nem logado; vai só para a origem de `baseUrl`.
 - O tempo limite é de 30 s e a resposta tem teto de 512 KiB. Mapa de status para `kind` e decisões em `docs/handoff/51.md`.
-- `createHttpApi(transport): Api` (`lib/http/httpApi.ts`, #184, parte 2 da #51) implementa as interfaces de `lib/api/` sobre o transporte. O provider `ApiProvider`/`useApi` e a ligação no bootstrap ficam para a #185; até lá nenhuma tela o consome.
+- `createHttpApi(transport): Api` (`lib/http/httpApi.ts`, #184, parte 2 da #51) implementa as interfaces de `lib/api/` sobre o transporte.
+- O `ApiProvider({ api, children })` e o hook `useApi()` (`lib/api/ApiProvider.tsx`, #185, parte 3 da #51) entregam a `Api` às telas; `useApi()` lança erro explícito fora do provider. Não é reexportado pelo `index.ts`: importe de `shared/lib/api/ApiProvider`. O `createApi` de `app/bootstrap.tsx` escolhe a implementação: em desenvolvimento (`import.meta.env.DEV`) o fake em memória, carregado por `import()` dinâmico, com os limites do ADR; em produção sempre `createHttpApi`, e o build não leva o fake (`tooling/apiBundle.build.test.ts`). Sem `/config.json` válido o app mostra a tela de erro em qualquer modo, sem cair no fake (falha fechada). O token entra por `bootstrap(container, fetchFn, { getAccessToken })`, ponto de injeção da sessão (#52); o padrão devolve `null` e as chamadas dão `unauthenticated` sem tocar a rede. No `main.tsx`: `bootstrap(container, fetch, { getAccessToken })`.
 - Rotas, iguais às do backend (`api/app/*/router.py`, #201): `designs.list` `GET /designs`; `get` `GET /designs/{id}`; `create` `POST /designs` (409 = `design-limit`); `update` `PATCH /designs/{id}` (409 = `version-conflict`); `duplicate` `POST /designs/{id}/duplicate` (409 = `design-limit`); `remove` `DELETE /designs/{id}`; `estimates.estimateUsage` `POST /estimates`; `quota.get` `GET /quota`; `account.deleteAccount` `DELETE /me`.
 - A entrada é validada com os schemas de `lib/api/ports.ts` antes de sair: inválida dá `invalid-request` sem chamada de rede, só os campos do contrato vão no corpo e nenhuma identidade é enviada. Id que não passa em `designIdSchema` não vira requisição: `get`, `update` e `duplicate` dão `not-found`; `remove` resolve.
 - A listagem aceita no máximo `MAX_DESIGNS` (50, ADR-0001).
