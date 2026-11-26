@@ -129,8 +129,11 @@ def test_noise_gives_no_price(region: str) -> None:
 @pytest.mark.parametrize("region", REGIONS)
 def test_every_price_is_one_open_tier_without_free_tier(region: str) -> None:
     # O ElastiCache não tem franquia permanente (só a de 12 meses, fora do projeto) nem faixas.
-    for price in build(region, answer(region)):
-        assert price.tiers == (Tier(None, price.tiers[0].unit_price),)
+    prices = build(region, answer(region))
+    assert len(prices) == len(SKUS)
+    for price in prices:
+        assert len(price.tiers) == 1
+        assert price.tiers[0].up_to is None
         assert price.free_tier is None
         assert price.minimum_quantity is None
 
@@ -146,8 +149,12 @@ def test_missing_product_is_left_to_expected_skus(region: str, sku: str) -> None
 
 @pytest.mark.parametrize("region", ["eu-west-1", "", "US-EAST-1"])
 def test_unknown_region_is_refused(region: str) -> None:
-    calls: list[Callable[[], object]] = [lambda: queries(region), lambda: build(region, ALL)]
-    for call in (*calls, lambda: build(region, [])):
+    calls: tuple[Callable[[], object], ...] = (
+        lambda: queries(region),
+        lambda: build(region, ALL),
+        lambda: build(region, []),
+    )
+    for call in calls:
         with pytest.raises(PricingError) as info:
             call()
         assert str(info.value) == "região sem prefixo de usagetype"

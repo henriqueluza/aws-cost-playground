@@ -7,6 +7,7 @@ Mensagens de erro levam só o SKU do catálogo, nunca texto da AWS.
 """
 
 from collections.abc import Mapping, Sequence
+from typing import NamedTuple
 
 from app.model import Filter, Price, PricingError, Product, Query, ServiceSpec, region_filter
 from app.products import tiers
@@ -16,11 +17,18 @@ _AWS_UNIT = "Hrs"
 # Prefixo do `usagetype` por região; as chaves são as de `catalog.REGIONS`. O `usagetype`
 # completo separa o NodeUsage do ExtendedSupport e do Outposts, que cobram o mesmo nó.
 _PREFIXES: Mapping[str, str] = {"us-east-1": "", "sa-east-1": "SAE1-"}
-# Motor do SKU -> (operation da AWS, nome na descrição). Filtra por `operation`, e não por
+
+
+class _Engine(NamedTuple):
+    operation: str
+    label: str
+
+
+# Motor do SKU -> operation da AWS e nome na descrição. Filtra por `operation`, e não por
 # `cacheEngine`: o código de operação é a chave de cobrança e não mudou com o rebrand "Redis OSS".
-_ENGINES: Mapping[str, tuple[str, str]] = {
-    "redis": ("CreateCacheCluster:0002", "Redis OSS"),
-    "memcached": ("CreateCacheCluster:0001", "Memcached"),
+_ENGINES: Mapping[str, _Engine] = {
+    "redis": _Engine("CreateCacheCluster:0002", "Redis OSS"),
+    "memcached": _Engine("CreateCacheCluster:0001", "Memcached"),
 }
 _NODE_TYPES = (
     "cache.t3.micro",
@@ -32,9 +40,9 @@ _NODE_TYPES = (
     "cache.m5.large",
     "cache.r5.large",
 )
-# Conjunto fechado, na ordem das consultas: SKU do catálogo -> (tipo de nó, motor).
+# Conjunto fechado, na ordem das consultas: SKU do catálogo -> (motor, tipo de nó).
 _SKUS: Mapping[str, tuple[str, str]] = {
-    f"elasticache-{engine}-{node}": (node, engine) for engine in _ENGINES for node in _NODE_TYPES
+    f"elasticache-{engine}-{node}": (engine, node) for engine in _ENGINES for node in _NODE_TYPES
 }
 
 
@@ -43,11 +51,11 @@ def _filters(region: str, sku: str) -> tuple[Filter, ...]:
     prefix = _PREFIXES.get(region)
     if prefix is None:
         raise PricingError("região sem prefixo de usagetype")
-    node, engine = _SKUS[sku]
+    engine, node = _SKUS[sku]
     return (
         region_filter(region),
         Filter("usagetype", f"{prefix}NodeUsage:{node}"),
-        Filter("operation", _ENGINES[engine][0]),
+        Filter("operation", _ENGINES[engine].operation),
     )
 
 
@@ -73,8 +81,8 @@ def _price(products: Sequence[Product], region: str, sku: str) -> Price | None:
     # Zero sai sempre "0" (`decimal_text`); faixa grátis aqui seria franquia não declarada.
     if price_tiers[0].unit_price == "0":
         raise PricingError(f"primeira faixa sem preço: {sku}")
-    node, engine = _SKUS[sku]
-    return Price(sku, f"Nó {node} ({_ENGINES[engine][1]})", "node-hour", price_tiers)
+    engine, node = _SKUS[sku]
+    return Price(sku, f"Nó {node} ({_ENGINES[engine].label})", "node-hour", price_tiers)
 
 
 def build(region: str, products: Sequence[Product]) -> tuple[Price, ...]:
