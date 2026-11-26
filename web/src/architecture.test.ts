@@ -46,6 +46,27 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     expect(rules).toContain('no-restricted-imports');
   });
 
+  const pureLayers = [
+    './features/pricing/application/x.ts',
+    './features/pricing/model/x.ts',
+    designLib,
+    apiLib,
+    moneyLib,
+  ];
+  const stateLibImports = [
+    "import { useQuery } from '@tanstack/react-query';",
+    "import { QueryClient } from '@tanstack/query-core';",
+    "import { create } from 'zustand';",
+    "import { createStore } from 'zustand/vanilla';",
+  ];
+  it.each(pureLayers.flatMap((file) => stateLibImports.map((line) => [line, file])))(
+    'proíbe %s em %s',
+    async (line, file) => {
+      const rules = await errorRules(`${line}\nexport const dep = 1;\n`, file);
+      expect(rules).toContain('no-restricted-imports');
+    },
+  );
+
   it('permite react em ui/', async () => {
     const rules = await errorRules(reactImport, './features/pricing/ui/x.tsx');
     expect(rules).not.toContain('no-restricted-imports');
