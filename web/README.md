@@ -26,7 +26,10 @@ npx prettier --check . && npx eslint . && npx tsc --noEmit && npm test -- --run 
 npx playwright test   # arquivos web/e2e/*.e2e.ts (o Vitest não os pega)
 ```
 
-Sobe o `npm run dev` na porta `E2E_PORT` (padrão 5173) ou reaproveita o servidor que já responde nela. `PLAYWRIGHT_CHROMIUM_PATH` aponta para um Chromium já instalado (opcional). O `export.e2e.ts` abre um design e baixa o `main.tf` pela aba **Exportar** do trilho do editor.
+Roda contra o build de produção servido pelo `vite preview` (cliente HTTP real, sem o fake de desenvolvimento) na porta `E2E_PORT` (padrão 4173). Fora do CI o build é refeito antes de subir o servidor; se já houver um respondendo na porta, ele é reaproveitado como está (sem novo build); no job `validate` os e2e rodam depois do build, com o Chromium da versão travada no lockfile, e em falha o relatório e os traces sobem como artefato (3 dias). `PLAYWRIGHT_CHROMIUM_PATH` aponta para um Chromium já instalado (opcional).
+
+- `anonymous-flow.e2e.ts`: o fluxo anônimo da apresentação. Abre o template e confere o total, adiciona um bloco pela paleta, conecta por "Conectar a…", edita um valor de uso, baixa o JSON, cria um novo design e abre o arquivo baixado, conferindo o mesmo total. Falha se qualquer requisição sair da origem do site (a API e o Cognito do `/config.json` ficam em outra origem; um segundo teste prova que a guarda acusa uma chamada à API) e roda o `axe-core` no editor, no inspetor e no diálogo de confirmação, nos temas claro e escuro, sem violações sérias ou críticas.
+- `export.e2e.ts`: abre um design e baixa o `main.tf` pela aba **Exportar** do trilho do editor.
 
 ### Lint de arquitetura
 
