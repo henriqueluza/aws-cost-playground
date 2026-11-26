@@ -6,10 +6,13 @@ import {
   ApiError,
   type ApiErrorKind,
   type CreateDesignInput,
+  type EstimateRequest,
   type UpdateDesignInput,
   designIdSchema,
   designSchema,
   designSummarySchema,
+  estimateRequestSchema,
+  estimateResponseSchema,
 } from './index';
 import { createInMemoryApi, type InMemoryApiOptions } from './inMemoryApi';
 
@@ -23,6 +26,8 @@ const UNKNOWN = '0'.repeat(26);
 function setup(overrides: Partial<InMemoryApiOptions> = {}) {
   let t = T0;
   const api = createInMemoryApi({
+    userDailyLimit: 20,
+    globalDailyLimit: 300,
     maxDesigns: 50,
     maxDocBytes: BIG,
     now: () => new Date(t),
@@ -372,7 +377,178 @@ describe('createInMemoryApi: cópias defensivas', () => {
   });
 });
 
+const REQUEST = estimateRequestSchema.parse({
+  region: ADR_DOC.region,
+  description: ADR_DOC.workload.description,
+  blocks: ADR_DOC.blocks,
+  edges: ADR_DOC.edges,
+});
+const DAY_END = '2026-11-26T00:00:00.000Z';
+const HOUR = 3_600_000;
+const badRequest = (value: unknown) => value as unknown as EstimateRequest;
+const rejectsExhausted = (p: Promise<unknown>, scope: 'user' | 'global', resetsAt = DAY_END) =>
+  expect(p).rejects.toMatchObject({ detail: { kind: 'quota-exhausted', scope, resetsAt } });
+
+describe('createInMemoryApi: quota', () => {
+  it('get devolve o limite do usuário e a próxima meia-noite UTC, sem consumir', async () => {
+    const { quota } = setup({ userDailyLimit: 3 });
+    const expected = { limit: 3, remaining: 3, resetsAt: DAY_END };
+    expect(await quota.get()).toEqual(expected);
+    expect(await quota.get()).toEqual(expected);
+  });
+
+  it('resetsAt é a meia-noite UTC seguinte no último instante do dia e no primeiro', async () => {
+    const s = setup();
+    s.advance(14 * HOUR - 1);
+    expect(s.iso()).toBe('2026-11-25T23:59:59.999Z');
+    expect((await s.quota.get()).resetsAt).toBe(DAY_END);
+    s.advance(1);
+    expect((await s.quota.get()).resetsAt).toBe('2026-11-27T00:00:00.000Z');
+  });
+
+  it('remaining não reflete o contador global e não fica negativo', async () => {
+    const s = setup({ userDailyLimit: 5, globalDailyLimit: 1 });
+    await s.estimates.estimateUsage(REQUEST);
+    expect(await s.quota.get()).toMatchObject({ limit: 5, remaining: 4 });
+    expect(await setup({ userDailyLimit: 0 }).quota.get()).toMatchObject({ remaining: 0 });
+  });
+});
+
+describe('createInMemoryApi: estimateUsage', () => {
+  it('responde ids com values vazios por padrão e a quota já decrementada', async () => {
+    const { estimates, quota } = setup({ userDailyLimit: 2 });
+    const response = await estimates.estimateUsage(REQUEST);
+    expect(estimateResponseSchema.safeParse(response).success).toBe(true);
+    expect(response).toEqual({
+      blocks: [
+        { id: 'blk_fn_api', values: {} },
+        { id: 'blk_assets', values: {} },
+      ],
+      edges: [{ id: 'edg_1', values: {} }],
+      quota: { limit: 2, remaining: 1, resetsAt: DAY_END },
+    });
+    expect(await quota.get()).toEqual(response.quota);
+  });
+
+  it('usa options.estimate com o pedido já validado e devolve só o que passa no schema', async () => {
+    const seen: EstimateRequest[] = [];
+    const { estimates } = setup({
+      estimate: (request) => {
+        seen.push(request);
+        const block = { id: 'blk_fn_api', values: { requestsPerMonth: 10 }, note: 'texto livre' };
+        return { blocks: [block], edges: [], quota: { remaining: 99 }, text: 'livre' } as never;
+      },
+    });
+    const response = await estimates.estimateUsage(badRequest({ ...REQUEST, extra: 'x' }));
+    expect(seen).toEqual([REQUEST]);
+    expect(response).toEqual({
+      blocks: [{ id: 'blk_fn_api', values: { requestsPerMonth: 10 } }],
+      edges: [],
+      quota: { limit: 20, remaining: 19, resetsAt: DAY_END },
+    });
+  });
+
+  it('estimativa fora do schema dá invalid-response e não consome quota', async () => {
+    const { estimates, quota } = setup({
+      estimate: () => ({ blocks: [{ id: 'blk_fn_api', values: { texto: 'livre' } }] }) as never,
+    });
+    await rejectsWith(estimates.estimateUsage(REQUEST), 'invalid-response');
+    expect((await quota.get()).remaining).toBe(20);
+  });
+
+  it('esgotar a quota do usuário dá quota-exhausted com scope user e resetsAt', async () => {
+    const { estimates, quota } = setup({ userDailyLimit: 2 });
+    await estimates.estimateUsage(REQUEST);
+    expect((await estimates.estimateUsage(REQUEST)).quota.remaining).toBe(0);
+    await rejectsExhausted(estimates.estimateUsage(REQUEST), 'user');
+    await expect(estimates.estimateUsage(REQUEST)).rejects.toBeInstanceOf(ApiError);
+    expect(await quota.get()).toEqual({ limit: 2, remaining: 0, resetsAt: DAY_END });
+  });
+
+  it('esgotar a quota global dá quota-exhausted com scope global, sem consumir a do usuário', async () => {
+    const { estimates, quota } = setup({ userDailyLimit: 5, globalDailyLimit: 2 });
+    await estimates.estimateUsage(REQUEST);
+    await estimates.estimateUsage(REQUEST);
+    await rejectsExhausted(estimates.estimateUsage(REQUEST), 'global');
+    await rejectsExhausted(estimates.estimateUsage(REQUEST), 'global');
+    expect((await quota.get()).remaining).toBe(3);
+  });
+
+  it('com os dois limites estourados vence o scope user', async () => {
+    const { estimates } = setup({ userDailyLimit: 1, globalDailyLimit: 1 });
+    await estimates.estimateUsage(REQUEST);
+    await rejectsExhausted(estimates.estimateUsage(REQUEST), 'user');
+  });
+
+  it('a virada do dia UTC renova os dois contadores', async () => {
+    const s = setup({ userDailyLimit: 1, globalDailyLimit: 1 });
+    await s.estimates.estimateUsage(REQUEST);
+    s.advance(14 * HOUR - 1);
+    await rejectsExhausted(s.estimates.estimateUsage(REQUEST), 'user');
+    s.advance(1);
+    const next = '2026-11-27T00:00:00.000Z';
+    expect(await s.quota.get()).toEqual({ limit: 1, remaining: 1, resetsAt: next });
+    expect((await s.estimates.estimateUsage(REQUEST)).quota).toMatchObject({ remaining: 0 });
+    await rejectsExhausted(s.estimates.estimateUsage(REQUEST), 'user', next);
+  });
+
+  it('llmEnabled=false responde unavailable sem consumir quota nem chamar estimate', async () => {
+    let calls = 0;
+    const estimate = () => (calls++, { blocks: [], edges: [] });
+    const { estimates, quota } = setup({ llmEnabled: false, userDailyLimit: 0, estimate });
+    await rejectsWith(estimates.estimateUsage(REQUEST), 'unavailable');
+    expect(calls).toBe(0);
+    expect(await setup({ llmEnabled: false }).quota.get()).toMatchObject({ remaining: 20 });
+    expect(await quota.get()).toMatchObject({ limit: 0, remaining: 0 });
+  });
+
+  it.each([
+    ['região fora da lista', { ...REQUEST, region: 'xx-nowhere-1' }],
+    ['descrição acima do limite', { ...REQUEST, description: 'a'.repeat(2001) }],
+    ['bloco sem id', { ...REQUEST, blocks: [{ type: 'aws.s3', attributes: {} }] }],
+    ['sem arestas', { region: REQUEST.region, description: 'x', blocks: [] }],
+    ['null', null],
+  ])('invalid-request não consome quota: %s', async (_name, request) => {
+    const { estimates, quota } = setup({ userDailyLimit: 1 });
+    await rejectsWith(estimates.estimateUsage(badRequest(request)), 'invalid-request');
+    expect((await quota.get()).remaining).toBe(1);
+    await expect(estimates.estimateUsage(REQUEST)).resolves.toBeDefined();
+  });
+
+  it('precedência: invalid-request, unavailable, quota-exhausted', async () => {
+    const off = setup({ llmEnabled: false, userDailyLimit: 0 });
+    await rejectsWith(off.estimates.estimateUsage(badRequest(null)), 'invalid-request');
+    await rejectsWith(off.estimates.estimateUsage(REQUEST), 'unavailable');
+    const on = setup({ userDailyLimit: 0 });
+    await rejectsWith(on.estimates.estimateUsage(badRequest(null)), 'invalid-request');
+    await rejectsExhausted(on.estimates.estimateUsage(REQUEST), 'user');
+  });
+});
+
 describe('createInMemoryApi: estado', () => {
+  it('deleteAccount apaga os designs e zera a quota do usuário, mas não a global', async () => {
+    const { designs, estimates, quota, account } = setup({
+      userDailyLimit: 5,
+      globalDailyLimit: 2,
+    });
+    await designs.create({ name: 'a', doc: SMALL_DOC });
+    await estimates.estimateUsage(REQUEST);
+    await estimates.estimateUsage(REQUEST);
+    expect((await quota.get()).remaining).toBe(3);
+    await account.deleteAccount();
+    expect(await designs.list()).toEqual([]);
+    expect((await quota.get()).remaining).toBe(5);
+    await rejectsExhausted(estimates.estimateUsage(REQUEST), 'global');
+  });
+
+  it('a quota de uma instância não é consumida por outra', async () => {
+    const one = setup({ userDailyLimit: 1, globalDailyLimit: 1 });
+    const other = setup({ userDailyLimit: 1, globalDailyLimit: 1 });
+    await one.estimates.estimateUsage(REQUEST);
+    expect((await other.quota.get()).remaining).toBe(1);
+    await expect(other.estimates.estimateUsage(REQUEST)).resolves.toBeDefined();
+  });
+
   it('deleteAccount apaga os designs, e o fake continua utilizável', async () => {
     const { designs, account } = setup({ maxDesigns: 1 });
     const d = await designs.create({ name: 'a', doc: SMALL_DOC });
