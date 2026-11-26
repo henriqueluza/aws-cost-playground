@@ -1,4 +1,4 @@
-"""Papéis apply do bootstrap: o que o `terraform test` não enxerga (recurso não declarado, lifecycle)."""
+"""Papéis apply do bootstrap: confere o que o `terraform test` não enxerga."""
 
 from __future__ import annotations
 
