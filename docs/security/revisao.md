@@ -312,19 +312,20 @@ Mesmo método da primeira rodada:
 
 **T5. Vazamento de chave ou de credencial de CI.**
 
-**Veredito: mitigada no delta.** `export-validate.yml` cumpre as regras da casa:
-- Gatilho só `pull_request` e `permissions: contents: read`.
-- Actions por SHA e `persist-credentials: false`.
-- `npm ci --ignore-scripts`.
-- Nenhuma expressão em `run:`.
-- Falha fechada se houver variável `AWS_*` no ambiente, imprimindo só os nomes.
-- Sem segredo, backend ou plano.
+**Veredito: mitigada no delta.** O workflow novo não tem credencial nem segredo, e o script só lê JSON.
 
-O `export_validate_report.py` só lê JSON e falha fechado. Provas:
-- `infra/tools/tests/test_workflow_export_validate.py`.
-- `infra/tools/tests/test_workflows_all.py`, cuja lista de workflows já inclui o novo.
-
-O log das rotas novas segue a allowlist (`api/tests/test_routes.py::test_log_da_rota_nao_traz_dado_do_usuario`).
+| Mitigação | Onde | Teste |
+|---|---|---|
+| Gatilho só `pull_request` para `main`, com `paths` | `.github/workflows/export-validate.yml:8-15` | `infra/tools/tests/test_workflow_export_validate.py::test_trigger_is_only_pull_request_to_main_with_the_paths`; `infra/tools/tests/test_workflows_all.py::EveryWorkflow::test_nenhum_gatilho_proibido` |
+| `permissions: contents: read`, declarado uma vez | `export-validate.yml:17-18` | `infra/tools/tests/test_workflow_export_validate.py::test_permissions_are_read_only_and_set_once`; `test_workflows_all.py::EveryWorkflow::test_permissoes_declaradas_e_escrita_so_onde_ja_existe` |
+| Actions por SHA; checkout sem credencial persistida | `export-validate.yml:34-36,37,42` | `infra/tools/tests/test_workflow_export_validate.py::test_every_uses_is_pinned_by_sha_with_version_comment`, `::test_checkout_keeps_no_credentials`; `test_workflows_all.py::EveryWorkflow::test_actions_por_sha_fora_as_pendencias_conhecidas` |
+| Nenhuma expressão em `run:` | `export-validate.yml:47-74` | `infra/tools/tests/test_workflow_export_validate.py::test_run_blocks_never_interpolate_expressions`; `test_workflows_all.py::EveryWorkflow::test_nenhuma_expressao_dentro_de_run` |
+| Sem segredo, token, OIDC ou credencial da AWS; falha fechada se houver `AWS_*`, imprimindo só os nomes | `export-validate.yml:46-53` | `infra/tools/tests/test_workflow_export_validate.py::test_no_secret_token_or_aws_credential`, `::test_any_aws_variable_fails_and_only_its_name_is_printed`; `test_workflows_all.py::EveryWorkflow::test_oidc_e_environment_so_nos_jobs_conhecidos` |
+| `npm ci --ignore-scripts`: sem script de instalação no job | `export-validate.yml:56` | — (leitura; o job não tem segredo a proteger) |
+| Só `init -backend=false` e `validate`, nunca `plan` | `export-validate.yml:60-70`, `web/src/features/export/test/terraform.local.test.ts` | `infra/tools/tests/test_workflow_export_validate.py::test_terraform_version_matches_infra_and_never_plans`, `::test_local_test_runs_init_without_backend_and_validate` |
+| O relatório falha fechado: ilegível sai com 2; teste pulado, reprovado ou cenário ausente sai com 1 | `infra/tools/export_validate_report.py:29-50,53-68` | `infra/tools/tests/test_workflow_export_validate.py::test_unreadable_report_fails_closed`, `::test_skipped_tests_fail_instead_of_passing_empty`, `::test_a_repeated_title_cannot_hide_a_failure`, `::test_a_scenario_file_without_a_test_fails` |
+| O workflow novo está na lista conhecida, e mexer nele dispara estes testes no CI | `.github/workflows/terraform.yml:14` | `test_workflows_all.py::EveryWorkflow::test_a_lista_de_workflows_e_a_conhecida`; `infra/tools/tests/test_workflow_export_validate.py::test_a_change_to_the_workflow_runs_these_tests_in_ci` |
+| Log das rotas novas pela allowlist, sem dado do usuário | `api/app/logs.py` (sem mudança) | `api/tests/test_routes.py::test_log_da_rota_nao_traz_dado_do_usuario` |
 
 **T6. Adulteração dos preços.**
 
