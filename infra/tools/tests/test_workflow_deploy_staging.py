@@ -282,8 +282,13 @@ class DeployStepsTest(unittest.TestCase):
         run = run_block(step(job("deploy"), "smoke"))
         self.assertIn("/quota", run)
         self.assertIn("401", run)
-        self.assertRegex(run, r'--fail[^\n]*"\$SITE_URL/"|curl_opts=\([^)]*--fail')
-        self.assertRegex(run, r'jq -S[^\n]*\$RUNNER_TEMP/config\.json')
+        self.assertIn('[ "$code" = "401" ]', run)
+        self.assertRegex(run, r"curl_opts=\([^)]*--fail")
+        for url in ('"$SITE_URL/"', '"$SITE_URL/config.json"'):
+            line = next((ln for ln in run.splitlines() if url in ln), "")
+            self.assertRegex(line, r'curl "\$\{curl_opts\[@\]\}"', f"curl de {url} sem --fail")
+        self.assertRegex(run, r'jq -S \. "\$RUNNER_TEMP/served\.json"\)" != "\$\(jq -S \. "\$RUNNER_TEMP/config\.json"\)"')
+        self.assertRegex(run, r"difere do publicado\"?\n\s+exit 1")
 
     def test_config_is_validated_then_published_from_the_generated_file(self) -> None:
         run = run_block(step(job("deploy"), "config"))
