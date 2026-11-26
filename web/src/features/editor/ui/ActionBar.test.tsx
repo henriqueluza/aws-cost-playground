@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations } from '../../../test/axe';
@@ -129,6 +129,22 @@ describe('Novo design', () => {
     designStore.getState().setRegion('us-east-1');
     await userEvent.click(screen.getByRole('button', { name: 'Novo design' }));
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('aviso ao fechar a aba', () => {
+  it('só impede o fechamento com alteração pendente', () => {
+    renderBar();
+    const close = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(close()).toBe(false);
+    act(() => void designStore.getState().setRegion('sa-east-1'));
+    expect(close()).toBe(true);
+    act(() => void designStore.getState().setRegion('us-east-1'));
+    expect(close()).toBe(false);
   });
 });
 

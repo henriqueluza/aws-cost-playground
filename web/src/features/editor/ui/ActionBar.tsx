@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { Button, Dialog, SelectField } from '../../../shared/ui';
 import { useDesignStore } from '../hooks/useDesignStore';
 import { parseRegion, REGION_OPTIONS } from '../model/regionOptions';
@@ -17,6 +17,14 @@ export function ActionBar() {
   const newDesign = useDesignStore((s) => s.newDesign);
   const [confirming, setConfirming] = useState(false);
   const [announcement, setAnnouncement] = useState('');
+
+  // Fechar ou recarregar a aba com alteração pendente também perderia o design: o navegador avisa.
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [unsaved]);
 
   const create = () => {
     newDesign();
