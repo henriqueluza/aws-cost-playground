@@ -56,7 +56,7 @@ class TfChecksTest(unittest.TestCase):
         result = run(self.infra)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("Falharam (1 de 2):", result.stdout)
-        self.assertIn("::error::validate ou terraform test falhou em", result.stdout)
+        self.assertIn("::error::init, validate ou terraform test falhou em", result.stdout)
         self.assertRegex(result.stdout, r"(?m)^  .*modules/broken$")
         self.assertNotRegex(result.stdout, r"(?m)^  .*modules/fine$")
 
@@ -96,6 +96,8 @@ class StaticJobTest(unittest.TestCase):
     def test_static_job_runs_the_script_with_a_shared_plugin_cache(self) -> None:
         self.assertRegex(self.static, r"(?m)^          infra/tools/tf_checks\.sh$")
         self.assertIn('export TF_PLUGIN_CACHE_DIR="$RUNNER_TEMP/tf-plugin-cache"', self.static)
+        step = self.static.split("- name: terraform validate e test", 1)[1].split("\n      - ", 1)[0]
+        self.assertNotIn("${{", step)
 
     def test_static_job_has_no_aws_credentials(self) -> None:
         for forbidden in ("configure-aws-credentials", "id-token", "secrets.", "AWS_PLAN_ROLE_ARN"):

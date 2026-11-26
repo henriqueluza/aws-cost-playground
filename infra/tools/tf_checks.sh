@@ -25,7 +25,7 @@ check() { # check <diretório> [opções do init]
     echo "::endgroup::"
   else
     echo "::endgroup::"
-    echo "::error::validate ou terraform test falhou em $dir"
+    echo "::error::init, validate ou terraform test falhou em $dir"
     failed+=("$dir")
   fi
 }
