@@ -2,7 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { Button, Dialog, Notice } from '../../../shared/ui';
 import type { DesignDocument } from '../../../shared/lib/design';
 import { saveTextFile } from '../hooks/saveTextFile';
-import { designStore } from '../hooks/designStore';
+import { designStore, type DesignStoreState } from '../hooks/designStore';
 import { useDesignStore } from '../hooks/useDesignStore';
 import {
   DESIGN_FILE_MIME,
@@ -12,10 +12,11 @@ import {
   serializeDesign,
   type DesignFileError,
 } from '../model/designFile';
+import { hasUnsavedChanges } from '../model/unsaved';
 import styles from './DesignFileActions.module.css';
 
-const hasContent = (doc: DesignDocument) =>
-  doc.blocks.length > 0 || doc.edges.length > 0 || doc.workload.description !== '';
+/** Só pergunta quando abrir o arquivo faria perder algo: o design de agora difere do último carregado. */
+const hasUnsaved = (state: DesignStoreState) => hasUnsavedChanges(state.document, state.baseline);
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -27,6 +28,7 @@ function useDownload() {
     const text = serializeDesign(document);
     if (text === null) return setError('too-large');
     saveTextFile(text, DESIGN_FILE_NAME, DESIGN_FILE_MIME);
+    designStore.getState().markSaved();
   };
   return { download, error, clear: () => setError(null) };
 }
@@ -88,7 +90,7 @@ export function DesignFileActions() {
     opener.current?.focus(); // o seletor nativo pode deixar o foco no body; o diálogo devolve o foco aqui
     if (!result.ok) return setOpenError(result.error);
     // O design pode ter mudado durante a leitura: decide com o estado de agora.
-    if (hasContent(designStore.getState().document)) setPending(result.document);
+    if (hasUnsaved(designStore.getState())) setPending(result.document);
     else replace(result.document);
   }
 

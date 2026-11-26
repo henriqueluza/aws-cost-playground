@@ -22,7 +22,13 @@ const ANY_IPV4 = '0.0.0.0/0';
 export const APP_PORT = 80;
 
 /** Tipos cujo gerador emite a rede. Cresce a cada gerador de bloco em VPC entregue. */
-const NETWORK_OWNERS: readonly BlockType[] = ['aws.ec2', 'aws.rds', 'aws.elasticache'];
+const NETWORK_OWNERS: readonly BlockType[] = [
+  'aws.alb',
+  'aws.ec2',
+  'aws.elasticache',
+  'aws.nat-gateway',
+  'aws.rds',
+];
 /** Tipos que escolhem zona pelo atributo `az` do contrato. */
 const ZONED: readonly BlockType[] = ['aws.ec2', 'aws.rds', 'aws.elasticache'];
 const ROLE_OF: Partial<Record<BlockType, NetworkRole>> = {
@@ -191,6 +197,7 @@ function securityGroupNodes(input: GeneratorInput): HclNode[] {
   }
   if (roles.includes('app')) {
     // Saída da aplicação: HTTPS (APIs da AWS e atualizações) e os bancos e caches ligados a ela.
+    // Sem bloco de NAT Gateway as sub-redes privadas não têm rota, e esta regra não alcança nada.
     nodes.push(rule('egress', 'app_https', 'app', 443, { cidr: ANY_IPV4 }, 'HTTPS para fora'));
   }
   const stores = [
@@ -223,6 +230,11 @@ function networkNodes(input: GeneratorInput): HclNode[] {
       'pública e uma privada por zona usada (no mínimo duas) e um security group por papel.',
     ),
     hcl.comment('Sem bloco de NAT Gateway, as sub-redes privadas não têm saída para a internet.'),
+    hcl.comment(
+      'Custo: EC2, RDS, ElastiCache, ALB e NAT Gateway cobram por hora mesmo sem tráfego.',
+    ),
+    hcl.comment('Identificadores como db-1 e cache-1 seguem a ordem dos blocos do design: quem já'),
+    hcl.comment('aplicou um export anterior deve ler o plano antes de aplicar um novo.'),
     resource('aws_vpc', 'main', [
       hcl.attr('cidr_block', hcl.string(VPC_CIDR)),
       hcl.attr('enable_dns_support', hcl.bool(true)),

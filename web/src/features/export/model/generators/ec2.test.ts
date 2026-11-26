@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { blockDefinition } from '../../../pricing';
 import { exportDesign } from '../../application/exportDesign';
 import { attrs, block, blocksOf, design, generate, labels, named } from '../../test/generatorKit';
 import { INJECTION_PAYLOADS } from '../../test/injectionPayloads';
@@ -68,6 +69,18 @@ describe('gerador de EC2', () => {
     });
     expect(attrs(named(nodes, 'aws_instance', 'a4')).ami).toBe('data.aws_ami.al2023_arm64.id');
     expect(mainTf(design([ec2('a1')]))).not.toMatch(/ami-[0-9a-f]{8}/);
+  });
+
+  it('toda família Graviton do contrato é reconhecida como arm64', () => {
+    const types = blockDefinition('aws.ec2')?.attributes.find((a) => a.key === 'instanceType');
+    const graviton = (types?.options ?? []).filter((type) =>
+      /^[a-z]+\d+g[a-z]*\./.test(String(type)),
+    );
+    expect(graviton.length).toBeGreaterThan(0);
+    for (const instanceType of graviton) {
+      const nodes = generate(design([ec2('g', { instanceType })]));
+      expect(attrs(named(nodes, 'aws_instance', 'g')).ami).toBe('data.aws_ami.al2023_arm64.id');
+    }
   });
 
   it('atributo fora do contrato recusa o bloco: não vira instância', () => {

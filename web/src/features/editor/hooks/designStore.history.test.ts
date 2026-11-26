@@ -68,9 +68,10 @@ const MUTATIONS: Record<string, (s: DesignStore) => void> = {
     void s.getState().loadDesign({ ...doc, workload: { description: 'Carregado' } }),
   replaceDocument: (s) =>
     void s.getState().replaceDocument({ ...doc, workload: { description: 'Trocado' } }),
+  newDesign: (s) => s.getState().newDesign(),
 };
 /** Ações que não tocam o documento nem o layout: não entram no histórico. */
-const NOT_DOCUMENT = ['select', 'undo', 'redo', 'beginGesture', 'endGesture'];
+const NOT_DOCUMENT = ['select', 'markSaved', 'undo', 'redo', 'beginGesture', 'endGesture'];
 
 describe('histórico: toda ação da store é desfazível', () => {
   const actions = Object.entries(setup().getState())

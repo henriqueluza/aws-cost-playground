@@ -8,3 +8,4 @@ Procedimentos que o autor executa à mão. Agentes escrevem e revisam estes docu
 | [Guardrails de custo](guardrails-de-custo.md) | Depois do primeiro deploy de cada ambiente e na revisão mensal (Issue #78) |
 | [Rotação de segredos](rotacao-de-segredos.md) | Para criar o parâmetro da chave da Claude API, a cada 90 dias e em suspeita de vazamento |
 | [Alarmes](alarmes.md) | Quando um alarme do CloudWatch chega por e-mail |
+| [Rollback de produção](rollback.md) | Quando um deploy de produção falha ou um alarme dispara logo depois dele: o mesmo workflow de deploy, com o SHA anterior |

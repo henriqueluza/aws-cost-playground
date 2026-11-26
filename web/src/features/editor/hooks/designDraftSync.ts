@@ -1,10 +1,14 @@
 import { useEffect } from 'react';
 import type { DesignDocument } from '../../../shared/lib/design';
 import { saveDesignDraft, takeDesignDraft } from '../model/designDraft';
+import { referenceDesign } from '../model/template/referenceTemplate';
+import { hasUnsavedChanges } from '../model/unsaved';
 import { designStore } from './designStore';
 
+/** O template inicial intocado conta como vazio: não há nele trabalho a guardar nem a perder. */
 const hasContent = (doc: DesignDocument) =>
-  doc.blocks.length > 0 || doc.edges.length > 0 || doc.workload.description !== '';
+  (doc.blocks.length > 0 || doc.edges.length > 0 || doc.workload.description !== '') &&
+  hasUnsavedChanges(doc, referenceDesign());
 
 /**
  * Antes de sair para o login: guarda o design em edição, se há o que guardar. Um design vazio não
