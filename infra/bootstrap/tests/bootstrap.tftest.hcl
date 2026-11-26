@@ -121,9 +121,10 @@ run "papel_plan_somente_leitura" {
   assert {
     condition = output.github_variables == {
       AWS_PLAN_ROLE_ARN          = aws_iam_role.plan.arn
+      AWS_PRICES_ROLE_ARN        = aws_iam_role.prices.arn
       TF_STATE_BUCKET_STAGING    = "acp-stg-tfstate-123456789012"
       TF_STATE_BUCKET_PRODUCTION = "acp-prod-tfstate-123456789012"
     }
-    error_message = "As saídas têm os nomes das variáveis que o terraform.yml lê."
+    error_message = "As saídas têm os nomes das variáveis que o terraform.yml e o workflow de preços leem."
   }
 }

@@ -12,16 +12,22 @@ IAM_RESOURCES = {
     "aws_iam_policy.apply_boundary",
     "aws_iam_role.apply",
     "aws_iam_role.plan",
+    "aws_iam_role.prices",
     "aws_iam_role_policy.apply_deny",
     "aws_iam_role_policy.apply_deny_data",
     "aws_iam_role_policy.apply_state",
     "aws_iam_role_policy.plan_deny_data",
+    "aws_iam_role_policy.prices_get_products",
     "aws_iam_role_policy_attachment.plan_read_only",
 }
 FORBIDDEN = ("AdministratorAccess", "managed_policy_arns", "inline_policy")
 RESOURCE = re.compile(r'^resource\s+"(aws_iam_\w+)"\s+"(\w+)"', re.M)
 # Identidade que o apply não pode perder: o papel e o limite de permissões dos papéis que ele cria.
-PROTECTED = {"o papel apply": ("aws_iam_role", "apply"), "o limite de permissões": ("aws_iam_policy", "apply_boundary")}
+PROTECTED = {
+    "o papel apply": ("aws_iam_role", "apply"),
+    "o limite de permissões": ("aws_iam_policy", "apply_boundary"),
+    "o papel prices": ("aws_iam_role", "prices"),
+}
 PREVENT_DESTROY = re.compile(r"^\s*prevent_destroy\s*=\s*true\s*$", re.M)
 HOSTILE = """
 resource "aws_iam_role" "apply" {
@@ -62,5 +68,6 @@ class BootstrapApplyRolesTest(unittest.TestCase):
             "IAM fora do inventário: aws_iam_role_policy.apply_extra",
             "o papel apply precisa de prevent_destroy = true",
             "o limite de permissões precisa de prevent_destroy = true",
+            "o papel prices precisa de prevent_destroy = true",
         ]
         self.assertEqual(violations(HOSTILE), expected)
