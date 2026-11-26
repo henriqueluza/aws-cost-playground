@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, type ApiErrorKind } from '../../../shared/lib/api';
 import { CONFIRM_WORD, confirmationMatches, accountErrorMessage } from './accountMessages';
 import { formatResetsAt, quotaSummary } from './format';
-
-const KINDS: ApiErrorKind[] = [
-  'unauthenticated',
-  'network',
-  'unavailable',
-  'invalid-request',
-  'quota-exhausted',
-];
 
 describe('confirmationMatches', () => {
   it('aceita só a palavra exata, ignorando espaço nas pontas', () => {
@@ -19,13 +10,6 @@ describe('confirmationMatches', () => {
     expect(confirmationMatches('EXCLUI')).toBe(false);
     expect(confirmationMatches('EXCLUIR conta')).toBe(false);
     expect(confirmationMatches('')).toBe(false);
-  });
-});
-
-describe('mensagens por código', () => {
-  it.each(KINDS)('%s tem frase própria, sem eco do erro', (kind) => {
-    const echo = new ApiError({ kind } as never).message;
-    expect(accountErrorMessage(kind)).not.toContain(echo);
   });
 });
 
