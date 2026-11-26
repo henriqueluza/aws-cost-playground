@@ -1,10 +1,7 @@
-/* DESIGN.md, "Bloco no canvas", "Arestas e cotas". Só tokens: nenhuma cor ou medida literal. */
-
 .canvas {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 0;
   border-radius: var(--radius-sheet);
   overflow: hidden;
 
