@@ -48,7 +48,7 @@ aws lambda get-account-settings \
 
   A reserva só dura se o módulo das funções ignorar `reserved_concurrent_executions` (ver "Drift com o Terraform"). Confira depois de cada `apply` com `aws lambda get-function-concurrency --function-name <função>`.
 
-  Com a reserva, o gargalo real passa a ser a Lambda, não o limite de taxa do passo 2. Uma estimativa pode levar até 29 s, então duas simultâneas já ocupam a reserva de produção, e a terceira recebe erro (nem o 429 do API Gateway, nem o 503 tratado). Com um usuário no lançamento, isso é aceitável; suba a reserva se aparecer erro de throttle no alarme do proxy.
+  Com a reserva, o gargalo real passa a ser a Lambda, não o limite de taxa do passo 2. Uma estimativa pode levar até 29 s, então duas simultâneas já ocupam a reserva de produção, e a terceira recebe erro (nem o 429 do API Gateway, nem o 503 tratado). Com um usuário no lançamento, isso é aceitável; suba a reserva se aparecer erro de throttle no alarme do proxy (ver [runbook de alarmes](alarmes.md)).
 
 - **Limite menor:** não reserve. Se quiser, peça aumento em Service Quotas → AWS Lambda → "Concurrent executions" (código `L-B99A9384`; o pedido é gratuito) e volte a este passo quando aprovado.
 
