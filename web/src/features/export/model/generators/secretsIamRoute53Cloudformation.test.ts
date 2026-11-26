@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { attrs, blocksOf, named } from '../../test/generatorKit';
+import { attrs, blocksOf, generate as kitGenerate, named } from '../../test/generatorKit';
 import {
-  body,
   code,
   generate,
   mainTf,
+  plain,
   relabel,
   resourceTypes,
   statements,
@@ -78,14 +78,17 @@ describe('gerador de IAM', () => {
     expect(resourceTypes(nodes, 'papel')).toEqual(['aws_iam_role']);
   });
 
-  it('sem bloco de computação, só a própria conta assume o papel', () => {
+  it('sem bloco de computação, quem assume o papel vem de uma variável sem padrão', () => {
     const nodes = generate([role, { id: 'cofre', type: 'aws.secrets-manager' }]);
     expect(trust(nodes).principals).toEqual({
       type: '"AWS"',
-      identifiers: '[data.aws_caller_identity.papel.account_id]',
+      identifiers: '[var.papel__trusted_arn]',
     });
-    expect(body(nodes, 'data', 'aws_caller_identity', 'papel')).toEqual([]);
-    expect(renderHcl(nodes)).toContain('# A confiança é a conta inteira: restrinja');
+    expect(Object.keys(attrs(blocksOf(nodes, 'papel__trusted_arn', 'variable')[0]!))).toEqual([
+      'description',
+      'type',
+    ]);
+    expect(renderHcl(nodes)).not.toMatch(/aws_caller_identity|:root/);
   });
 
   it('não tem `*` em ação nem em recurso, e nenhuma política de permissão', () => {
@@ -93,18 +96,13 @@ describe('gerador de IAM', () => {
       const nodes = generate(blocks);
       const text = renderHcl(nodes.filter((node) => node.kind !== 'comment'));
       expect(allowedWildcards(nodes)).toEqual([]);
-      expect(plainActions(nodes)).toEqual(['sts:AssumeRole']);
+      expect(plain(value(trust(nodes).statement, 'actions'))).toEqual(['sts:AssumeRole']);
       expect(text).not.toMatch(
         /aws_iam_(role_)?policy(_attachment)?"|managed_policy_arns|inline_policy/,
       );
     }
   });
 });
-
-const plainActions = (nodes: ReturnType<typeof generate>) => {
-  const actions = value(statements(nodes, 'papel__assume')[0] ?? [], 'actions');
-  return actions?.kind === 'list' ? actions.items.map((item) => 'value' in item && item.value) : [];
-};
 
 describe('gerador de CloudFormation', () => {
   it('gera só comentário e conta como exportado', () => {
@@ -165,7 +163,7 @@ describe('export do design com os blocos de nível B e C', () => {
     expect(text).toMatch(/^# Blocos exportados: 7 de 7\.$/m);
     expect(text).not.toMatch(SENSITIVE_LITERAL);
     expect(text).not.toMatch(/arn:aws|AKIA[0-9A-Z]{16}|-----BEGIN/);
-    expect(text).not.toMatch(/^\s*(not_)?(actions|resources|identifiers)\s*=.*\*/m);
+    expect(allowedWildcards(kitGenerate(levelBcDesign))).toEqual([]);
   });
 
   it('é determinístico e não depende da ordem do documento', () => {

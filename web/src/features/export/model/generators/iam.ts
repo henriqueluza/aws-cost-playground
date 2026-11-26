@@ -13,14 +13,15 @@ const TRUSTED_SERVICES: readonly (readonly [BlockType, string])[] = [
 /**
  * IAM: um papel sem nenhuma permissão. O contrato do bloco não tem atributo, uso nem aresta de
  * dados, então o design não diz o que o papel acessa: nenhuma ação e nenhum recurso são inventados,
- * e não há curinga. A confiança sai dos blocos de computação do design; sem nenhum, só a própria
- * conta pode assumir o papel.
+ * e não há curinga. A confiança sai dos blocos de computação do design; sem nenhum, quem assume o
+ * papel é o principal informado numa variável sem padrão.
  */
 export const iam: BlockGenerator = ({ block, blocks }) => {
   const services = TRUSTED_SERVICES.filter(([type]) =>
     blocks.some((candidate) => candidate.type === type),
   ).map(([, service]) => service);
   const assume = `${block.name}__assume`;
+  const trusted = `${block.name}__trusted_arn`;
   return {
     exported: true,
     nodes: [
@@ -28,11 +29,20 @@ export const iam: BlockGenerator = ({ block, blocks }) => {
       hcl.comment('Ao dar acesso, liste cada ação e o ARN de cada recurso. Nunca use curinga.'),
       ...(services.length === 0
         ? [
-            hcl.comment('Sem bloco de computação no design: só a própria conta assume o papel.'),
             hcl.comment(
-              'A confiança é a conta inteira: restrinja o principal antes de dar permissões.',
+              'Sem bloco de computação no design: quem assume o papel vem de uma variável.',
             ),
-            hcl.block('data', ['aws_caller_identity', block.name], []),
+            hcl.block(
+              'variable',
+              [trusted],
+              [
+                hcl.attr(
+                  'description',
+                  hcl.string('ARN do usuário ou do papel de IAM que pode assumir este papel.'),
+                ),
+                hcl.attr('type', hcl.ref('string')),
+              ],
+            ),
           ]
         : []),
       policyDocument(assume, [
@@ -41,10 +51,7 @@ export const iam: BlockGenerator = ({ block, blocks }) => {
           principal:
             services.length > 0
               ? { type: 'Service', identifiers: services }
-              : {
-                  type: 'AWS',
-                  identifiers: [hcl.ref('data', 'aws_caller_identity', block.name, 'account_id')],
-                },
+              : { type: 'AWS', identifiers: [hcl.ref('var', trusted)] },
         },
       ]),
       hcl.block(
