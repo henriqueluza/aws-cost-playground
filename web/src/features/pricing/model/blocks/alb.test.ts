@@ -50,6 +50,8 @@ describe('priceAlb', () => {
     ['GB processado', input(10, 600, 500, 0), '500'],
     // 292; 146; 100; 2.000 × 730 / 1.000 = 1.460.
     ['avaliações de regra', input(10, 600, 100, 2000), '1460'],
+    // O contrato aceita fração: 0,5 × 730 / 25 = 14,6; as outras dimensões em zero.
+    ['conexões novas fracionadas', input(0.5, 0, 0, 0), '14.6'],
     // Uso zero ainda emite as duas cobranças.
     ['uso zero', input(0, 0, 0, 0), '0'],
   ])('LCU-hora é a maior dimensão, não a soma: %s', (_, block, lcuHours) => {
