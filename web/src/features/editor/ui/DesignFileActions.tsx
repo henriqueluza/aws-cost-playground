@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { Button, Dialog, Notice } from '../../../shared/ui';
 import type { DesignDocument } from '../../../shared/lib/design';
 import { saveTextFile } from '../hooks/saveTextFile';
+import { designStore } from '../hooks/designStore';
 import { useDesignStore } from '../hooks/useDesignStore';
 import {
   DESIGN_FILE_MIME,
@@ -86,7 +87,8 @@ export function DesignFileActions() {
     reading.current = false;
     opener.current?.focus(); // o seletor nativo pode deixar o foco no body; o diálogo devolve o foco aqui
     if (!result.ok) return setOpenError(result.error);
-    if (hasContent(current)) setPending(result.document);
+    // O design pode ter mudado durante a leitura: decide com o estado de agora.
+    if (hasContent(designStore.getState().document)) setPending(result.document);
     else replace(result.document);
   }
 

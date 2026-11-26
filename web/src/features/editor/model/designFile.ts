@@ -72,7 +72,7 @@ export function migrateDesign(
 
 /**
  * Conta, no texto, as chaves `"id": "blk_..."` (só aparecem fora de string: dentro dela a aspa vem
- * escapada) e para ao passar de `maxBlocks`: o limite de blocos vale antes do parse completo.
+ * escapada) e recusa mais de `maxBlocks`: o limite de blocos vale antes do parse completo.
  */
 function exceedsBlockLimit(text: string): boolean {
   const ids = text.matchAll(/"id"\s*:\s*"blk_/g);
