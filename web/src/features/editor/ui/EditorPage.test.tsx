@@ -95,7 +95,7 @@ describe.each([
     const paleta = screen.getByRole('complementary', { name: 'Paleta' });
     expect(within(paleta).getByRole('heading', { name: 'Paleta' })).toBeVisible();
     expect(within(screen.getByRole('main')).getByRole('heading', { name: 'Canvas' })).toBeVisible();
-    const tabs = within(screen.getByRole('tablist', { name: 'Painéis do design' })).getAllByRole(
+    const tabs = within(screen.getByRole('tablist', { name: 'Custo, bloco e carga' })).getAllByRole(
       'tab',
     );
     expect(tabs.map((t) => t.textContent)).toEqual(['Custo', 'Bloco', 'Carga']);
@@ -173,12 +173,12 @@ describe('EditorPage e a largura em runtime', () => {
 
   it('alterna entre largo e estreito ao disparar change', () => {
     const { media } = renderPage(true);
-    expect(screen.getByRole('tablist', { name: 'Painéis do design' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Custo, bloco e carga' })).toBeInTheDocument();
     media.set(false);
     expect(screen.queryByRole('tablist')).toBeNull();
     expect(screen.getByRole('main')).toBeInTheDocument();
     media.set(true);
-    expect(screen.getByRole('tablist', { name: 'Painéis do design' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Custo, bloco e carga' })).toBeInTheDocument();
     expect(screen.getByRole('banner')).toBeInTheDocument();
   });
 });

@@ -45,8 +45,8 @@ export function EditorPage() {
         <h1 className={styles.hidden}>Editor</h1>
         <CanvasPanel />
       </main>
-      <aside aria-label="Painéis" className={styles.rail}>
-        <RailTabs label="Painéis do design" tabs={RAIL_TABS} />
+      <aside aria-label="Painéis do design" className={styles.rail}>
+        <RailTabs label="Custo, bloco e carga" tabs={RAIL_TABS} />
         <EstimateNotice stamp={stamp} />
       </aside>
     </div>
