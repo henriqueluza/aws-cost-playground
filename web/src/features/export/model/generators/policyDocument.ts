@@ -8,7 +8,11 @@ export interface PolicyStatement {
   readonly effect?: 'Deny';
   readonly actions: readonly string[];
   readonly resources?: readonly HclValue[];
-  readonly principal?: { readonly type: 'Service' | '*'; readonly identifiers: readonly string[] };
+  readonly principal?: {
+    readonly type: 'Service' | 'AWS' | '*';
+    /** Texto constante do gerador, ou referência (por exemplo o id da conta, de um data source). */
+    readonly identifiers: readonly (string | HclValue)[];
+  };
   readonly condition?: {
     readonly test: string;
     readonly variable: string;
@@ -41,7 +45,14 @@ export function policyDocument(label: string, statements: readonly PolicyStateme
                   [],
                   [
                     hcl.attr('type', hcl.string(statement.principal.type)),
-                    hcl.attr('identifiers', strings(statement.principal.identifiers)),
+                    hcl.attr(
+                      'identifiers',
+                      hcl.list(
+                        statement.principal.identifiers.map((id) =>
+                          typeof id === 'string' ? hcl.string(id) : id,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ]

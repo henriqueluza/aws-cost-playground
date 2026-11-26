@@ -3,6 +3,11 @@
 # afrouxamento; os asserts de forma dizem o que está errado quando ela quebra.
 mock_provider "aws" {}
 
+# O domínio só importa para a política de `by_id.tf`; aqui vale qualquer nome válido.
+variables {
+  zone_name = "example.com"
+}
+
 override_data {
   target = data.aws_caller_identity.current
   values = {

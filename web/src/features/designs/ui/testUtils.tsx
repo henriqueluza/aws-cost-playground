@@ -30,6 +30,7 @@ export function renderWithApp(api: Api, ui: ReactNode, other: ReactNode = <p>Out
     [
       { path: '/', element: ui },
       { path: '/designs', element: other },
+      { path: '/comparar', element: <p>Comparar</p> },
     ],
     { initialEntries: ['/'] },
   );

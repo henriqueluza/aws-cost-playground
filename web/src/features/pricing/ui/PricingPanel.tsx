@@ -23,7 +23,7 @@ export interface PricingPanelProps {
 }
 
 /** Texto próprio por tipo de erro; nunca `error.message` (DESIGN.md, estado de erro). */
-function errorText(kind: CatalogErrorKind, region: string): string {
+export function errorText(kind: CatalogErrorKind, region: string): string {
   if (kind === 'network')
     return 'Não foi possível buscar os preços. Verifique a conexão e tente de novo.';
   if (kind === 'missing') return `Sem preços de ${region} neste momento.`;

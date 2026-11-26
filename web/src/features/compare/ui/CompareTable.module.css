@@ -27,9 +27,62 @@
 }
 
 .cellTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: var(--fs-small);
   line-height: var(--lh-small);
   color: var(--muted);
+}
+
+/* Hachura do variável e tinta sólida do fixo (DESIGN.md): lê-se sem cor, só a tinta. */
+.swatch {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-3);
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-block-start: var(--space-1);
+}
+
+.barRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.barSide {
+  flex: none;
+  width: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+}
+
+.bar {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  height: var(--split-bar);
+}
+
+.solid {
+  fill: var(--text);
+}
+
+.outline {
+  stroke: var(--text);
+  stroke-width: 2px; /* 1px visível: a metade de fora é cortada pelo viewport do SVG */
+}
+
+.hatchLine {
+  stroke: var(--text);
+  stroke-width: 1px;
 }
 
 .sides {
@@ -137,13 +190,23 @@
   font-variant-numeric: tabular-nums;
 }
 
+.table tbody tr {
+  height: var(--row-table);
+}
+
+/* Valor e quantidade na mesma linha (40px, --row-table): o valor fica à direita, a quantidade à sua esquerda. */
+.amounts {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
 .money {
-  display: block;
   font-family: var(--font-mono);
 }
 
 .count {
-  display: block;
   font-size: var(--fs-small);
   line-height: var(--lh-small);
   color: var(--muted);

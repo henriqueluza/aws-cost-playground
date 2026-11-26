@@ -11,3 +11,4 @@ export {
   type Direction,
 } from './model/compare';
 export { DIRECTION_WORD, formatDiff } from './application/format';
+export { CompareLink } from './ui/CompareLink';
