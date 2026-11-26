@@ -1,6 +1,6 @@
 # infra/bootstrap
 
-O que precisa existir antes de qualquer ambiente: os buckets de estado, o provedor OIDC do GitHub e os papéis que o CI assume. Decisões em `docs/architecture/aws-cost-playground/ADR-0001-stack.md` ("Ambientes e deploy" e "Travas contra destruição da infra").
+O que precisa existir antes de qualquer ambiente: os buckets de estado, o provedor OIDC do GitHub e os papéis que o CI assume. Decisões em `docs/architecture/aws-cost-playground/ADR-0001-stack.md` ("Hospedagem e ambientes" e "Travas contra destruição da infra").
 
 **Quem aplica é o autor, à mão, uma única vez** (Issue #77). Agentes só alteram este diretório por Issue que o autorize de forma explícita, e nunca rodam `plan`, `apply`, `import` nem comandos de estado aqui.
 
@@ -159,7 +159,7 @@ Limites conhecidos:
 
 ## Como aplicar (autor)
 
-Pré-requisitos: Terraform 1.16, credencial temporária de administrador da conta (SSO ou sessão de curta duração, nunca chave de acesso gravada em arquivo) e a conta já preparada conforme `docs/runbooks/guardrails-de-custo.md`.
+Pré-requisitos: Terraform 1.16, credencial temporária de administrador da conta (SSO ou sessão de curta duração, nunca chave de acesso gravada em arquivo). Os guardrails de custo (`docs/runbooks/guardrails-de-custo.md`) vêm depois, por ambiente, com a infra dele já aplicada; antes do bootstrap só cabe a leitura da quota de concorrência da conta (guardrail 1 do runbook).
 
 ```bash
 cd infra/bootstrap

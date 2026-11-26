@@ -83,6 +83,26 @@ def bucket_suffix_mismatches(named_tf: str, env_tfs: dict[str, str]) -> list[str
     return found
 
 
+STATEMENT = re.compile(r'Sid\s*=\s*"(\w+)"(.*?)(?=\bSid\s*=|\Z)', re.S)
+ACTION = re.compile(r'"[a-z0-9-]+:([A-Za-z0-9*]+)"')
+
+
+def undocumented_actions(policy_tf: str, readme: str) -> list[str]:
+    """Ações de um `Allow` que não aparecem na linha do Sid na tabela do README (falha fechada)."""
+    found = []
+    for sid, body in STATEMENT.findall(policy_tf):
+        row = next((line for line in readme.splitlines() if line.startswith(f"| `{sid}` |")), None)
+        if row is None:
+            found.append(f"{sid}: sem linha na tabela do README")
+            continue
+        # Só o trecho de `Action`: condição e recurso têm chaves com o mesmo formato.
+        actions = ACTION.findall(body.split("Resource", 1)[0])
+        named = set(re.findall(r"`(?:[a-z0-9-]+:)?([A-Za-z0-9*]+)`", row.split("|")[2]))
+        found += [f"{sid}: {action} fora da tabela do README" for action in actions if action not in named]
+        found += [f"{sid}: ação com curinga ({action})" for action in actions if "*" in action]
+    return found or ([] if STATEMENT.search(policy_tf) else ["nenhum statement encontrado"])
+
+
 class BootstrapApplyRolesTest(unittest.TestCase):
     def test_bootstrap_real_nao_tem_violacao(self) -> None:
         tf = "\n".join(path.read_text() for path in sorted(BOOTSTRAP.glob("*.tf")))
@@ -115,3 +135,21 @@ class BootstrapApplyRolesTest(unittest.TestCase):
         self.assertEqual(len(bucket_suffix_mismatches(named, {"staging": ok, "production": ""})), 1)
         self.assertEqual(len(bucket_suffix_mismatches("", {"staging": ok, "production": ok})), 1)
         self.assertEqual(len(bucket_suffix_mismatches(named, {"staging": ok})), 1)
+
+    def test_toda_acao_da_politica_de_escrita_esta_na_tabela_do_readme(self) -> None:
+        readme = (BOOTSTRAP / "README.md").read_text()
+        self.assertEqual(undocumented_actions((BOOTSTRAP / "named.tf").read_text(), readme), [])
+
+    def test_acao_sem_justificativa_ou_com_curinga_e_reprovada(self) -> None:
+        tf = (
+            'Sid = "Table"\n Action = ["dynamodb:CreateTable", "dynamodb:Delete*"]\n Resource = "x"\n'
+            ' Sid = "Novo"\n Action = "s3:PutObject"'
+        )
+        readme = "| `Table` | `dynamodb:CreateTable` | Tabelas | Nenhuma |"
+        expected = [
+            "Table: Delete* fora da tabela do README",
+            "Table: ação com curinga (Delete*)",
+            "Novo: sem linha na tabela do README",
+        ]
+        self.assertEqual(undocumented_actions(tf, readme), expected)
+        self.assertEqual(undocumented_actions("", readme), ["nenhum statement encontrado"])
