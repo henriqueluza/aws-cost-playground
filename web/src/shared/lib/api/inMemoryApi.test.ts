@@ -6,6 +6,7 @@ import {
   ApiError,
   type ApiErrorKind,
   type CreateDesignInput,
+  type UpdateDesignInput,
   designIdSchema,
   designSchema,
   designSummarySchema,
@@ -143,6 +144,175 @@ describe('createInMemoryApi: get e remove', () => {
   });
 });
 
+describe('createInMemoryApi: update', () => {
+  it.each([
+    ['expectedVersion 0', { expectedVersion: 0, name: 'x' }],
+    ['expectedVersion 1.5', { expectedVersion: 1.5, name: 'x' }],
+    ['sem expectedVersion', { name: 'x' }],
+    ['sem name e sem doc', { expectedVersion: 1 }],
+    ['nome só com espaços', { expectedVersion: 1, name: '   ' }],
+    ['doc inválido', { expectedVersion: 1, doc: { schemaVersion: 1 } }],
+    ['input null', null],
+  ])('rejeita invalid-request sem gravar: %s', async (_caso, input) => {
+    const { designs } = setup();
+    const d = await designs.create({ name: 'a', doc: SMALL_DOC });
+    await rejectsWith(designs.update(d.id, input as UpdateDesignInput), 'invalid-request');
+    expect(await designs.get(d.id)).toEqual(d);
+  });
+
+  it('id desconhecido dá not-found', async () => {
+    await rejectsWith(
+      setup().designs.update(UNKNOWN, { expectedVersion: 1, name: 'x' }),
+      'not-found',
+    );
+  });
+
+  it('version-conflict não grava nada', async () => {
+    const s = setup();
+    const d = await s.designs.create({ name: 'a', doc: SMALL_DOC });
+    s.advance();
+    await rejectsWith(
+      s.designs.update(d.id, { expectedVersion: 2, name: 'b', doc: LARGE_DOC }),
+      'version-conflict',
+    );
+    expect(await s.designs.get(d.id)).toEqual(d);
+    await s.designs.update(d.id, { expectedVersion: 1, name: 'b' });
+    await rejectsWith(
+      s.designs.update(d.id, { expectedVersion: 1, name: 'c' }),
+      'version-conflict',
+    );
+    expect(await s.designs.get(d.id)).toMatchObject({ name: 'b', version: 2 });
+  });
+
+  it('soma 1 à version e muda só updatedAt; renomear preserva o doc', async () => {
+    const s = setup();
+    const d = await s.designs.create({ name: 'a', doc: LARGE_DOC });
+    s.advance();
+    const renamed = await s.designs.update(d.id, { expectedVersion: 1, name: ' b ' });
+    expect(renamed).toEqual({ ...d, name: 'b', version: 2, updatedAt: s.iso() });
+    s.advance();
+    const redoc = await s.designs.update(d.id, { expectedVersion: 2, doc: SMALL_DOC });
+    expect(redoc).toEqual({
+      ...renamed,
+      doc: SMALL_DOC,
+      blockCount: 1,
+      sizeBytes: bytes(SMALL_DOC),
+      version: 3,
+      updatedAt: s.iso(),
+    });
+    expect(designSchema.safeParse(redoc).success).toBe(true);
+    expect(await s.designs.get(d.id)).toEqual(redoc);
+  });
+
+  it('aceita doc com tamanho exato de maxDocBytes e rejeita too-large acima, sem gravar', async () => {
+    const size = await sizeOf(LARGE_DOC);
+    const atLimit = setup({ maxDocBytes: size });
+    const a = await atLimit.designs.create({ name: 'x', doc: SMALL_DOC });
+    await expect(
+      atLimit.designs.update(a.id, { expectedVersion: 1, doc: LARGE_DOC }),
+    ).resolves.toMatchObject({ version: 2 });
+    const below = setup({ maxDocBytes: size - 1 });
+    const b = await below.designs.create({ name: 'x', doc: SMALL_DOC });
+    await rejectsWith(
+      below.designs.update(b.id, { expectedVersion: 1, name: 'y', doc: LARGE_DOC }),
+      'too-large',
+    );
+    expect(await below.designs.get(b.id)).toEqual(b);
+  });
+
+  it('precedência: invalid-request, not-found, version-conflict, too-large', async () => {
+    const { designs } = setup({ maxDocBytes: await sizeOf(SMALL_DOC) });
+    const d = await designs.create({ name: 'a', doc: SMALL_DOC });
+    await rejectsWith(
+      designs.update(UNKNOWN, { expectedVersion: 0, doc: LARGE_DOC }),
+      'invalid-request',
+    );
+    await rejectsWith(designs.update(UNKNOWN, { expectedVersion: 9, doc: LARGE_DOC }), 'not-found');
+    await rejectsWith(
+      designs.update(d.id, { expectedVersion: 9, doc: LARGE_DOC }),
+      'version-conflict',
+    );
+    await rejectsWith(designs.update(d.id, { expectedVersion: 1, doc: LARGE_DOC }), 'too-large');
+  });
+
+  it('grava o doc do parse, sem chaves extras, e mede sizeBytes sobre ele', async () => {
+    const { designs } = setup();
+    const d = await designs.create({ name: 'a', doc: SMALL_DOC });
+    const input = { expectedVersion: 1, doc: { ...LARGE_DOC, extra: 3 }, extra: 4 };
+    const updated = await designs.update(d.id, input);
+    expect(updated).not.toHaveProperty('extra');
+    expect(updated.doc).toEqual(LARGE_DOC);
+    expect(updated.sizeBytes).toBe(bytes(LARGE_DOC));
+    expect(await designs.get(d.id)).toEqual(updated);
+  });
+
+  it('não guarda referência ao input nem ao retorno', async () => {
+    const { designs } = setup();
+    const d = await designs.create({ name: 'a', doc: SMALL_DOC });
+    const input = { expectedVersion: 1, doc: structuredClone(LARGE_DOC) };
+    const updated = await designs.update(d.id, input);
+    const original = structuredClone(updated);
+    input.doc.workload.description = 'mutado';
+    updated.doc.region = 'sa-east-1';
+    expect(await designs.get(d.id)).toEqual(original);
+  });
+});
+
+describe('createInMemoryApi: duplicate', () => {
+  it('cria id novo, version 1, datas novas, doc igual e nome do input', async () => {
+    const s = setup();
+    const d = await s.designs.create({ name: 'a', doc: LARGE_DOC });
+    s.advance();
+    const c = await s.designs.duplicate(d.id, { name: ' Cópia ' });
+    expect(c.id).not.toBe(d.id);
+    expect(designSchema.safeParse(c).success).toBe(true);
+    expect(c).toEqual({ ...d, id: c.id, name: 'Cópia', createdAt: s.iso(), updatedAt: s.iso() });
+    expect(await s.designs.get(c.id)).toEqual(c);
+    expect(await s.designs.get(d.id)).toEqual(d);
+    expect(await s.designs.list()).toHaveLength(2);
+  });
+
+  it('a cópia é profunda: mudar uma não altera a outra', async () => {
+    const { designs } = setup();
+    const d = await designs.create({ name: 'a', doc: LARGE_DOC });
+    const c = await designs.duplicate(d.id, { name: 'b' });
+    c.doc.workload.description = 'mutado';
+    await designs.update(c.id, { expectedVersion: 1, doc: SMALL_DOC });
+    expect(await designs.get(d.id)).toEqual(d);
+    await designs.update(d.id, { expectedVersion: 1, name: 'a2' });
+    await designs.remove(d.id);
+    expect(await designs.get(c.id)).toMatchObject({ name: 'b', version: 2, doc: SMALL_DOC });
+  });
+
+  it.each([
+    ['nome vazio', { name: '' }],
+    ['nome com 81 caracteres', { name: 'a'.repeat(81) }],
+    ['sem nome', {}],
+    ['input null', null],
+  ])('rejeita invalid-request sem criar nada: %s', async (_caso, input) => {
+    const { designs } = setup();
+    const d = await designs.create({ name: 'a', doc: SMALL_DOC });
+    await rejectsWith(designs.duplicate(d.id, input as { name: string }), 'invalid-request');
+    expect(await designs.list()).toHaveLength(1);
+  });
+
+  it('no limite rejeita com design-limit e não cria nada', async () => {
+    const { designs } = setup({ maxDesigns: 2 });
+    const d = await designs.create({ name: 'a', doc: SMALL_DOC });
+    await expect(designs.duplicate(d.id, { name: 'b' })).resolves.toBeDefined();
+    await rejectsWith(designs.duplicate(d.id, { name: 'c' }), 'design-limit');
+    expect((await designs.list()).map((i) => i.name).sort()).toEqual(['a', 'b']);
+  });
+
+  it('precedência: invalid-request, not-found, design-limit', async () => {
+    const { designs } = setup({ maxDesigns: 1 });
+    const d = await designs.create({ name: 'a', doc: SMALL_DOC });
+    await rejectsWith(designs.duplicate(UNKNOWN, { name: '  ' }), 'invalid-request');
+    await rejectsWith(designs.duplicate(UNKNOWN, { name: 'b' }), 'not-found');
+    await rejectsWith(designs.duplicate(d.id, { name: 'b' }), 'design-limit');
+  });
+});
+
 describe('createInMemoryApi: list', () => {
   it('ordena por updatedAt decrescente, sem a chave doc', async () => {
     const s = setup();
@@ -155,6 +325,18 @@ describe('createInMemoryApi: list', () => {
       expect(item).not.toHaveProperty('doc');
       expect(designSummarySchema.safeParse(item).success).toBe(true);
     }
+  });
+
+  it('um update leva o design para o topo: a ordem é por updatedAt, não por createdAt', async () => {
+    const s = setup();
+    const a = await s.designs.create({ name: 'a', doc: SMALL_DOC });
+    s.advance();
+    const b = await s.designs.create({ name: 'b', doc: SMALL_DOC });
+    s.advance();
+    await s.designs.update(a.id, { expectedVersion: 1, name: 'a2' });
+    const items = await s.designs.list();
+    expect(items.map((i) => i.id)).toEqual([a.id, b.id]);
+    expect(items[0]).toMatchObject({ name: 'a2', version: 2, updatedAt: s.iso() });
   });
 
   it('desempata por id decrescente com o mesmo relógio', async () => {
@@ -206,5 +388,7 @@ describe('createInMemoryApi: estado', () => {
     const d = await one.designs.create({ name: 'a', doc: SMALL_DOC });
     expect(await other.designs.list()).toEqual([]);
     await rejectsWith(other.designs.get(d.id), 'not-found');
+    await rejectsWith(other.designs.update(d.id, { expectedVersion: 1, name: 'b' }), 'not-found');
+    await rejectsWith(other.designs.duplicate(d.id, { name: 'b' }), 'not-found');
   });
 });
