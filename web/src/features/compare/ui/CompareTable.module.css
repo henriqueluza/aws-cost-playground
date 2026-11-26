@@ -22,6 +22,10 @@
   margin: 0;
 }
 
+.cell .diff {
+  align-self: flex-start;
+}
+
 .cellTitle {
   font-size: var(--fs-small);
   line-height: var(--lh-small);
@@ -79,6 +83,11 @@
   overflow-x: auto;
 }
 
+.scroll:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
 .table {
   width: 100%;
   min-width: 640px;
@@ -96,6 +105,9 @@
 }
 
 .table thead th {
+  position: sticky;
+  top: 0;
+  background-color: var(--surface);
   height: var(--row-header);
   padding-block: 0;
   font-size: var(--fs-small);
@@ -109,10 +121,6 @@
 }
 
 .name {
-  max-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-weight: var(--fw-regular);
 }
 

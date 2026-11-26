@@ -58,8 +58,8 @@ describe('CompareTable e SummaryStrip', () => {
       'Design B',
       'Diferença (B − A)',
     ]);
-    expect(within(table).getByText('Blocos')).toHaveAttribute('scope', 'colgroup');
-    expect(within(table).getByText('Arestas')).toHaveAttribute('scope', 'colgroup');
+    expect(within(table).getByText('Blocos')).toHaveAttribute('scope', 'rowgroup');
+    expect(within(table).getByText('Arestas')).toHaveAttribute('scope', 'rowgroup');
     const rows = within(table).getAllByRole('row');
     const ec2 = rows.find((row) => within(row).queryByText(/EC2/))!;
     expect(within(ec2).getByText('Este design não tem blocos deste tipo.')).toBeInTheDocument();
@@ -68,7 +68,13 @@ describe('CompareTable e SummaryStrip', () => {
     expect(rds).toHaveTextContent('+US$ 40,00a mais');
     const s3 = rows.find((row) => within(row).queryByText(/S3/))!;
     expect(s3).toHaveTextContent('US$ 0,00igual');
-    expect(within(table).getByText('Transferência de dados')).toBeInTheDocument();
+    expect(rows.find((row) => within(row).queryByText('Transferência de dados'))).toHaveTextContent(
+      '−US$ 4,00a menos',
+    );
+    expect(screen.getByRole('region', { name: /Tabela de comparação/ })).toHaveAttribute(
+      'tabindex',
+      '0',
+    );
     await expectNoAxeViolations(container);
   });
 

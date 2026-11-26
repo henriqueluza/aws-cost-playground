@@ -35,7 +35,9 @@ function Diff({ diff, large = false }: { diff: Decimal; large?: boolean }): Reac
 function Cell({ title, amounts, large }: { title: string; amounts: Amounts; large?: boolean }) {
   return (
     <div role="group" aria-label={title} className={styles.cell}>
-      <p className={styles.cellTitle}>{title}</p>
+      <p className={styles.cellTitle} aria-hidden="true">
+        {title}
+      </p>
       <Diff diff={amounts.diff} large={large} />
       <p className={styles.sides}>
         <span>A {formatUsd(amounts.a)}</span>
@@ -85,13 +87,13 @@ function Group(props: {
   return (
     <tbody>
       <tr>
-        <th scope="colgroup" colSpan={4} className={styles.group}>
+        <th scope="rowgroup" colSpan={4} className={styles.group}>
           {props.title}
         </th>
       </tr>
       {props.rows.map((row) => (
         <tr key={row.key}>
-          <th scope="row" className={styles.name} title={props.label(row.key)}>
+          <th scope="row" className={styles.name}>
             {props.label(row.key)}
           </th>
           <Side amount={row.total.a} count={row.countA} unit={props.unit} />
@@ -108,7 +110,12 @@ function Group(props: {
 /** Diferença por tipo de bloco e de aresta. Tabela semântica: `caption`, `scope`, valores em texto. */
 export function CompareTable({ comparison }: { comparison: Comparison }): ReactElement {
   return (
-    <div className={styles.scroll}>
+    <div
+      className={styles.scroll}
+      role="region"
+      tabIndex={0}
+      aria-label="Tabela de comparação por tipo"
+    >
       <table className={styles.table}>
         <caption className={styles.srOnly}>
           Custo mensal por tipo de bloco e por tipo de aresta, em dólares, com a diferença do design

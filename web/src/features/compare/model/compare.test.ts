@@ -114,6 +114,25 @@ describe('compareEstimates', () => {
     expect(directionOf(sums.total.diff)).toBe('same');
   });
 
+  it('as linhas fecham com os totais: a soma dos tipos de cada lado é o total do lado', () => {
+    const a = estimateOf([block('aws.ec2', '30', '1'), block('aws.s3', '5')], [edge('data', '2')]);
+    const b = estimateOf([block('aws.s3', '7.5')], [edge('logs', '3')]);
+    const result = compareEstimates(a, b);
+    const rows = [...result.blocks, ...result.edges];
+    expect(
+      toFixed(
+        rows.reduce((acc, r) => add(acc, r.total.a), money('0')),
+        4,
+      ),
+    ).toBe(toFixed(a.total, 4));
+    expect(
+      toFixed(
+        rows.reduce((acc, r) => add(acc, r.total.b), money('0')),
+        4,
+      ),
+    ).toBe(toFixed(b.total, 4));
+  });
+
   it('conta os itens sem preço de cada lado', () => {
     const a = estimateOf([block('aws.ec2', '0', '0', 'unavailable')]);
     const b = estimateOf([block('aws.ec2', '1')]);
