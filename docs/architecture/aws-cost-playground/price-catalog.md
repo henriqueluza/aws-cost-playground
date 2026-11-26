@@ -76,13 +76,13 @@ Como o motor interpreta (detalhe em [cost-estimate.md](cost-estimate.md#algoritm
 }
 ```
 
-| Campo            | Regra                                                                                   |
-| ---------------- | --------------------------------------------------------------------------------------- |
-| `schemaVersion`  | `1`                                                                                     |
-| `source`         | `seed` (valores escritos à mão no repositório) ou `price-list` (gerado pelo `pricing/`) |
-| `generatedAt`    | ISO 8601 em UTC, com sufixo `Z`                                                         |
-| `files[].path`   | `<region>/<service>.json`, relativo a `public/prices/`; único na lista                  |
-| `files[].sha256` | 64 caracteres hexadecimais minúsculos                                                   |
+| Campo            | Regra                                                                                                                                  |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion`  | `1`                                                                                                                                    |
+| `source`         | `price-list` só quando todos os arquivos listados vieram da Price List na mesma execução; com qualquer arquivo semente mantido, `seed` |
+| `generatedAt`    | ISO 8601 em UTC, com sufixo `Z`                                                                                                        |
+| `files[].path`   | `<region>/<service>.json`, relativo a `public/prices/`; único na lista                                                                 |
+| `files[].sha256` | 64 caracteres hexadecimais minúsculos                                                                                                  |
 
 ## Regras de validação
 
@@ -145,4 +145,4 @@ Liga o design ao catálogo. Camadas: `ui/ -> hooks/ -> application/ -> model/`.
 
 - Componente visual do aviso/erro de carga: fica com o editor (#12) e o painel de custo (#43).
 - Calcular custo com o catálogo: é o motor, em [cost-estimate.md](cost-estimate.md) (`PriceCatalog` é só o que ele recebe).
-- Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest. O gerador está em construção nas Issues #195 (cliente e parse), #202 (registro de serviços e render) e #196 (CLI e gravação). O contrato acima não muda.
+- Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest. O gerador está em `pricing/` (veja `pricing/README.md`). Os arquivos versionados em `web/public/prices/` começam como semente (`prices: []`, `source: seed`) e o manifest é gerado por `python -m app seed`, nunca editado à mão. O teste de contrato é `generatorContract.test.ts`. O contrato acima não muda. O espelho em Python destes schemas continua em `pricing/app/schema.py`, igual ou mais estrito: quem mudar o zod muda o espelho no mesmo PR.

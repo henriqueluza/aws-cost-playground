@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "service": "ec2",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": []
+}

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "service": "lambda",
+  "region": "us-east-1",
+  "currency": "USD",
+  "prices": [
+    {
+      "sku": "lambda-duration-x86",
+      "description": "Duração (x86)",
+      "unit": "GB-second",
+      "tiers": [
+        {
+          "upTo": "6000000000",
+          "unitPrice": "0.0000166667"
+        },
+        {
+          "upTo": "15000000000",
+          "unitPrice": "0.000015"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.0000133334"
+        }
+      ],
+      "freeTier": {
+        "quantity": "400000"
+      },
+      "minimumQuantity": "0.001"
+    },
+    {
+      "sku": "lambda-requests",
+      "description": "Requisições",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0000002"
+        }
+      ],
+      "freeTier": {
+        "quantity": "1000000",
+        "pool": "lambda-requests"
+      }
+    }
+  ]
+}
