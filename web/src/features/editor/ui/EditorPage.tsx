@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { PricingPanel, usePriceCatalog } from '../../pricing';
 import { WorkloadPanel } from '../../workload';
+import { useHistoryShortcuts } from '../hooks/historyShortcuts';
 import { useDesignStore } from '../hooks/useDesignStore';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { catalogStamp } from '../model/estimateNotice';
@@ -10,8 +11,15 @@ import styles from './EditorPage.module.css';
 import { DownloadDesignButton } from './DesignFileActions';
 import { EstimateNotice } from './EstimateNotice';
 import { InspectorPanel } from './InspectorPanel';
+import { LiveAnnouncer } from './LiveAnnouncer';
 import { PalettePanel } from './PalettePanel';
 import { RailTabs } from './RailTabs';
+
+/** Atalhos de histórico só existem com o canvas na tela. */
+function HistoryShortcuts(): null {
+  useHistoryShortcuts();
+  return null;
+}
 
 export function EditorPage() {
   const wide = useMediaQuery('(min-width: 1024px)', true);
@@ -51,6 +59,8 @@ export function EditorPage() {
 
   return (
     <div className={styles.shell}>
+      <HistoryShortcuts />
+      <LiveAnnouncer />
       <header className={styles.topbar}>
         <ActionBar />
       </header>

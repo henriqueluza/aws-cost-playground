@@ -62,6 +62,7 @@
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-card);
   font-family: var(--font);
+  cursor: grab;
 }
 
 .head {
@@ -185,5 +186,55 @@
   .canvas :global(.react-flow__node.selected:focus-visible) > .block {
     outline-style: double;
     outline-width: calc(3 * var(--focus-width));
+  }
+}
+
+.canvas :global(.react-flow__edge.selected .react-flow__edge-path) {
+  stroke-width: 2;
+}
+
+.canvas :global(.react-flow__node.dragging) > .block {
+  box-shadow: var(--shadow-float);
+}
+
+.tools {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding-bottom: var(--space-6);
+  background-color: transparent;
+  pointer-events: none;
+}
+
+.hint {
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.refusal {
+  position: absolute;
+  inset-inline: var(--space-4);
+  bottom: var(--space-6);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Durante a conexão, o destino sob o cursor ganha a tinta de seleção. */
+.canvas :global(.react-flow__handle.connectingfrom)::after,
+.canvas :global(.react-flow__handle.connectingto)::after {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+@media (forced-colors: active) {
+  .canvas :global(.react-flow__edge.selected .react-flow__edge-path) {
+    stroke: Highlight;
   }
 }

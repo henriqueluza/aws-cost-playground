@@ -2,7 +2,7 @@
 
 API em Python + FastAPI + Pydantic v2, executada em AWS Lambda atrás do API Gateway HTTP API. Stack e decisões: `docs/architecture/aws-cost-playground/ADR-0001-stack.md`. Nível de arquitetura: `simple`.
 
-As nove rotas do contrato estão declaradas, com corpo e resposta validados. `DELETE /me` está implementada (#55); as outras oito respondem 501 até as Issues de cada uma (seção Rotas). O OpenAPI (`/docs`, `/redoc`, `/openapi.json`) está desligado.
+As nove rotas do contrato estão declaradas, com corpo e resposta validados. Criar, ler e listar designs (#53) e `DELETE /me` (#55) estão implementadas; as outras cinco respondem 501 até as Issues de cada uma (seção Rotas). O OpenAPI (`/docs`, `/redoc`, `/openapi.json`) está desligado.
 
 ## Pré-requisitos
 
@@ -44,7 +44,7 @@ Nenhum segredo vai em código nem em variável commitada.
 - `dynamo.py` — acesso à tabela única (`get_table()`).
 - `design_document.py` — modelos Pydantic do documento do design, equivalentes ao schema zod do `web/`.
 - `contracts.py` — leitor de `contracts/blocks.json` e `contracts/edges.json` (`load_contracts()`, `get_contracts()`).
-- `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade. `designs/`, `estimates/` e `quotas/` têm só `router.py` (handlers que respondem 501) e `schemas.py`; seguirão `router` → `service` → repositório quando as rotas forem implementadas. `account/` já segue o formato: `router.py`, `service.py` (ordem da exclusão, Cognito) e `repository.py` (DynamoDB); não tem schemas.
+- `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade. `designs/` segue `router` → `service` → `repository`, com `schemas.py` (entradas e saídas) e `errors.py` (`DesignError` e subclasses, com status e `detail` fixos). A `DesignRoute`, em `designs/router.py`, converte `DesignError` em problem details. `account/` segue o mesmo formato (`router.py`, `service.py` com a ordem da exclusão e o Cognito, `repository.py` no DynamoDB; sem schemas). `estimates/` e `quotas/` têm só `router.py` (handlers que respondem 501) e `schemas.py`; seguirão o mesmo desenho quando as rotas forem implementadas.
 - `designs/schemas.py` também guarda `MAX_DOC_BYTES` (350.000) e `doc_size_bytes()`, que mede o `doc` em bytes UTF-8 do JSON compacto.
 
 ## Documento do design e contratos
@@ -73,7 +73,7 @@ Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **
 
 ## Rotas
 
-Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo em camelCase; `design_id` é ULID (fora do formato: 422). Todas exigem identidade; as não implementadas respondem 501 em problem details.
+Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo em camelCase; `design_id` é ULID (fora do formato: 422). Todas exigem identidade. As três da #53 e `DELETE /me` estão implementadas; as outras respondem 501 em problem details.
 
 | Método e caminho | Corpo | Sucesso | Issue |
 |---|---|---|---|
@@ -88,11 +88,28 @@ Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo
 | `DELETE /me` | — | 204 (implementada) | #55 |
 
 - `PATCH` exige ao menos um entre `name` e `doc` e recusa `null` explícito nos dois: omita a chave para não alterar.
-- Quando as rotas forem implementadas, 409 será `design-limit` em create/duplicate e `version-conflict` no update.
+- 409: `design-limit` já vale em `POST /designs`; em duplicate virá com a #54, junto de `version-conflict` no update.
 - `DELETE /me`: 204 sem corpo; 401 sem `sub` ou `username` válido; 503 `Account deletion incomplete, retry` com `Retry-After: 5`. Detalhes em "Exclusão de conta".
 - As rotas de designs ainda não estão no API Gateway (`infra/envs/*/main.tf`): é outra Issue.
 
-Ordem das respostas: 401 (sem `sub`) → 413 (corpo cru acima de 1 MiB, ou `doc` acima de 350.000 bytes) → 400 (JSON que o parser recusa, como inteiro com mais de 4.300 dígitos ou aninhamento extremo) / 422 (validação) → 501. A `ProtectedRoute` garante que o 401 saia sem olhar o corpo e que o 413 do corpo cru saia antes de o JSON ser decodificado. O limite de 350.000 bytes do `doc` é medido depois do parse completo do documento (sem as chaves desconhecidas) e tem precedência sobre o 422: se algum erro de validação for `doc_too_large`, a resposta é 413 mesmo que haja outros campos inválidos.
+Ordem das respostas: 401 (sem `sub`) → 413 (corpo cru acima de 1 MiB, ou `doc` acima de 350.000 bytes) → 400 (JSON que o parser recusa, como inteiro com mais de 4.300 dígitos ou aninhamento extremo) / 422 (validação) → handler (resposta da rota, ou 501 nas ainda não implementadas). A `ProtectedRoute` garante que o 401 saia sem olhar o corpo e que o 413 do corpo cru saia antes de o JSON ser decodificado. O limite de 350.000 bytes do `doc` é medido depois do parse completo do documento (sem as chaves desconhecidas) e tem precedência sobre o 422: se algum erro de validação for `doc_too_large`, a resposta é 413 mesmo que haja outros campos inválidos.
+
+## Designs no DynamoDB
+
+Item na tabela única (`app/designs/repository.py`):
+
+- `PK = USER#<sub>`, `SK = DESIGN#<ulid>`. O `id` do design vem da `SK`: não há atributo `id`. Não há `ttl`.
+- Atributos: `name`, `region`, `schemaVersion`, `blockCount`, `sizeBytes`, `createdAt`, `updatedAt`, `version` e `doc` (JSON compacto, em string).
+- O id é um ULID gerado no servidor: 48 bits de tempo e 80 bits de `secrets`. Datas em UTC, com milissegundos e `Z`.
+- Leituras usam `ConsistentRead`. A listagem é uma `Query` com `begins_with(SK, "DESIGN#")` e projeção sem `doc`, que percorre todas as páginas e ordena por `updatedAt` decrescente e depois `id` decrescente, com no máximo 50 resumos.
+- Só `GetItem`, `PutItem`, `DeleteItem` e `Query`, as ações da política do papel da função. Nunca `Scan`.
+- Design de outro usuário responde 404, igual a inexistente: a chave sempre leva o `sub` do JWT.
+
+**Limite de 50 designs por usuário.** Sem transação, `POST /designs` conta (`Query` com `Select=COUNT`), grava com `attribute_not_exists(PK)`, conta de novo e, se passou de 50, apaga o que gravou e responde 409. Se a recontagem falhar, também apaga e devolve o erro (o cliente não recebeu o id). Duas criações simultâneas no limite podem ser ambas recusadas, nunca ambas aceitas. Resíduo: se a função morrer entre a gravação e a remoção, ou se a remoção falhar, pode sobrar 1 item acima do limite; a listagem continua devolvendo no máximo 50.
+
+**Custo de leitura.** `Select=COUNT` e a projeção não reduzem a leitura cobrada: o DynamoDB cobra os itens inteiros, com o `doc`. Uma partição cheia (50 designs de 350 KB) custa cerca de 4.400 unidades de leitura por listagem ou contagem. Separar o `doc` dos metadados ou limitar a taxa por usuário é decisão de ADR (#277).
+
+**Falhas.** Item gravado que não passa no schema de saída responde 500 sem detalhe e registra `error_type: CorruptedItem`. Falha do DynamoDB responde 503 (throttling, indisponibilidade, rede) ou 500 (o resto), nunca com texto da AWS, e grava uma linha de log `app.designs` só com o código do erro em `error_type`.
 
 ## Identidade
 
@@ -138,6 +155,7 @@ Toda resposta de erro segue o problem details (RFC 9457), com `Content-Type: app
 - O 413 vale para corpo cru acima de `MAX_BODY_BYTES` e para `doc` acima de `MAX_DOC_BYTES`; neste último caso não há lista `errors`.
 - O 422 lista no máximo 20 erros (`MAX_REPORTED_ERRORS`) e trunca cada parte do `loc` em 40 caracteres (`MAX_LOC_PART_LENGTH`), porque o `loc` pode trazer chave enviada pelo usuário.
 - O 401 do `auth.py` usa o mesmo formato.
+- O 404 vale para design inexistente ou de outro usuário. O 409 de `design-limit` traz `detail` "Design limit reached". O 503 indica falha transitória do DynamoDB (vale tentar de novo) e não tem `detail`.
 - O 500 não tem `detail`: a mensagem da exceção nunca vai para o cliente.
 
 ## Logs

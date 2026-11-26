@@ -13,7 +13,7 @@ from fastapi import Depends, HTTPException, Request
 
 _CLAIMS_PATH = ("requestContext", "authorizer", "jwt", "claims")
 # `sub` do Cognito é UUID; recusar `#` protege a chave `USER#<sub>` do DynamoDB.
-_SUB_PATTERN = re.compile(r"[A-Za-z0-9-]{1,128}")
+SUB_PATTERN = re.compile(r"[A-Za-z0-9-]{1,128}")
 # `Username` do pool: com e-mail como atributo de login, o Cognito gera um UUID.
 _USERNAME_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,128}")
 
@@ -34,7 +34,7 @@ def _claim(request: Request, name: str, pattern: re.Pattern[str]) -> str:
 
 def current_user_id(request: Request) -> str:
     """Devolve o `sub` do JWT. Sem claim válido, levanta HTTPException 401."""
-    return _claim(request, "sub", _SUB_PATTERN)
+    return _claim(request, "sub", SUB_PATTERN)
 
 
 def current_username(request: Request) -> str:
