@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kinds": [
+    {
+      "kind": "data",
+      "usage": [{"key": "gbPerMonth", "unit": "GB", "default": 10, "min": 0, "max": 100000000, "integer": false}],
+      "pairs": [
+        {
+          "sources": [
+            "aws.route53", "aws.cloudfront", "aws.waf", "aws.alb", "aws.nat-gateway",
+            "aws.ec2", "aws.ecs", "aws.lambda", "aws.rds", "aws.dynamodb",
+            "aws.elasticache", "aws.s3", "aws.sqs", "aws.cognito", "aws.secrets-manager"
+          ],
+          "targets": [
+            "aws.route53", "aws.cloudfront", "aws.waf", "aws.alb", "aws.nat-gateway",
+            "aws.ec2", "aws.ecs", "aws.lambda", "aws.rds", "aws.dynamodb",
+            "aws.elasticache", "aws.s3", "aws.sqs", "aws.cognito", "aws.secrets-manager"
+          ]
+        },
+        {
+          "sources": ["aws.cloudfront", "aws.s3", "aws.alb", "aws.ec2"],
+          "targets": ["client"]
+        }
+      ]
+    },
+    {
+      "kind": "runs-on",
+      "usage": [],
+      "pairs": [
+        {
+          "sources": ["aws.ecs"],
+          "targets": ["aws.ec2"]
+        }
+      ]
+    },
+    {
+      "kind": "logs",
+      "usage": [{"key": "gbPerMonth", "unit": "GB", "default": 10, "min": 0, "max": 100000000, "integer": false}],
+      "pairs": [
+        {
+          "sources": [
+            "aws.lambda", "aws.s3", "aws.sqs", "aws.dynamodb", "aws.ec2", "aws.rds",
+            "aws.elasticache", "aws.cloudfront", "aws.alb", "aws.nat-gateway", "aws.waf",
+            "aws.cognito", "aws.secrets-manager", "aws.cloudtrail", "aws.route53",
+            "aws.codepipeline", "aws.iam", "aws.cloudformation", "aws.ecs"
+          ],
+          "targets": ["aws.cloudwatch"]
+        }
+      ]
+    }
+  ]
+}
