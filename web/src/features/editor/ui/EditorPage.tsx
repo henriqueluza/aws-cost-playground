@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { PricingPanel, usePriceCatalog } from '../../pricing';
 import { WorkloadPanel } from '../../workload';
@@ -21,7 +22,8 @@ function HistoryShortcuts(): null {
   return null;
 }
 
-export function EditorPage() {
+/** `actions`: botões de outras features para a barra superior (o app os injeta). */
+export function EditorPage({ actions }: { actions?: ReactNode } = {}) {
   const wide = useMediaQuery('(min-width: 1024px)', true);
   const design = useDesignStore((s) => s.document);
   const selection = useDesignStore((s) => s.selection);
@@ -62,7 +64,7 @@ export function EditorPage() {
       <HistoryShortcuts />
       <LiveAnnouncer />
       <header className={styles.topbar}>
-        <ActionBar />
+        <ActionBar>{actions}</ActionBar>
       </header>
       <aside aria-label="Paleta" className={styles.palette}>
         <PalettePanel />

@@ -2,12 +2,16 @@ import type { RouteObject } from 'react-router';
 import { AccountPage } from '../features/account';
 import { AuthCallbackPage, RequireAuth } from '../features/auth';
 import { ComparePage } from '../features/compare';
-import { DesignsPage } from '../features/designs';
+import { DesignsPage, SaveControls } from '../features/designs';
 import { EditorPage } from '../features/editor';
 import { PrivacyPage, TermsPage } from '../features/legal';
 
+function EditorRoute() {
+  return <EditorPage actions={<SaveControls />} />;
+}
+
 export const routes: RouteObject[] = [
-  { path: '/', Component: EditorPage },
+  { path: '/', Component: EditorRoute },
   {
     path: '/designs',
     element: (

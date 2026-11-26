@@ -2,9 +2,18 @@ import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it } from 'vitest';
+import { ApiProvider } from '../shared/lib/api/ApiProvider';
+import { createInMemoryApi } from '../shared/lib/api/inMemoryApi';
 import { AuthProvider } from '../features/auth';
 import { fakeAuth } from '../test/authFixtures';
 import { routes } from './router';
+
+const api = createInMemoryApi({
+  maxDesigns: 50,
+  maxDocBytes: 350_000,
+  userDailyLimit: 20,
+  globalDailyLimit: 300,
+});
 
 describe('routes', () => {
   it.each([
@@ -19,9 +28,11 @@ describe('routes', () => {
     const auth = fakeAuth({ status: 'authenticated', user: { sub: 'u1', email: null } });
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <AuthProvider service={auth.service}>
-          <RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />
-        </AuthProvider>
+        <ApiProvider api={api}>
+          <AuthProvider service={auth.service}>
+            <RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />
+          </AuthProvider>
+        </ApiProvider>
       </QueryClientProvider>,
     );
     expect(screen.getByRole('heading', { level: 1, name })).toBeInTheDocument();
@@ -43,9 +54,11 @@ describe('routes', () => {
     const auth = fakeAuth();
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <AuthProvider service={auth.service}>
-          <RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />
-        </AuthProvider>
+        <ApiProvider api={api}>
+          <AuthProvider service={auth.service}>
+            <RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />
+          </AuthProvider>
+        </ApiProvider>
       </QueryClientProvider>,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Editor' })).toBeInTheDocument();
