@@ -4,7 +4,7 @@ O catálogo é o conjunto de arquivos JSON de preço que o frontend baixa de `pu
 
 - **Origem:** [ADR-0001](ADR-0001-stack.md). Este documento só detalha o formato e a validação.
 - **Onde mora:** `web/src/features/pricing/model/catalog.ts` (schemas zod `priceFileSchema` e `priceManifestSchema`, `CATALOG_LIMITS` e os tipos `Price`, `PriceTier`, `PriceFile`, `PriceManifest`, `PriceSource` e `PriceCatalog`). Importe pelo `index.ts` da feature. Se este texto e o código divergirem, vale o código.
-- **Fora deste contrato:** o hook do TanStack Query e o motor de cálculo.
+- **Fora deste contrato:** o motor de cálculo e os componentes visuais do aviso e do erro de carga.
 
 ## Arquivo de preço
 
@@ -121,8 +121,28 @@ A porta lança `CatalogError` para `network`, `missing` e `too-large`; o carrega
 - **Tempo limite:** 10 s, corpo incluído.
 - **Erros:** 404 vira `missing`. Status diferente de 200, redirecionamento, falha de rede ou tempo limite viram `network`. O erro não leva `cause` e a mensagem é fixa.
 
+### Hook (`usePriceCatalog`)
+
+Liga o design ao catálogo. Camadas: `ui/ -> hooks/ -> application/ -> model/`.
+
+- **`catalogServices(design, blocks?)`** (`application/catalogServices.ts`, pura): serviços do catálogo que o design usa. Vem do serviço de cada tipo de bloco do contrato (tipo sem `aws.`, via `blockService` de `model/engine.ts`) mais o `service` declarado por alguma cobrança do bloco. Sem repetição, em ordem alfabética. Tipo fora do contrato não pede serviço; as arestas ficam de fora até a #42.
+- **`createCatalogSession(newLoader)`** (`application/catalogSession.ts`): devolve um `LoadCatalog` com um carregador por aplicação (o manifest é lido uma vez). Em erro `integrity` (catálogo republicado com a aba aberta), troca o carregador, relê o manifest e tenta uma única vez.
+- **`usePriceCatalog(design, load?)`** (`hooks/usePriceCatalog.ts`): devolve `PriceCatalogState`.
+
+| `status`  | Quando                                       | Campos                                         |
+| --------- | -------------------------------------------- | ---------------------------------------------- |
+| `idle`    | Design sem bloco do contrato; nada é buscado | -                                              |
+| `loading` | Primeira carga da região e dos serviços      | -                                              |
+| `error`   | A carga falhou (após as tentativas)          | `error` (`CatalogError`), `retry`              |
+| `ready`   | Catálogo disponível                          | `catalog`, `source`, `generatedAt`, `updating` |
+
+- **Query key:** `['pricing', 'catalog', region, [serviços em ordem]]` (`priceCatalogKey`), só strings.
+- **Cache:** `staleTime` 24 h, `gcTime` 1 h, sem refetch em foco de janela nem em reconexão. `placeholderData: keepPreviousData` mantém o catálogo anterior enquanto o novo carrega (`updating: true`).
+- **Erros:** `retry` só para `network` (2 tentativas a mais); `throwOnError: false`, o erro volta no estado.
+- **Memória:** `structuralSharing: false`. O `PriceCatalog` (com `Decimal`) vive só no cache em memória; não persistir.
+
 ## Fora do escopo
 
-- Hook com TanStack Query (#174).
+- Componente visual do aviso/erro de carga: fica com o editor (#12) e o painel de custo (#43).
 - Calcular custo com o catálogo: é o motor, em [cost-estimate.md](cost-estimate.md) (`PriceCatalog` é só o que ele recebe).
 - Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest.

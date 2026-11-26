@@ -63,6 +63,12 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     expect(await errorRules(code, './features/pricing/api/x.ts')).toEqual([]);
   });
 
+  it('permite a pricing/hooks usar React, TanStack Query e as camadas de dentro', async () => {
+    const code =
+      "import { useQuery } from '@tanstack/react-query';\nimport { useMemo } from 'react';\nimport { httpPriceFiles } from '../api/httpPriceFiles';\nimport { catalogServices } from '../application/catalogServices';\nexport const deps = [useQuery, useMemo, httpPriceFiles, catalogServices];\n";
+    expect(await errorRules(code, './features/pricing/hooks/x.ts')).toEqual([]);
+  });
+
   it('proíbe outra feature de importar o adaptador de pricing/api direto', async () => {
     const code =
       "import { httpPriceFiles } from '../../pricing/api/httpPriceFiles';\nexport const p = httpPriceFiles;\n";
