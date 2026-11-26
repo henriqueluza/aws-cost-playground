@@ -42,7 +42,7 @@ def fetch_products(client: PricingClient, query: Query, *, max_pages: int = 50) 
         for number, page in enumerate(pages, start=1):
             if number > max_pages:
                 raise PricingError(f"{query.service_code} passou de {max_pages} páginas")
-            items = page.get("PriceList", [])
+            items = page.get("PriceList", []) if isinstance(page, dict) else None
             if not isinstance(items, list):
                 raise PricingError(f"PriceList inválida em {query.service_code}")
             for item in items:

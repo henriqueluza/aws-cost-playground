@@ -129,6 +129,8 @@ def terms_of(**term: Any) -> dict[str, Any]:
         *(with_dims(dim(pricePerUnit={"USD": v})) for v in ("-0.1", "1e-7", 0.1)),
         with_dims(dim(beginRange="5", endRange="5")),
         with_dims(dim(beginRange="5", endRange="3")),
+        with_dims(dim(endRange=...)),
+        item(terms=terms_of(priceDimensions=[])),
     ],
     ids=lambda v: str(v)[:40],
 )
@@ -176,8 +178,9 @@ def test_tiers_limit_is_16() -> None:
         [d("0", None), d("5", None)],
         [d("0", "10")],
         [d("0", "10", unit="a"), d("10", None, unit="b")],
+        [d("0", "0"), d("0", None)],
     ],
-    ids=["empty", "start", "gap", "overlap", "two-open", "closed-last", "units"],
+    ids=["empty", "start", "gap", "overlap", "two-open", "closed-last", "units", "zero-width"],
 )
 def test_tiers_rejects(dims: list[Dimension]) -> None:
     with pytest.raises(PricingError):

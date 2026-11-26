@@ -2,7 +2,16 @@ import dataclasses
 
 import pytest
 
-from app.model import Filter, PricingError, ServiceSpec, decimal_text, region_filter
+from app.model import (
+    Filter,
+    FreeTier,
+    Price,
+    PricingError,
+    ServiceSpec,
+    Tier,
+    decimal_text,
+    region_filter,
+)
 
 
 @pytest.mark.parametrize(
@@ -71,3 +80,10 @@ def test_service_spec_defaults_and_frozen() -> None:
     assert spec.expected_skus == frozenset()
     with pytest.raises(dataclasses.FrozenInstanceError):
         spec.slug = "z"  # type: ignore[misc]
+
+
+def test_price_optional_fields_default_to_none() -> None:
+    price = Price("lambda-requests", "Requisições", "Requests", (Tier(None, "0.0000002"),))
+    assert (price.free_tier, price.minimum_quantity) == (None, None)
+    assert FreeTier("1000000").pool is None
+    assert Tier("10", "1").up_to == "10"

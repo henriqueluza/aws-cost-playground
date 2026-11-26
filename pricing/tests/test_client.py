@@ -107,6 +107,21 @@ def test_more_pages_than_max_pages_fails() -> None:
             fetch_products(client, QUERY, max_pages=1)
 
 
+def test_exactly_max_pages_is_accepted() -> None:
+    with stubbed() as (client, stubber):
+        stubber.add_response("get_products", {"PriceList": [item("A")], "NextToken": "t"})
+        stubber.add_response("get_products", {"PriceList": [item("B")]})
+        products = fetch_products(client, QUERY, max_pages=2)
+    assert [p.sku for p in products] == ["A", "B"]
+
+
+def test_default_page_limit_is_50() -> None:
+    pages = [{"PriceList": [item(f"S{n:02d}")]} for n in range(51)]
+    assert len(fetch_products(FakeClient(iter(pages[:50])), QUERY)) == 50
+    with pytest.raises(PricingError):
+        fetch_products(FakeClient(iter(pages)), QUERY)
+
+
 def test_duplicate_sku_fails() -> None:
     with stubbed() as (client, stubber):
         stubber.add_response("get_products", {"PriceList": [item("A"), item("A")]})
@@ -169,19 +184,21 @@ def test_make_client_region_and_service(monkeypatch: pytest.MonkeyPatch) -> None
 class FakeClient:
     """Paginador falso para respostas que o Stubber recusaria (fora do modelo do botocore)."""
 
-    def __init__(self, pages: Iterator[dict[str, Any]]) -> None:
+    def __init__(self, pages: Iterator[Any]) -> None:
         self.pages = pages
 
     def get_paginator(self, operation_name: str) -> FakeClient:
         return self
 
-    def paginate(self, **kwargs: Any) -> Iterator[dict[str, Any]]:
+    def paginate(self, **kwargs: Any) -> Iterator[Any]:
         return self.pages
 
 
-def test_price_list_not_a_list_fails() -> None:
-    with pytest.raises(PricingError):
-        fetch_products(FakeClient(iter([{"PriceList": "VAZOU"}])), QUERY)
+@pytest.mark.parametrize("page", [{"PriceList": "VAZOU"}, None, ["VAZOU"]])
+def test_page_or_price_list_out_of_shape_fails(page: Any) -> None:
+    with pytest.raises(PricingError) as err:
+        fetch_products(FakeClient(iter([page])), QUERY)
+    assert "VAZOU" not in str(err.value)
 
 
 def test_botocore_error_has_no_aws_text() -> None:
