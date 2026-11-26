@@ -42,6 +42,7 @@ it.each(cases)('%s: rótulo, erro, desabilitado, caixa, sem HTML e axe', async (
   const message = screen.getByText(error).closest('p');
   expect(message?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
   expect(message).toHaveClass(cls('error'));
+  expect(message).toHaveAttribute('role', 'alert'); // a frase é anunciada quando o erro aparece
   await userEvent.keyboard('{Tab}{Tab}{Tab}'); // Normal, Com erro e Diálogo: pula o desabilitado.
   expect(get('Diálogo')).toHaveFocus();
   for (const k of Object.values(stateClass)) expect(box(normal)).not.toHaveClass(cls(k));

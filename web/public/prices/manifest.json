@@ -13,7 +13,7 @@
     },
     {
       "path": "sa-east-1/cloudtrail.json",
-      "sha256": "ccac50b2a52d140f5901f570fb7c7a1857586511a7692be450926f0cf3487ff9"
+      "sha256": "bb6f099fe537ed06fd7b7dd8500cf4584e45e4657e1d774c22dd92269c1427d7"
     },
     {
       "path": "sa-east-1/cloudwatch.json",
@@ -21,11 +21,11 @@
     },
     {
       "path": "sa-east-1/codepipeline.json",
-      "sha256": "b51f3a1cd5b76059613e08c7366d85a6997c4c331b68d48714039fd2024d5af3"
+      "sha256": "90d9390eda947ea5a0c00873af95ce76d253aeaf5f0f7c096e0dc65ecfd28c65"
     },
     {
       "path": "sa-east-1/cognito.json",
-      "sha256": "8530d83ebe2d7594af729cecc3cc8c207604db0111ef091e2d9b30518becb74e"
+      "sha256": "6a17687ab3e67ca2d769c676671353175eaa6be57d8f71a48a5c24ce001adfb7"
     },
     {
       "path": "sa-east-1/data-transfer.json",
@@ -65,7 +65,7 @@
     },
     {
       "path": "sa-east-1/secrets-manager.json",
-      "sha256": "df5bea6007f18b7ea258966b44e98f86bdad0e0c2cc8f59c90312fc801422d19"
+      "sha256": "39bc565d63b48fe8f35c3bb57a084ea475204a3871317a3e7d159d592916c992"
     },
     {
       "path": "sa-east-1/sqs.json",
@@ -85,7 +85,7 @@
     },
     {
       "path": "us-east-1/cloudtrail.json",
-      "sha256": "6263964633db4aef87ade070493f74bcff741ed8354d897fa3ef1744fdc7f5c4"
+      "sha256": "0b1fdc5c3e83d8461224522f73da2ca27d848be4ec474333cab37bfa770b651d"
     },
     {
       "path": "us-east-1/cloudwatch.json",
@@ -93,11 +93,11 @@
     },
     {
       "path": "us-east-1/codepipeline.json",
-      "sha256": "ac0a6de04b77605ab9ac69091e27dd5d3ee77e9ca088981c4b814d0cdcdebf1a"
+      "sha256": "0e7f62051941a2214879ab89872da46cd2ace9ee310a35f0f82cbb4aaa83e80d"
     },
     {
       "path": "us-east-1/cognito.json",
-      "sha256": "1b1565e81e302961734b6ab0ec52f27dfeeab8d837c6dc2daf29ecd9845d2993"
+      "sha256": "219a2e9c7de47a6ecde5a4e34fde0255a914d62b059935d46bb50416e5b6453d"
     },
     {
       "path": "us-east-1/data-transfer.json",
@@ -137,7 +137,7 @@
     },
     {
       "path": "us-east-1/secrets-manager.json",
-      "sha256": "609f1a7406529e3119ce5dd7ff7185966d2b0520ccaee25550df8afbf756feab"
+      "sha256": "ae2504effb3ccf3868f2fd2725c2350eee8c75379366f33909a0d0f2ac257cd2"
     },
     {
       "path": "us-east-1/sqs.json",

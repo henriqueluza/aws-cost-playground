@@ -4,6 +4,7 @@ import { useDesignStore } from '../hooks/useDesignStore';
 import { parseRegion, REGION_OPTIONS } from '../model/regionOptions';
 import { hasUnsavedChanges } from '../model/unsaved';
 import styles from './ActionBar.module.css';
+import { DesignFileActions } from './DesignFileActions';
 import pageStyles from './EditorPage.module.css';
 
 /**
@@ -40,7 +41,7 @@ export function ActionBar() {
   return (
     <>
       <h2 className={pageStyles.hidden}>Ações</h2>
-      <div className={styles.bar}>
+      <div className={pageStyles.actions}>
         <div className={styles.region}>
           <SelectField label="Região" value={region} onChange={onRegion}>
             {REGION_OPTIONS.map(({ value, text }) => (
@@ -51,6 +52,7 @@ export function ActionBar() {
           </SelectField>
         </div>
         <Button onClick={() => (unsaved ? setConfirming(true) : create())}>Novo design</Button>
+        <DesignFileActions />
       </div>
       <p role="status" className={pageStyles.hidden}>
         {announcement}

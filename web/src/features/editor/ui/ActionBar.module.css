@@ -1,12 +1,5 @@
-/* Barra de ações da moldura (DESIGN.md, "A casca do editor"): sobre --ground, sem régua.
-   24px entre grupos (região, ações), 12px dentro. Só tokens. */
-.bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-left: auto;
-}
-
+/* Barra de ações da moldura (DESIGN.md, "A casca do editor"). O contêiner é o `.actions` do
+   EditorPage; aqui, a região e o diálogo de "Novo design". Só tokens. */
 /* Na barra de 48px o rótulo da região vai ao lado do controle, não acima (o rótulo segue visível). */
 .region > div {
   display: flex;

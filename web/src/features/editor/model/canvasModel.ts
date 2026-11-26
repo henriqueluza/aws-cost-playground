@@ -1,6 +1,6 @@
 import { CLIENT_NODE_ID, type DesignDocument, type EdgeKind } from '../../../shared/lib/design';
 import { toFixed, type Money } from '../../../shared/lib/money';
-import { blockDefinition, type BlockCategory } from '../../pricing';
+import { blockDefinition, edgeKindsFor, type BlockCategory } from '../../pricing';
 import type { Layout, Selection } from './editorState';
 
 /** As cinco categorias do desenho (DESIGN.md, "Categorias dos blocos"). */
@@ -187,4 +187,46 @@ export function toCanvasEdges(doc: DesignDocument, selection: Selection): Canvas
     markerEnd: ARROW,
     data: { kind: edge.kind },
   }));
+}
+
+export type ConnectionRefusal = 'unknown' | 'same-node' | 'not-allowed' | 'duplicate';
+export type ConnectionCheck =
+  | { readonly ok: true; readonly kind: EdgeKind }
+  | { readonly ok: false; readonly reason: ConnectionRefusal; readonly message: string };
+
+/**
+ * Julga uma conexão `source → target` pelo contrato (`edgeKindsFor`) e pelo design. O tipo da
+ * aresta é o primeiro que o contrato aceita para o par; a escolha entre tipos é da #46.
+ */
+export function checkConnection(
+  doc: DesignDocument,
+  sourceId: string,
+  targetId: string,
+): ConnectionCheck {
+  const typeOf = (id: string) =>
+    id === CLIENT_NODE_ID ? CLIENT_NODE_ID : doc.blocks.find((b) => b.id === id)?.type;
+  const sourceType = sourceId === CLIENT_NODE_ID ? undefined : typeOf(sourceId);
+  const targetType = typeOf(targetId);
+  const refuse = (reason: ConnectionRefusal, message: string): ConnectionCheck => ({
+    ok: false,
+    reason,
+    message,
+  });
+  if (sourceType === undefined || targetType === undefined) {
+    return refuse('unknown', 'Essa conexão não pode partir da internet nem de um bloco ausente.');
+  }
+  if (sourceId === targetId) return refuse('same-node', 'Um bloco não se conecta a ele mesmo.');
+  const kinds = edgeKindsFor(sourceType, targetType);
+  const from = serviceName(sourceType);
+  const to = targetId === CLIENT_NODE_ID ? 'a internet' : serviceName(targetType);
+  const kind = kinds[0];
+  if (kind === undefined) {
+    return refuse(
+      'not-allowed',
+      `${from} não se conecta com ${to}: o contrato não prevê esse par.`,
+    );
+  }
+  const repeated = doc.edges.some((e) => e.source === sourceId && e.target === targetId);
+  if (repeated) return refuse('duplicate', `${from} já está conectado a ${to}.`);
+  return { ok: true, kind };
 }
