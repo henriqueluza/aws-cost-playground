@@ -11,5 +11,45 @@
 #   saída:  0 com o zip criado; 2 para uso errado; 1 para qualquer outra falha
 set -euo pipefail
 
-echo "build-functions.sh: ainda não implementado" >&2
-exit 1
+if [ "$#" -ne 1 ] || [ -z "$1" ]; then
+  echo "uso: scripts/build-functions.sh <saida.zip>" >&2
+  exit 2
+fi
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+case "$1" in
+  /*) out="$1" ;;
+  *) out="$PWD/$1" ;;
+esac
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+mkdir -p "$(dirname "$out")"
+rm -f "$out"
+
+# Só as dependências de runtime do lock, com hashes. O boto3 entra de propósito:
+# é a versão do lock (testada), não a do runtime da Lambda.
+uv export --quiet --project "$root/api" --locked --no-dev --no-emit-project \
+  --format requirements.txt --output-file "$tmp/requirements.txt" >&2
+
+# Alvo explícito (Lambda arm64), sem compilar nada na máquina local.
+uv pip install --quiet --target "$tmp/package" -r "$tmp/requirements.txt" \
+  --python-platform aarch64-manylinux_2_28 \
+  --python-version "$(tr -d '[:space:]' < "$root/api/.python-version")" \
+  --only-binary :all: --require-hashes --no-deps >&2
+
+cp -R "$root/api/app" "$tmp/package/app"
+find "$tmp/package" -name __pycache__ -type d -prune -exec rm -rf {} +
+find "$tmp/package" -name '*.pyc' -delete
+rm -rf "$tmp/package/app/tests"
+
+# Reprodutível: mtimes fixos (1980-01-01 UTC), ordem estável e sem atributos extras (-X).
+find "$tmp/package" -exec touch -h -d @315532800 {} + 2>/dev/null \
+  || find "$tmp/package" -exec env TZ=UTC touch -h -t 198001010000 {} +
+(
+  cd "$tmp/package"
+  find . -mindepth 1 ! -type d | sed 's|^\./||' | LC_ALL=C sort | zip -X -q "$out" -@ >&2
+)
+
+shasum -a 256 "$out" | cut -d' ' -f1
