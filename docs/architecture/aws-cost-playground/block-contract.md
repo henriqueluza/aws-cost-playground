@@ -3,8 +3,8 @@
 `contracts/blocks.json` diz o que cada um dos 20 blocos aceita (atributos do SKU e chaves de uso). `contracts/edges.json` diz quais tipos de aresta existem, o uso de cada um e quais pares de blocos podem se ligar. A API (#10, Pydantic) lê os mesmos arquivos, então quem mudar um lado muda o outro junto.
 
 - **Origem:** [ADR-0001](ADR-0001-stack.md) e o PRD (F2, F10 a F12). O design que referencia estes tipos está em [design-document.md](design-document.md); o catálogo de preços, em [price-catalog.md](price-catalog.md); o resultado do motor, em [cost-estimate.md](cost-estimate.md).
-- **Onde mora:** os dados em `contracts/blocks.json` e `contracts/edges.json`; os schemas zod (`blocksFileSchema`, `edgesFileSchema`), `PRD_BLOCK_LEVELS`, `BLOCK_TYPES`, `BLOCK_CATEGORIES`, `BLOCK_CONTRACT_LIMITS`, os tipos (`BlockDefinition`, `AttributeDefinition`, `UsageKeyDefinition`, `EdgeKindDefinition`) e a assinatura da função de preço (`BlockPricer`, `BlockPriceInput`, `BlockCharge`) em `web/src/features/pricing/model/blockContract.ts`. Se este texto e o código divergirem, vale o código.
-- **Estado:** a #175 (parte 1 de #9) traz `edges.json` e o contrato em código. `blocks.json` e o registro de blocos (`blockRegistry.ts`, `blocks/*.ts`) ainda não existem: chegam nas Issues #176 (11 blocos de nível A) e #177 (9 de nível B e C, fecha a #9).
+- **Onde mora:** os dados em `contracts/blocks.json` e `contracts/edges.json`; os schemas zod (`blocksFileSchema`, `edgesFileSchema`), `PRD_BLOCK_LEVELS`, `BLOCK_TYPES`, `BLOCK_CATEGORIES`, `BLOCK_CONTRACT_LIMITS`, os tipos (`BlockDefinition`, `AttributeDefinition`, `UsageKeyDefinition`, `EdgeKindDefinition`) e a assinatura da função de preço (`BlockPricer`, `BlockPriceInput`, `BlockCharge`) em `web/src/features/pricing/model/blockContract.ts`; o registro (`BLOCKS`, `blockDefinition`, `blockPricer`, `edgeKindsFor`) em `blockRegistry.ts` e as funções de preço em `blocks/<bloco>.ts`. Se este texto e o código divergirem, vale o código.
+- **Estado:** a #175 (parte 1 de #9) traz `edges.json` e o contrato em código. A #176 (parte 2 de #9) traz o registro de blocos e os 11 blocos de nível A em `blocks.json`; os 9 de nível B e C chegam na #177 (fecha a #9).
 
 ## `contracts/blocks.json`
 
@@ -57,6 +57,81 @@ Raiz: `{ "schemaVersion": 1, "kinds": [...] }`. Cada tipo de aresta (`data`, `ru
 
 `gbPerMonth` vai de 0 a 100.000.000 e aceita fração (`integer: false`). Todos os tipos acima levam o prefixo `aws.`.
 
+## Registro de blocos
+
+`web/src/features/pricing/model/blockRegistry.ts` carrega `contracts/blocks.json` e `contracts/edges.json` e valida os dois com os schemas zod na carga do módulo: arquivo inválido derruba o import, não chega à tela. Exporta:
+
+- `BLOCKS`: as definições de `blocks.json`.
+- `EDGE_KIND_DEFINITIONS`: as definições de `edges.json`.
+- `blockDefinition(type)`: a definição do tipo, ou `undefined` se o tipo não está no contrato.
+- `blockPricer(type)`: a função de preço do tipo, ou `undefined` se o tipo não está no contrato.
+- `edgeKindsFor(sourceType, targetType)`: os tipos de aresta aceitos entre dois tipos de bloco (`targetType` pode ser `client`), na ordem de `edges.json`.
+
+`edgeKindsFor` devolve lista vazia quando origem ou destino é um tipo fora do contrato ou ainda ausente de `blocks.json`. Por isso `aws.ecs -> aws.ec2` só passa a aceitar `runs-on` na #177, quando `aws.ecs` entra no JSON, mesmo que o par já conste em `edges.json`.
+
+As funções de preço dos blocos de nível A são provisórias e devolvem `[]`: as regras reais chegam nas Issues de preço (#30 a #37). `BLOCK_PRICERS` é `Partial<Record<BlockType, BlockPricer>>` até a #177, que o completa com os 9 blocos restantes.
+
+Para acrescentar um bloco:
+
+1. Uma entrada em `contracts/blocks.json`.
+2. Um arquivo `web/src/features/pricing/model/blocks/<bloco>.ts` com a função de preço.
+3. Uma linha em `web/src/features/pricing/model/blocks/index.ts`.
+
+## Blocos de nível A
+
+Valores copiados de `contracts/blocks.json`. Atributo sem `default` é opcional.
+
+### Atributos
+
+| Bloco | Atributo | Opções | Padrão |
+| ----- | -------- | ------ | ------ |
+| `aws.lambda` | `architecture` | `x86_64`, `arm64` | `arm64` |
+| `aws.lambda` | `memoryMb` | `128`, `256`, `512`, `1024`, `2048`, `4096`, `8192`, `10240` | `512` |
+| `aws.s3` | `storageClass` | `STANDARD`, `STANDARD_IA` | `STANDARD` |
+| `aws.sqs` | `queueType` | `standard`, `fifo` | `standard` |
+| `aws.dynamodb` | `capacityMode` | `on-demand`, `provisioned` | `on-demand` |
+| `aws.ec2` | `instanceType` | `t3.micro`, `t3.small`, `t3.medium`, `t3.large`, `t4g.micro`, `t4g.small`, `t4g.medium`, `m5.large`, `m5.xlarge`, `c5.large`, `r5.large` | `t3.small` |
+| `aws.ec2` | `az` | `a`, `b`, `c` | sem padrão (opcional) |
+| `aws.rds` | `engine` | `postgres`, `mysql` | `postgres` |
+| `aws.rds` | `instanceClass` | `db.t3.micro`, `db.t3.small`, `db.t3.medium`, `db.t4g.micro`, `db.t4g.small`, `db.t4g.medium`, `db.m5.large`, `db.r5.large` | `db.t3.micro` |
+| `aws.rds` | `deployment` | `single-az`, `multi-az` | `single-az` |
+| `aws.rds` | `az` | `a`, `b`, `c` | sem padrão (opcional) |
+| `aws.elasticache` | `engine` | `redis`, `memcached` | `redis` |
+| `aws.elasticache` | `nodeType` | `cache.t3.micro`, `cache.t3.small`, `cache.t3.medium`, `cache.t4g.micro`, `cache.t4g.small`, `cache.t4g.medium`, `cache.m5.large`, `cache.r5.large` | `cache.t3.micro` |
+| `aws.elasticache` | `az` | `a`, `b`, `c` | sem padrão (opcional) |
+
+### Chaves de uso
+
+| Bloco | Chave | Unidade | Padrão | Mínimo | Máximo | Inteiro |
+| ----- | ----- | ------- | ------ | ------ | ------ | ------- |
+| `aws.lambda` | `requestsPerMonth` | requests | `1000000` | `0` | `100000000000` | sim |
+| `aws.lambda` | `avgDurationMs` | ms | `120` | `1` | `900000` | sim |
+| `aws.s3` | `storageGb` | GB | `50` | `0` | `10000000` | não |
+| `aws.s3` | `putRequestsPerMonth` | requests | `100000` | `0` | `100000000000` | sim |
+| `aws.s3` | `getRequestsPerMonth` | requests | `1000000` | `0` | `100000000000` | sim |
+| `aws.sqs` | `requestsPerMonth` | requests | `1000000` | `0` | `100000000000` | sim |
+| `aws.dynamodb` | `readRequestsPerMonth` | requests | `1000000` | `0` | `100000000000` | sim |
+| `aws.dynamodb` | `writeRequestsPerMonth` | requests | `500000` | `0` | `100000000000` | sim |
+| `aws.dynamodb` | `storageGb` | GB | `5` | `0` | `1000000` | não |
+| `aws.dynamodb` | `provisionedReadUnits` | RCU | `5` | `0` | `100000` | sim |
+| `aws.dynamodb` | `provisionedWriteUnits` | WCU | `5` | `0` | `100000` | sim |
+| `aws.ec2` | `instanceCount` | instances | `1` | `1` | `1000` | sim |
+| `aws.ec2` | `hoursPerMonth` | hours | `730` | `0` | `744` | não |
+| `aws.ec2` | `rootVolumeGb` | GB | `30` | `8` | `16384` | sim |
+| `aws.rds` | `storageGb` | GB | `20` | `20` | `65536` | sim |
+| `aws.rds` | `backupStorageGb` | GB | `20` | `0` | `1000000` | não |
+| `aws.elasticache` | `nodeCount` | nodes | `1` | `1` | `500` | sim |
+| `aws.cloudfront` | `requestsPerMonth` | requests | `1000000` | `0` | `100000000000` | sim |
+| `aws.alb` | `newConnectionsPerSecond` | connections/s | `10` | `0` | `1000000` | não |
+| `aws.alb` | `activeConnectionsPerMinute` | connections/min | `1000` | `0` | `100000000` | não |
+| `aws.alb` | `processedGbPerMonth` | GB | `100` | `0` | `100000000` | não |
+| `aws.alb` | `ruleEvaluationsPerSecond` | evaluations/s | `0` | `0` | `10000000` | não |
+| `aws.cloudwatch` | `logsIngestedGbPerMonth` | GB | `5` | `0` | `10000000` | não |
+| `aws.cloudwatch` | `logsStoredGb` | GB | `5` | `0` | `100000000` | não |
+| `aws.cloudwatch` | `customMetrics` | metrics | `10` | `0` | `1000000` | sim |
+| `aws.cloudwatch` | `alarms` | alarms | `10` | `0` | `100000` | sim |
+| `aws.nat-gateway` | `processedGbPerMonth` | GB | `100` | `0` | `100000000` | não |
+
 ## Tipos dos blocos e nível
 
 Nível de preço do PRD (F10 a F12); `C` é custo zero.
@@ -67,11 +142,11 @@ Nível de preço do PRD (F10 a F12); `C` é custo zero.
 | B     | `aws.waf`, `aws.cognito`, `aws.secrets-manager`, `aws.cloudtrail`, `aws.route53`, `aws.codepipeline`                       |
 | C     | `aws.iam`, `aws.cloudformation`, `aws.ecs`                                                                                |
 
-Os de nível A chegam na #176; os de B e C, na #177.
+Os de nível A já estão em `blocks.json` (#176); os de B e C chegam na #177.
 
 ## Função de preço
 
-Cada bloco terá uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInput` e devolve `readonly BlockCharge[]`, o que cobrar, sem o valor em dólar.
+Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInput` e devolve `readonly BlockCharge[]`, o que cobrar, sem o valor em dólar.
 
 | Tipo              | Campo                      | Significado                                                           |
 | ----------------- | -------------------------- | --------------------------------------------------------------------- |
