@@ -1,0 +1,121 @@
+import { describe, expect, it } from 'vitest';
+import { designDocumentSchema } from '../../../shared/lib/design';
+import { decimal } from '../../../shared/lib/money';
+import { adrExampleDesign } from '../../../test/designFixtures';
+import {
+  canvasCategory,
+  checkConnection,
+  defaultPosition,
+  formatUsd,
+  toCanvasEdges,
+  toCanvasNodes,
+  type BlockNodeData,
+} from './canvasModel';
+
+const doc = designDocumentSchema.parse(adrExampleDesign);
+const costs = new Map([['blk_fn_api', { text: 'US$ 5,73', zero: false }]]);
+
+describe('toCanvasNodes', () => {
+  const nodes = toCanvasNodes(doc, {}, null, costs);
+
+  it('põe o client primeiro, fixo e não removível', () => {
+    expect(nodes[0]).toMatchObject({ id: 'client', type: 'client', deletable: false });
+    expect(nodes[0]?.selectable).toBe(false);
+  });
+
+  it('dá a cada bloco categoria, custo e nome acessível com tipo, rótulo e custo', () => {
+    const lambda = nodes[1];
+    expect(lambda?.data).toMatchObject({
+      category: 'compute',
+      cost: 'US$ 5,73',
+      service: 'Lambda',
+    });
+    expect(lambda?.ariaLabel).toBe('Lambda, API handler, Computação, US$ 5,73 por mês');
+    const s3 = nodes[2];
+    expect((s3?.data as BlockNodeData).cost).toBe('—');
+    expect(s3?.ariaLabel).toContain('custo ainda sem valor');
+  });
+
+  it('usa a posição do layout e, sem ela, a grade padrão', () => {
+    const placed = toCanvasNodes(doc, { blk_assets: { x: 7, y: 9 } }, null, costs);
+    expect(placed[2]?.position).toEqual({ x: 7, y: 9 });
+    expect(placed[1]?.position).toEqual(defaultPosition(0));
+  });
+
+  it('marca só o bloco selecionado', () => {
+    const picked = toCanvasNodes(doc, {}, { kind: 'block', id: 'blk_assets' }, costs);
+    expect(picked.map((n) => n.selected)).toEqual([false, false, true]);
+  });
+
+  it('guarda a marcação do rótulo como texto, sem interpretá-la', () => {
+    const evil = '<img src=x onerror=alert(1)>';
+    const [, block] = toCanvasNodes(
+      { ...doc, blocks: [{ ...doc.blocks[0]!, label: evil }] },
+      {},
+      null,
+      costs,
+    );
+    expect((block?.data as BlockNodeData).label).toBe(evil);
+  });
+
+  it('cai no nome do serviço quando o rótulo é vazio e avisa que o custo do ECS está no EC2', () => {
+    const ecs = { ...doc.blocks[0]!, id: 'blk_ecs', type: 'aws.ecs', label: ' ', attributes: {} };
+    const [, node] = toCanvasNodes({ ...doc, blocks: [ecs], edges: [] }, {}, null, new Map());
+    expect(node?.data).toMatchObject({ label: 'ECS', costNote: 'custo no EC2' });
+  });
+});
+
+describe('toCanvasEdges', () => {
+  it('descreve a aresta e marca a selecionada', () => {
+    const [edge] = toCanvasEdges(doc, { kind: 'edge', id: 'edg_1' });
+    expect(edge).toMatchObject({ source: 'blk_assets', target: 'client', selected: true });
+    expect(edge?.ariaLabel).toBe('Dados: S3 para Internet');
+  });
+});
+
+describe('checkConnection', () => {
+  const blocks = [
+    { ...doc.blocks[0]!, id: 'blk_a', type: 'aws.lambda' },
+    { ...doc.blocks[0]!, id: 'blk_b', type: 'aws.dynamodb' },
+    { ...doc.blocks[0]!, id: 'blk_c', type: 'aws.iam' },
+    { ...doc.blocks[0]!, id: 'blk_cdn', type: 'aws.cloudfront' },
+  ];
+  const d = { ...doc, blocks, edges: [] };
+
+  it('aceita o par do contrato e devolve o tipo da aresta', () => {
+    expect(checkConnection(d, 'blk_a', 'blk_b')).toEqual({ ok: true, kind: 'data' });
+    expect(checkConnection(d, 'blk_cdn', 'client')).toEqual({ ok: true, kind: 'data' });
+  });
+
+  it.each([
+    ['blk_c', 'blk_a', 'not-allowed', 'IAM não se conecta com Lambda'],
+    ['blk_a', 'client', 'not-allowed', 'Lambda não se conecta com a internet'],
+    ['blk_a', 'blk_a', 'same-node', 'ele mesmo'],
+    ['client', 'blk_a', 'unknown', 'internet'],
+    ['blk_x', 'blk_a', 'unknown', 'ausente'],
+  ])('recusa %s → %s com explicação', (from, to, reason, text) => {
+    const result = checkConnection(d, from, to);
+    expect(result).toMatchObject({ ok: false, reason });
+    expect(result.ok ? '' : result.message).toContain(text);
+  });
+
+  it('recusa a aresta repetida', () => {
+    const edge = { ...doc.edges[0]!, id: 'edg_9', source: 'blk_a', target: 'blk_b' };
+    const result = checkConnection({ ...d, edges: [edge] }, 'blk_a', 'blk_b');
+    expect(result).toMatchObject({ ok: false, reason: 'duplicate' });
+  });
+});
+
+describe('formatUsd e categoria', () => {
+  it('formata em dólar com separadores brasileiros', () => {
+    expect(formatUsd(decimal('1234567.891'))).toBe('US$ 1.234.567,89');
+    expect(formatUsd(decimal(0))).toBe('US$ 0,00');
+  });
+
+  it('agrupa os 20 tipos nas cinco categorias do desenho', () => {
+    expect(canvasCategory('aws.sqs')).toBe('data');
+    expect(canvasCategory('aws.codepipeline')).toBe('ops');
+    expect(canvasCategory('aws.alb')).toBe('network');
+    expect(canvasCategory('aws.desconhecido')).toBeNull();
+  });
+});
