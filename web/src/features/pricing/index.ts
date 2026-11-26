@@ -9,6 +9,8 @@ export {
   type PriceSource,
   type PriceTier,
 } from './model/catalog';
+export { CatalogError, createCatalogLoader } from './application/loadCatalog';
+export type { CatalogErrorKind, CatalogLoader, ReadPriceFile } from './application/loadCatalog';
 export {
   estimate,
   type BlockCost,
