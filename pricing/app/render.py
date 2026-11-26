@@ -2,7 +2,9 @@
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
+from typing import Literal
 
 from app.model import Price
 
@@ -35,6 +37,23 @@ def render_price_file(service: str, region: str, prices: Sequence[Price]) -> byt
         "region": region,
         "currency": "USD",
         "prices": [_price_doc(p) for p in sorted(prices, key=lambda p: p.sku)],
+    }
+    return (json.dumps(doc, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
+def render_manifest(
+    hashes: Mapping[str, str],
+    generated_at: datetime,
+    source: Literal["seed", "price-list"] = "price-list",
+) -> bytes:
+    """JSON do `manifest.json`: `files` por `path`, data em UTC com `Z` e precisão de segundos."""
+    if generated_at.tzinfo is None:
+        raise ValueError("generated_at sem fuso horário")
+    doc = {
+        "schemaVersion": _SCHEMA_VERSION,
+        "source": source,
+        "generatedAt": generated_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "files": [{"path": path, "sha256": hashes[path]} for path in sorted(hashes)],
     }
     return (json.dumps(doc, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
