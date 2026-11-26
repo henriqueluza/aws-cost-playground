@@ -2,7 +2,7 @@ mock_provider "aws" {}
 override_resource {
   target          = aws_apigatewayv2_api.this
   override_during = plan
-  values          = { execution_arn = "arn:aws:execute-api:us-east-1:111111111111:api123" }
+  values          = { id = "api123", execution_arn = "arn:aws:execute-api:us-east-1:111111111111:api123" }
 }
 override_resource {
   target          = aws_apigatewayv2_authorizer.jwt
@@ -19,6 +19,11 @@ override_resource {
   override_during = plan
   values          = { id = "int-llm" }
 }
+override_resource {
+  target          = aws_apigatewayv2_domain_name.this
+  override_during = plan
+  values          = { domain_name_configuration = { target_domain_name = "d-abc123.execute-api.us-east-1.amazonaws.com", hosted_zone_id = "Z1UJRXOUMOOFQ8" } }
+}
 variables {
   name_prefix          = "acp-stg"
   function_names       = { "api" = "acp-stg-api", "llm-proxy" = "acp-stg-llm-proxy" }
@@ -27,6 +32,8 @@ variables {
   jwt_audience         = ["exampleclientid"]
   cors_allowed_origins = ["https://staging.exemplo.com"]
   default_throttle     = { rate_limit = 10, burst_limit = 20 }
+  domain_name          = "api.staging.exemplo.com"
+  acm_certificate_arn  = "arn:aws:acm:us-east-1:111111111111:certificate/00000000-0000-0000-0000-000000000000"
   routes = {
     "POST /estimates"       = { throttle = { rate_limit = 1, burst_limit = 5 } }
     "GET /estimates/{id}"   = {}
@@ -144,5 +151,58 @@ run "retencao_do_log_vem_da_variavel" {
   assert {
     condition     = aws_cloudwatch_log_group.access.retention_in_days == 14
     error_message = "A retenção do log de acesso vem de log_retention_days."
+  }
+}
+run "dominio_proprio_regional_com_tls_1_2" {
+  command = plan
+  assert {
+    condition     = aws_apigatewayv2_domain_name.this.domain_name == var.domain_name && length(aws_apigatewayv2_domain_name.this.domain_name_configuration) == 1 && aws_apigatewayv2_domain_name.this.domain_name_configuration[0].endpoint_type == "REGIONAL" && aws_apigatewayv2_domain_name.this.domain_name_configuration[0].security_policy == "TLS_1_2" && aws_apigatewayv2_domain_name.this.domain_name_configuration[0].certificate_arn == var.acm_certificate_arn
+    error_message = "O domínio da API é regional, exige TLS 1.2 e usa o certificado informado."
+  }
+  assert {
+    condition     = aws_apigatewayv2_api_mapping.this.api_id == "api123" && aws_apigatewayv2_api_mapping.this.domain_name == var.domain_name && aws_apigatewayv2_api_mapping.this.stage == "$default" && aws_apigatewayv2_api_mapping.this.api_mapping_key == null
+    error_message = "O domínio inteiro (sem chave de caminho) é mapeado para o stage $default desta API."
+  }
+  assert {
+    condition     = aws_apigatewayv2_api.this.disable_execute_api_endpoint
+    error_message = "O endpoint execute-api padrão deve ficar desligado."
+  }
+  assert {
+    condition     = output.domain_alias == { name = "d-abc123.execute-api.us-east-1.amazonaws.com", zone_id = "Z1UJRXOUMOOFQ8" }
+    error_message = "domain_alias sai no formato de api_alias do módulo dns: name e zone_id do domínio."
+  }
+}
+run "dominio_com_esquema_e_porta_ou_certificado_de_outra_regiao_sao_rejeitados" {
+  command = plan
+  variables {
+    domain_name         = "https://api.staging.exemplo.com:443"
+    acm_certificate_arn = "arn:aws:acm:sa-east-1:111111111111:certificate/00000000-0000-0000-0000-000000000000"
+  }
+  expect_failures = [var.domain_name, var.acm_certificate_arn]
+}
+run "dominio_curinga_e_rejeitado" {
+  command = plan
+  variables { domain_name = "*.staging.exemplo.com" }
+  expect_failures = [var.domain_name]
+}
+run "dominio_em_maiusculas_e_rejeitado" {
+  command = plan
+  variables { domain_name = "API.staging.exemplo.com" }
+  expect_failures = [var.domain_name]
+}
+run "dominio_e_certificado_nulos_sao_rejeitados" {
+  command = plan
+  variables {
+    domain_name         = null
+    acm_certificate_arn = null
+  }
+  expect_failures = [var.domain_name, var.acm_certificate_arn]
+}
+# O dns entrega nome e certificado e recebe o alvo em api_alias: o plan só passa sem ciclo.
+run "consumidor_com_dns_sem_ciclo" {
+  command   = plan
+  providers = { aws = aws }
+  module {
+    source = "./tests/consumer"
   }
 }

@@ -8,8 +8,8 @@ Como trocar a chave da Claude API de um ambiente e o que fazer se ela vazar. É 
 - **Onde fica a chave:** SSM Parameter Store, `SecureString`, em `/acp/<env>/anthropic-api-key` (`<env>` é `staging` ou `production`). Trocar o valor não pode gerar diferença no plano do Terraform.
 - **Quem lê:**
   - em execução, só o papel do `llm-proxy` de cada ambiente tem `ssm:GetParameter` nesse caminho;
-  - como o Terraform declara o parâmetro fica para a #18 decidir: placeholder com `ignore_changes`, argumento write-only ou parâmetro criado fora do Terraform. No primeiro caso, o refresh lê o valor real com o papel de CI e grava esse valor no state;
-  - se for assim, o bucket de estado e os papéis de CI também guardam a chave e entram na investigação de vazamento. Atualize este runbook e o ADR quando a #18 decidir.
+  - o parâmetro fica **fora do Terraform**: o autor o cria e o altera à mão (seção "Criar o parâmetro pela primeira vez"). O valor nunca passa pelo plano, pelo state nem por um runner do CI;
+  - nenhum papel de CI (`plan`, `apply-*`) tem `ssm:GetParameter` nesse caminho. O papel `plan` tem negação explícita.
 - **Uma chave por ambiente**, cada uma no workspace do Console da Anthropic do próprio ambiente (`acp-staging`, `acp-production`), com limite de gasto próprio (ver [guardrails de custo](guardrails-de-custo.md), passo 8).
 - **Placeholders:** tudo entre `< >` é substituído na hora. O valor da chave nunca vai para arquivo, Issue, PR, commit, log, chat ou histórico do shell.
 
@@ -20,6 +20,22 @@ Como trocar a chave da Claude API de um ambiente e o que fazer se ela vazar. É 
 - Em qualquer suspeita de vazamento: siga direto a seção "Vazamento".
 
 Rotacione **staging primeiro**, confirme, e só então produção.
+
+## Criar o parâmetro pela primeira vez
+
+Uma vez por ambiente. Pode ser feito antes ou depois do primeiro `apply`: o papel do `llm-proxy` aponta para o parâmetro pelo nome. Sem o parâmetro, o proxy responde erro e não chama a Claude API.
+
+1. **Crie a chave** no Console da Anthropic, como no passo 1 da rotação planejada (escopo do workspace `acp-<env>`).
+2. **Console da AWS, região `us-east-1`:** Systems Manager → Parameter Store → Create parameter.
+   - Name: `/acp/<env>/anthropic-api-key` (exatamente esse caminho; `<env>` é `staging` ou `production`).
+   - Tier: Standard (sem custo).
+   - Type: `SecureString`.
+   - KMS key source: My current account, chave `alias/aws/ssm` (gerenciada pela AWS, sem custo). Não crie chave própria do KMS: ela tem custo fixo.
+   - Value: cole a chave. Não use a CLI com o valor na linha de comando: ele ficaria no histórico do shell.
+3. **Confira** que o parâmetro aparece como `SecureString` e que a aba de tags e a de histórico não mostram o valor.
+4. **Ligue o proxy** só depois: `LLM_ENABLED=true` no ambiente e uma estimativa de teste.
+
+Não importe o parâmetro para o Terraform nem o declare em nenhum módulo: isso faria o CI ler a chave a cada plano.
 
 ## Rotação planejada (sem indisponibilidade)
 
@@ -57,8 +73,8 @@ Trate como incidente. Velocidade importa mais que disponibilidade: o proxy pode 
 5. **Ache a origem do vazamento:**
    - Repositório: `gitleaks git` (ou `gitleaks detect` em versões antigas) no histórico local. Se a chave entrou num commit, a rotação já resolve o risco; reescrever o histórico exige `push --force`, que é decisão só do autor e não de agente.
    - Logs: busque nos grupos `acp-` do CloudWatch (Logs Insights) pelo começo fixo que toda chave da Anthropic tem, sem colar nenhuma chave inteira no terminal.
-   - Acesso ao parâmetro: CloudTrail → Event history, com fonte do evento `ssm.amazonaws.com`. Olhe todos os eventos que leem o valor (`GetParameter`, `GetParameters`, `GetParametersByPath`, `GetParameterHistory`) e, com fonte `kms.amazonaws.com`, os eventos `Decrypt`. Confira se algum principal além do papel do `llm-proxy` (e do papel de CI, se o Terraform lê o valor) leu `/acp/<env>/anthropic-api-key`. Sem trail próprio, o Event history guarda só 90 dias; vazamento mais antigo que isso fica sem essa evidência.
-   - CI e estado: logs dos workflows recentes do GitHub Actions, inclusive a saída dos `plan`; e, se o Terraform grava o valor no state, quem acessou o bucket de estado.
+   - Acesso ao parâmetro: CloudTrail → Event history, com fonte do evento `ssm.amazonaws.com`. Olhe todos os eventos que leem o valor (`GetParameter`, `GetParameters`, `GetParametersByPath`, `GetParameterHistory`) e, com fonte `kms.amazonaws.com`, os eventos `Decrypt`. Confira se algum principal além do papel do `llm-proxy` (e dos papéis de CI `plan` e `apply-*`, que leem no refresh) leu `/acp/<env>/anthropic-api-key`. Sem trail próprio, o Event history guarda só 90 dias; vazamento mais antigo que isso fica sem essa evidência.
+   - CI e estado: logs dos workflows recentes do GitHub Actions, inclusive a saída dos `plan`. O parâmetro não é gerenciado pelo Terraform, então o valor não está no state nem na saída de um `plan`: o bucket de estado não precisa ser investigado por causa da chave.
 6. **Se algum principal estranho leu o parâmetro**, o problema é maior que a chave: trate como credencial AWS comprometida (revogar sessões do papel, revisar quem pode assumi-lo) antes de religar.
 7. **Escreva o pós-incidente** numa Issue: quando, como foi descoberto, origem, gasto indevido, ações tomadas e o que muda para não repetir. Sem nenhum valor de segredo.
 
@@ -68,5 +84,5 @@ Se a chave vazada for a de staging, produção não é afetada, porque usa outra
 
 - [ ] Cada ambiente usa uma chave do próprio workspace, criada há menos de 90 dias.
 - [ ] Nenhuma chave antiga ativa no Console da Anthropic, e toda chave do projeto com escopo de workspace.
-- [ ] O parâmetro de cada ambiente é `SecureString`. Só o papel do `llm-proxy` tem `ssm:GetParameter` nele, mais o papel de CI se a #18 tiver mantido o valor no state.
+- [ ] O parâmetro de cada ambiente é `SecureString`. Só o papel do `llm-proxy` tem `ssm:GetParameter` nele; nenhum papel de CI o lê, e ele não é um recurso do Terraform.
 - [ ] Nenhum valor de chave em repositório, Issue, log ou histórico do shell.

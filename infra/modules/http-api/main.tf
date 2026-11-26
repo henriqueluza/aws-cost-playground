@@ -11,6 +11,9 @@ resource "aws_apigatewayv2_api" "this" {
   name          = "${var.name_prefix}-http-api"
   protocol_type = "HTTP"
 
+  # A única porta é o domínio próprio: ninguém contorna o domínio pelo endpoint execute-api.
+  disable_execute_api_endpoint = true
+
   # Sem rota OPTIONS: com métodos explícitos, o próprio API Gateway responde o preflight.
   cors_configuration {
     allow_origins     = var.cors_allowed_origins
