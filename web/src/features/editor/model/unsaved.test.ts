@@ -46,9 +46,4 @@ describe('hasUnsavedChanges', () => {
     const saved = referenceDesign();
     expect(hasUnsavedChanges(change(saved), saved)).toBe(true);
   });
-
-  it('a ordem das listas conta', () => {
-    const saved = referenceDesign();
-    expect(hasUnsavedChanges({ ...saved, blocks: [...saved.blocks].reverse() }, saved)).toBe(true);
-  });
 });

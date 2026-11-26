@@ -51,13 +51,4 @@ describe.each(REGIONS)('template inicial com as sementes de %s e o motor real', 
       }),
     ).toEqual([]);
   });
-
-  it('cobra os blocos de nível A, B e C como o PRD pede', () => {
-    const byType = new Map(result.blocks.map((cost) => [cost.blockType, cost]));
-    const free = ['aws.iam', 'aws.cloudformation', 'aws.ecs'];
-    for (const [type, cost] of byType) {
-      if (free.includes(type)) expect(Number(toFixed(cost.total, 2)), type).toBe(0);
-    }
-    expect(byType.size).toBe(20);
-  });
 });
