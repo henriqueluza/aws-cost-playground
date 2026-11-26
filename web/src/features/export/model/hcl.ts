@@ -147,6 +147,9 @@ function renderValue(value: HclValue, indent: string): string {
       );
       return `{\n${lines.join('\n')}\n${indent}}`;
     }
+    default:
+      // Dado que burlou os tipos (um `as`, um JSON): recusa em vez de escrever `undefined`.
+      throw new HclError('Valor de HCL desconhecido.');
   }
 }
 

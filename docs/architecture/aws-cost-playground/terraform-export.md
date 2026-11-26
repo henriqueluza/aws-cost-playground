@@ -52,22 +52,27 @@ Os erros são lançados em `renderHcl`, não na criação do nó.
 - Acento é reduzido à letra base (NFKD); qualquer outra sequência vira um `_`.
 - No máximo 48 caracteres, já com o sufixo de colisão. Só os primeiros 256 caracteres do texto são lidos.
 - Fallback quando o texto não deixa letra nem dígito: o tipo do bloco sem `aws.`, depois `bloco`.
-- Colisão resolvida por sufixo `_2`, `_3`... na ordem recebida. A #267 ordena os blocos por id, então o mesmo design dá sempre os mesmos nomes.
+- Colisão resolvida por sufixo `_2`, `_3`... na ordem recebida. `buildExportModel` ordena os blocos por id, então o mesmo design dá sempre os mesmos nomes.
 
-## Registro de geradores e `exportDesign` (chega com a #267)
+## Registro de geradores e `exportDesign`
 
-A fatia seguinte acrescenta, sobre o construtor:
+Sobre o construtor (#267):
 
-- `BlockGenerator`: função pura `(GeneratorInput) => GeneratorOutput`, um arquivo por tipo de bloco em `model/generators/`. A entrada traz `block` (`id`, `type`, `name`, `label`, `attributes`, `usage`), `links` (arestas que tocam o bloco), `blocks` (todos os exportáveis) e `region`. A saída traz `exported` (`false` põe o bloco na lista de não exportados do cabeçalho) e `nodes`.
-- `buildExportModel`: lê o design pelo contrato dos blocos, ordena por id, aplica `uniqueNames` e separa os blocos recusados (tipo fora do contrato ou atributo fora das opções).
-- `exportDesign(design)`: devolve `{ ok: true, files }` ou `{ ok: false, error: 'invalid-design' }`, com o cabeçalho de aviso, o bloco `terraform`, a variável `aws_region` e o `provider`. Os nomes e a forma exata estão no código dessa Issue.
+- **`BlockGenerator`** (`model/generator.ts`): função pura `(GeneratorInput) => GeneratorOutput`, um arquivo por tipo de bloco em `model/generators/`, registrada em `BLOCK_GENERATORS` (`Record<BlockType, BlockGenerator>`: o compilador recusa um bloco do PRD sem entrada).
+  - Entrada: `block` (`id`, `type`, `name`, `label`, `attributes`, `usage`), `links` (arestas que tocam o bloco, na ordem do id da aresta: `kind`, `role` `source` ou `target`, e `peer`, que é `undefined` quando o outro lado é a internet), `blocks` (todos os blocos conferidos, para o que é gerado uma vez por design, como rede e AZs) e `region`.
+  - Saída: `nodes` (nós do construtor) e `exported`. `exported: false` põe o bloco na lista de não exportados do cabeçalho.
+- **Gerador provisório** (`generators/provisional.ts`): devolve o comentário "Não suportado ainda" e `exported: false`. `PROVISIONAL_BLOCK_TYPES` lista os tipos que ainda estão nele; o teste `registry.test.ts` tem a lista escrita à mão, e cada gerador real (#65, #66, #67) tira o seu tipo dela.
+- **`buildExportModel`** (`model/exportBlocks.ts`): lê o design pelo contrato dos blocos. Atributos: só as chaves do contrato, cada uma com uma das opções aceitas (ausente recebe o padrão); valor fora das opções recusa o bloco (`invalid-attribute`), tipo fora do contrato também (`unknown-type`). Uso: o efetivo (override vence), só com as chaves do contrato, limitado à faixa. Blocos ordenados por id; nomes por `uniqueNames`. Aresta para bloco recusado não vira ligação.
+- **`exportDesign(input)`** (`application/exportDesign.ts`): valida o documento de novo (`designDocumentSchema`) e devolve `{ ok: true, files }` ou `{ ok: false, error }`. Os erros são dois: `invalid-design` (o documento não passa no schema) e `generation-failed` (um gerador devolveu um nó que o construtor recusa, ou lançou). A falha é fechada: nos dois casos não sai arquivo nenhum, nem parcial, e a mensagem da exceção não é repassada. Quem chama (o painel da #268) mostra um erro e não baixa nada. O `main.tf` traz, nesta ordem: o aviso fixo (ponto de partida sem garantia, custos são estimativa, sem credenciais), a contagem de blocos exportados com a lista dos não exportados e o motivo, o bloco `terraform` com as versões fixadas, a variável `aws_region`, o `provider "aws"` com `default_tags`, e uma seção por bloco aberta por um comentário com tipo, rótulo e nome de recurso.
+
+Nenhum bloco some: sem gerador real, de tipo desconhecido ou com atributo fora do contrato, ele aparece como comentário e na lista do cabeçalho.
 
 ## Convenções para os geradores (#65, #66 e #67)
 
 Regras normativas; o revisor recusa o que fugir delas.
 
 1. O gerador só devolve nós do construtor. Texto do usuário entra apenas por `hcl.string` ou `hcl.comment`. `hcl.ref` nunca recebe texto do usuário, exceto `block.name`. Se faltar algo ao construtor (por exemplo chamada de função), a mudança é no construtor, com teste; nunca texto cru.
-2. O recurso principal do bloco leva `block.name` como rótulo.
+2. O recurso principal do bloco leva `block.name` como rótulo. As chaves de `hcl.map` são constantes do gerador: não monte o objeto com chave vinda do design (`__proto__` perde o valor e chave numérica muda de ordem).
 3. Nenhum segredo no arquivo: nada de senha, chave ou token em literal nem em `default` de variável. Onde o recurso exige senha (RDS), use `manage_master_user_password = true` ou variável com `sensitive = true` e sem `default`. Segredo do Secrets Manager é criado sem valor.
 4. Seguro por padrão:
    - nada de `0.0.0.0/0` em regra de entrada de banco, cache ou administração;
