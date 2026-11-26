@@ -193,9 +193,9 @@ A lista abaixo foi conferida nos workflows de `main`. Só `terraform.yml` e `dep
 | `AWS_PLAN_ROLE_ARN` | variável | repositório | Saída `github_variables` do bootstrap | `terraform.yml` (liga o job `plan`) |
 | `TF_VAR_PACKAGE_BUCKET` | variável | Environment `staging` | Bucket de artefatos de staging, criado pela #209 | `deploy-staging.yml` |
 | `AWS_APPLY_ROLE_ARN` | variável | Environment `staging` | Saída `github_environment_variables` do bootstrap | `deploy-staging.yml` (liga o deploy) |
-| `AWS_APPLY_ROLE_ARN` | variável | Environment `production` | Saída `github_environment_variables` do bootstrap | Nenhum workflow ainda (produção é a #23) |
+| `AWS_APPLY_ROLE_ARN` | variável | Environment `production` | Saída `github_environment_variables` do bootstrap | `deploy-production.yml` (só por disparo manual do autor) |
 
-Os cinco valores de repositório precisam ficar no repositório, e não no Environment: o job `plan` roda sem `environment:` e não enxerga variável de Environment (`infra/README.md`, "Variáveis do job plan"). O Environment `production` só recebe as demais variáveis quando o workflow de produção existir (#23).
+Os cinco valores de repositório precisam ficar no repositório, e não no Environment: o job `plan` roda sem `environment:` e não enxerga variável de Environment (`infra/README.md`, "Variáveis do job plan"). O workflow de produção (`deploy-production.yml`) também pede `TF_VAR_PACKAGE_BUCKET` no Environment `production` e falha fechado sem ela; as variáveis de produção estão em `docs/infra.md`, "Variáveis de produção que o autor cria", e o rollback em [`rollback.md`](rollback.md).
 
 A ordem importa. `AWS_PLAN_ROLE_ARN` liga o job `plan`, que falha fechado se faltar domínio ou e-mail. `AWS_APPLY_ROLE_ARN` liga o deploy, que falha fechado se faltar qualquer outro valor (`docs/infra.md`, "Ordem para ligar o pipeline").
 
