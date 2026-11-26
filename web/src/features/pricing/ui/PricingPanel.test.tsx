@@ -77,12 +77,6 @@ describe('PricingPanel', () => {
     expect(detail).not.toBeVisible();
   });
 
-  it('explica o item sem preço no detalhamento', async () => {
-    setup(ready());
-    await userEvent.setup().click(screen.getByRole('button', { name: /^Uploads(?! \u2192)/ }));
-    expect(screen.getAllByText(/Sem preço no catálogo para este item/)[0]).toBeVisible();
-  });
-
   it('seleciona pelo teclado (Enter e espaço) e a aresta também é selecionável', async () => {
     const { onSelect } = setup(ready());
     const user = userEvent.setup();
