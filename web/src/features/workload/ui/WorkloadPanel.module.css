@@ -78,23 +78,6 @@
   white-space: nowrap;
 }
 
-.quota {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.track {
-  height: 4px;
-  border-radius: 2px;
-  background-color: var(--rule);
-  overflow: hidden;
-}
-.fill {
-  height: 100%;
-  background-color: var(--text);
-}
-
 .status {
   margin: 0;
   font-size: var(--fs-small);

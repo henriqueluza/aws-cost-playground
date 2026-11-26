@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import * as m from './messages';
-import { failureMessage, failureOf, type EstimateFailure } from './messages';
+import {
+  appliedMessage,
+  blockedReason,
+  failureMessage,
+  failureOf,
+  lockOf,
+  quotaLine,
+  type EstimateFailure,
+} from './messages';
 
 const RESET = '2026-11-27T00:00:00.000Z';
 
@@ -58,33 +65,49 @@ describe('failureMessage', () => {
   });
 });
 
-describe('appliedMessage, quotaLine e quotaRatio', () => {
-  it('zero, singular e plural', () => {
-    expect(m.appliedMessage(0, 0)).toContain('não trouxe valores utilizáveis');
-    expect(m.appliedMessage(1, 1)).toBe('Estimativa aplicada: 1 bloco e 1 conexão.');
-    expect(m.appliedMessage(3, 0)).toBe('Estimativa aplicada: 3 blocos e 0 conexões.');
+const FUTURE = '2999-01-01T00:00:00.000Z';
+const PAST = '2020-01-01T00:00:00.000Z';
+const NOW = Date.parse('2026-11-26T12:00:00.000Z');
+
+describe('appliedMessage e quotaLine', () => {
+  it('conta no singular e no plural; sem nada aproveitável diz que nada mudou', () => {
+    expect(appliedMessage(1, 1)).toBe('Estimativa aplicada: 1 bloco e 1 conexão.');
+    expect(appliedMessage(3, 2)).toBe('Estimativa aplicada: 3 blocos e 2 conexões.');
+    expect(appliedMessage(0, 0)).toMatch(/não trouxe valores utilizáveis; nada foi alterado/);
   });
-  it('linha 0 de 20 e proporção limitada a 0..1 (limite 0 dá 0)', () => {
-    expect(m.quotaLine({ limit: 20, remaining: 0 })).toBe('Restam 0 de 20 hoje');
-    expect(m.quotaRatio({ limit: 0, remaining: 0 })).toBe(0);
-    expect(m.quotaRatio({ limit: 20, remaining: 99 })).toBe(1);
+
+  it('linha da quota restante', () => {
+    expect(quotaLine({ limit: 20, remaining: 12 })).toBe('Restam 12 de 20 hoje');
   });
 });
 
-describe('blockedReason e lockOf', () => {
-  const locked: EstimateFailure = { kind: 'quota-user', resetsAt: RESET };
-  const now = Date.parse('2026-11-26T12:00:00.000Z');
-  const past = '2026-11-26T00:00:00.000Z';
-  it('blockedReason: sem blocos, sem descrição, quota, livre (nessa ordem)', () => {
-    expect(m.blockedReason({ blocks: 0, description: '', locked })).toMatch(/Adicione blocos/);
-    expect(m.blockedReason({ blocks: 2, description: ' ', locked })).toMatch(/Descreva a carga/);
-    expect(m.blockedReason({ blocks: 2, description: 'x', locked })).toBe(failureMessage(locked));
-    expect(m.blockedReason({ blocks: 2, description: 'x', locked: null })).toBeNull();
+describe('blockedReason', () => {
+  const lock: EstimateFailure = { kind: 'quota-user', resetsAt: FUTURE };
+  it('ordem: sem blocos, sem descrição, trava de quota; livre é null', () => {
+    expect(blockedReason({ blocks: 0, description: '', locked: lock })).toMatch(/Adicione blocos/);
+    expect(blockedReason({ blocks: 2, description: '  ', locked: lock })).toMatch(
+      /Descreva a carga/,
+    );
+    expect(blockedReason({ blocks: 2, description: 'x', locked: lock })).toBe(failureMessage(lock));
+    expect(blockedReason({ blocks: 2, description: 'x', locked: null })).toBeNull();
   });
-  it('lockOf: falha de quota e remaining 0 travam até a hora de voltar', () => {
-    expect(m.lockOf(locked, null, now)).toBe(locked);
-    expect(m.lockOf({ ...locked, resetsAt: past }, null, now)).toBeNull();
-    expect(m.lockOf(null, { remaining: 0, resetsAt: RESET }, now)).toEqual(locked);
-    expect(m.lockOf(null, { remaining: 0, resetsAt: past }, now)).toBeNull();
+});
+
+describe('lockOf', () => {
+  const user = (resetsAt: string): EstimateFailure => ({ kind: 'quota-user', resetsAt });
+  it('falha de quota vale até a hora de voltar, e só ela', () => {
+    expect(lockOf(user(FUTURE), null, NOW)).toEqual(user(FUTURE));
+    expect(lockOf({ kind: 'quota-global', resetsAt: FUTURE }, null, NOW)?.kind).toBe(
+      'quota-global',
+    );
+    expect(lockOf(user(PAST), null, NOW)).toBeNull();
+    expect(lockOf({ kind: 'unavailable' }, null, NOW)).toBeNull();
+    expect(lockOf(null, null, NOW)).toBeNull();
+  });
+
+  it('quota zerada trava até resetsAt; com saldo ou vencida solta', () => {
+    expect(lockOf(null, { remaining: 0, resetsAt: FUTURE }, NOW)).toEqual(user(FUTURE));
+    expect(lockOf(null, { remaining: 0, resetsAt: PAST }, NOW)).toBeNull();
+    expect(lockOf(null, { remaining: 3, resetsAt: FUTURE }, NOW)).toBeNull();
   });
 });

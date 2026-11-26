@@ -1,5 +1,6 @@
 export { EditorPage } from './ui/EditorPage';
 export { keepDesignForLogin } from './hooks/designDraftSync';
+export { designFileMessage, readDesignFile, type DesignFileError } from './model/designFile';
 export { discardDesignDraft } from './model/designDraft';
 export { useDesignStore } from './hooks/useDesignStore';
 export { designStore } from './hooks/designStore';

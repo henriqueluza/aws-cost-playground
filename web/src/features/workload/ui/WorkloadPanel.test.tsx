@@ -20,8 +20,9 @@ const LLM = {
   edges: [],
 };
 
-type Opts = { signedIn?: boolean; estimate?: Api['estimates']['estimateUsage']; quota?: Quota };
-function setup(opts: Opts = {}) {
+function setup(
+  opts: { signedIn?: boolean; estimate?: Api['estimates']['estimateUsage']; quota?: Quota } = {},
+) {
   const base = createInMemoryApi({
     maxDesigns: 5,
     maxDocBytes: 350_000,
@@ -194,6 +195,38 @@ describe('WorkloadPanel: estimar', () => {
   });
 });
 
+describe('WorkloadPanel: quota zerada e resposta vazia', () => {
+  it('remaining 0 com resetsAt futuro trava o botão com a frase; vencido libera', async () => {
+    const { unmount } = setup({
+      quota: { limit: 20, remaining: 0, resetsAt: '2999-01-01T00:00:00.000Z' },
+    });
+    expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
+    expect(screen.getByText(/Você usou as estimativas de hoje/)).toBeInTheDocument();
+    expect(button()).toHaveAttribute('aria-disabled', 'true');
+    unmount();
+    setup({ quota: { limit: 20, remaining: 0, resetsAt: '2020-01-01T00:00:00.000Z' } });
+    expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
+    expect(screen.queryByText(/Você usou as estimativas de hoje/)).toBeNull();
+    expect(button()).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('resposta sem valor aproveitável diz isso e não limpa a marca de desatualizada', async () => {
+    let calls = 0;
+    const quota = { limit: 20, remaining: 5, resetsAt: '2999-01-01T00:00:00.000Z' };
+    setup({
+      estimate: () =>
+        Promise.resolve({ ...(calls++ === 0 ? LLM : { blocks: [], edges: [] }), quota }),
+    });
+    await userEvent.click(button());
+    await screen.findByText(/Estimativa aplicada/);
+    fireEvent.change(screen.getByLabelText('Descrição da carga'), { target: { value: 'Outra' } });
+    expect(screen.getByText('Estimativa desatualizada')).toBeInTheDocument();
+    await userEvent.click(button());
+    expect(await screen.findByText(/não trouxe valores utilizáveis/)).toBeInTheDocument();
+    expect(screen.getByText('Estimativa desatualizada')).toBeInTheDocument();
+  });
+});
+
 describe('WorkloadPanel: erros', () => {
   const reset = '2026-11-27T00:00:00.000Z';
   it.each([
@@ -236,33 +269,5 @@ describe('WorkloadPanel: erros', () => {
     expect(
       within(invite.closest('div')!.parentElement!).getByRole('button', { name: 'Entrar' }),
     ).toBeInTheDocument();
-  });
-});
-
-describe('WorkloadPanel: quota e trava', () => {
-  const at = (ms: number) => new Date(Date.now() + ms).toISOString();
-  it.each([
-    ['no futuro trava', 86_400_000, 'true'],
-    ['já passada solta', -86_400_000, 'false'],
-  ])('0 de 20 com a hora de voltar %s', async (_, ms, locked) => {
-    setup({ quota: { limit: 20, remaining: 0, resetsAt: at(ms) } });
-    expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
-    expect(button()).toHaveAttribute('aria-disabled', locked);
-    expect(screen.queryByText(/Você usou as estimativas/) !== null).toBe(locked === 'true');
-  });
-
-  it('resposta sem valor aproveitável mostra a frase e mantém a marca de desatualizada', async () => {
-    const quota = { limit: 20, remaining: 5, resetsAt: at(86_400_000) };
-    const estimate = vi
-      .fn()
-      .mockResolvedValueOnce({ ...LLM, quota })
-      .mockResolvedValueOnce({ blocks: [], edges: [], quota });
-    setup({ estimate });
-    await userEvent.click(button());
-    await screen.findByText(/Estimativa aplicada/);
-    fireEvent.change(screen.getByLabelText('Descrição da carga'), { target: { value: 'Mais' } });
-    await userEvent.click(button());
-    expect(await screen.findByText(/não trouxe valores utilizáveis/)).toBeInTheDocument();
-    expect(screen.getByText('Estimativa desatualizada')).toBeInTheDocument();
   });
 });
