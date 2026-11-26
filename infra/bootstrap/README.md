@@ -48,7 +48,7 @@ O `sub` de environment não carrega o branch, então o `ref` é fixado no IAM. U
 | `DenyDataDeletion` | `cognito-idp:DeleteUserPool`, `dynamodb:DeleteTable`, `dynamodb:PutResourcePolicy`, `route53:DeleteHostedZone`, `s3:DeleteBucket` | Camada IAM do ADR: um plano destrutivo aprovado por engano falha no apply. Uma política de recurso na tabela daria `DeleteTable` a outra conta |
 | `DenyParameterStore` | `ssm:*` | A chave da Claude API fica num parâmetro criado à mão, fora do Terraform (#126): o CI não lê, não sobrescreve nem apaga parâmetro |
 | `DenyCiIdentity` | `iam:*` nos papéis `acp-ci-*`, nas políticas `acp-ci-*` e no provedor OIDC | O papel não altera a si mesmo, os outros papéis de CI, a política de limite nem o provedor |
-| `DenyIamOutsideEnvironment` | `iam:*` em tudo que não for `role/acp-<stg\|prod>-*` | Sem usuários, grupos, políticas gerenciadas, papéis do outro ambiente, papéis vinculados a serviço nem `PassRole` fora do ambiente |
+| `DenyIamOutsideEnvironment` | `iam:*` em tudo que não for `role/acp-<stg\|prod>-*` | Sem usuários, grupos, políticas gerenciadas, papéis do outro ambiente, papéis vinculados a serviço nem `PassRole` de papel de fora do ambiente. O `PassRole` dos papéis do próprio ambiente não é negado aqui: depende do `Allow` da #167 |
 | `DenyRoleWithoutBoundary` | `iam:CreateRole`, `PutRolePolicy`, `DeleteRolePolicy` e `PutRolePermissionsBoundary` em papel sem o limite `acp-ci-boundary-<env>` | O apply cria os papéis das Lambdas; sem o limite, criaria um papel sem as negações e apagaria a tabela por uma função |
 | `DenyRoleBypass` | `iam:DeleteRolePermissionsBoundary`, `UpdateAssumeRolePolicy`, `AttachRolePolicy`, `DetachRolePolicy` | Tirar o limite, trocar o trust de um papel existente, anexar ou desanexar política gerenciada (desanexar desligaria o corte do Budgets no papel do proxy) |
 | `DenyStateBucketConfig` | No bucket de estado do ambiente, tudo que não for ler, gravar, apagar e listar objetos | Política, versionamento, criptografia, bloqueio público, ciclo de vida e exclusão de versões. Apagar um objeto só cria um marcador: as versões antigas continuam lá |
@@ -56,7 +56,9 @@ O `sub` de environment não carrega o branch, então o `ref` é fixado no IAM. U
 
 Limites conhecidos:
 
-- O branch é garantido no IAM pelo `ref`. Restringir os GitHub Environments `staging` e `production` ao branch `main` é a segunda camada e é feita pelo autor (#77). Não existe chave de condição para o evento: push e `workflow_dispatch` em `main` não se distinguem no IAM.
+- O branch é garantido no IAM pelo `ref`. Restringir os GitHub Environments `staging` e `production` ao branch `main` é a segunda camada e é feita pelo autor (#77).
+- Não existe chave de condição para o evento, e o trust não fixa o arquivo de workflow. Qualquer job de um workflow que esteja em `main`, declare o Environment e rode com `ref` igual a `refs/heads/main` assume o papel: push, `workflow_dispatch`, `schedule` e também `pull_request_target` e `workflow_run`. Por isso nenhum job com `environment:` pode rodar em `pull_request_target` ou `workflow_run` executando código do PR (regra para a #22 e a #23). Quando os workflows de deploy existirem, o trust pode fixar também `job_workflow_ref` (#169).
+- O papel grava o próprio estado, então consegue sobrescrevê-lo. O que ele não consegue é excluir versões nem desligar o versionamento: o autor recupera a versão anterior. A negação `DenyStateBucketConfig` não escolhe quais objetos do bucket são lidos ou gravados; isso é do `Allow`, que só cita o estado e o `.tflock`. O bucket de estado casa com `acp-<prefixo>-*`: nenhum `Allow` de S3 das continuações pode usar esse prefixo.
 - O trust só é provado no primeiro deploy depois da #77: os testes usam provider simulado.
 - `iam:CreateRole` aceita qualquer trust. O apply pode criar um papel `acp-<prefixo>-*` que confie em outra conta, sempre dentro do limite; a #166 trata disso no limite.
 - Quem faz deploy controla o código das Lambdas. Dentro do limite, esse código lê e apaga itens e lê a chave. O IAM não fecha isso; a revisão do PR e o `plan-guard` são as outras camadas.
@@ -111,7 +113,7 @@ A saída `github_environment_variables` é um mapa de dois níveis: a chave exte
 | `staging` | `AWS_APPLY_ROLE_ARN` | ARN do papel `acp-ci-apply-staging` |
 | `production` | `AWS_APPLY_ROLE_ARN` | ARN do papel `acp-ci-apply-production` |
 
-Pré-requisito: os Environments `staging` e `production` existem e estão restritos ao branch `main` antes de cadastrar a variável.
+Pré-requisito: os Environments `staging` e `production` existem e estão restritos ao branch `main` antes de cadastrar a variável. Criar os Environments e a restrição faz parte da #77; sem o Environment, o `gh variable set --env` falha.
 
 ```bash
 terraform output -json github_environment_variables |
@@ -149,6 +151,6 @@ terraform -chdir=infra/bootstrap validate
 terraform -chdir=infra/bootstrap test
 ```
 
-Os testes (`tests/bootstrap.tftest.hcl` e `tests/apply.tftest.hcl`) usam provider simulado. O CI roda `fmt`, `tflint` e `trivy config` neste diretório, mas não `validate` nem `test` (#117). O `terraform test` não enxerga `lifecycle`: o `prevent_destroy` dos buckets, do provedor OIDC e dos papéis `apply` é conferido por leitura.
+Os testes (`tests/bootstrap.tftest.hcl` e `tests/apply.tftest.hcl`) usam provider simulado. O CI roda `fmt`, `tflint` e `trivy config` neste diretório, mas não `validate` nem `test` (#117). O `terraform test` não enxerga `lifecycle` nem recurso que não foi declarado: o `prevent_destroy` dos buckets e do provedor OIDC é conferido por leitura. Para os papéis `apply`, o `prevent_destroy` e a ausência de política gerenciada (critério "sem `AdministratorAccess`") são conferidos por `infra/tools/tests/test_bootstrap_apply_roles.py`, que o CI roda com os testes do `plan-guard`.
 
 `.terraform.lock.hcl` é versionado, com os hashes `h1:` de linux_amd64, linux_arm64 e darwin_arm64.

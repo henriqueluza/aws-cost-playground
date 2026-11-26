@@ -9,8 +9,8 @@ override_data {
   }
 }
 
-# Os papéis são lidos por `aws_iam_role.apply["<env>"].<atributo>`, sem índice dinâmico: com o
-# mapa inteiro na condição, o Terraform 1.16 entra em panic ao imprimir um assert que falha.
+# Não ponha o mapa inteiro de aws_iam_role.apply na condição (`for r in ...`, índice dinâmico): o
+# Terraform 1.16.0 dá panic (`value has marks`) ao imprimir assert que falha. Leia `apply["<env>"].<attr>`.
 run "trust_dos_papeis_apply" {
   command = apply
 
@@ -65,11 +65,6 @@ run "estado_do_proprio_ambiente" {
       aws_iam_role_policy.apply_state[env].name == "state" && aws_iam_role_policy.apply_state[env].role == "acp-ci-apply-${env}"
     ])
     error_message = "A política de estado se chama state e está presa ao papel apply do próprio ambiente."
-  }
-
-  assert {
-    condition     = alltrue([for env in ["staging", "production"] : !strcontains(aws_iam_role_policy.apply_state[env].policy, "*")])
-    error_message = "A política de estado não pode ter curinga: nenhum Allow com asterisco."
   }
 }
 

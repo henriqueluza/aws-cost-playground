@@ -49,8 +49,8 @@ resource "aws_iam_role" "apply" {
   }
 }
 
-# Permissões que o backend S3 do Terraform pede com `use_lockfile`: o estado nunca é
-# apagado, só o `.tflock`.
+# Permissões que a documentação do backend S3 lista para `use_lockfile`. `DeleteObject` vale
+# só para o `.tflock`: este `Allow` não deixa apagar o estado.
 resource "aws_iam_role_policy" "apply_state" {
   for_each = local.environments
 
