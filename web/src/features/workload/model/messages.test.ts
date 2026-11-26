@@ -38,6 +38,14 @@ describe('failureMessage', () => {
     }
   });
 
+  it('503, falta de rede e 413 têm frases diferentes', () => {
+    const texts = (['unavailable', 'network', 'too-large'] as const).map((kind) =>
+      failureMessage({ kind }),
+    );
+    expect(new Set(texts).size).toBe(3);
+    expect(texts[0]).toMatch(/indisponível/);
+  });
+
   it('a quota do usuário diz quando volta, ou "amanhã" se a data não vale; nunca promete que não contou', () => {
     expect(failureMessage({ kind: 'quota-user', resetsAt: RESET })).toMatch(
       /voltam às \d{2}:\d{2}/,

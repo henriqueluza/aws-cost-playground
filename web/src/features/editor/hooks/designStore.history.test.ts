@@ -216,6 +216,16 @@ describe('descrição da carga e estimativa', () => {
     expect(s.getState().document.workload.description).toBe(doc.workload.description);
   });
 
+  it('applyEstimate recusa documento fora do schema e não cria passo', () => {
+    const s = setup();
+    const bad = {
+      ...doc,
+      blocks: doc.blocks.map((b) => ({ ...b, usage: { source: 'llm', values: { x: -1 } } })),
+    };
+    expect(s.getState().applyEstimate(bad as never)).toMatchObject({ ok: false });
+    expect(past(s)).toBe(0);
+  });
+
   it('aplicar a estimativa muda só o que o documento trazia e desfaz de uma vez', () => {
     const s = setup();
     MUTATIONS['applyEstimate']?.(s);

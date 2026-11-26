@@ -83,6 +83,22 @@ describe('runEstimate', () => {
     expect(t.commit).not.toHaveBeenCalled();
   });
 
+  it('o commit recusado vira unusable', async () => {
+    const t = setup(async () =>
+      answer([{ id: 'blk_assets', source: 'llm', values: { storageGb: 9 } }]),
+    );
+    t.commit.mockReturnValueOnce(false);
+    expect(await t.run()).toEqual({ status: 'failed', failure: { kind: 'unusable' } });
+  });
+
+  it('desmontada antes do erro: cancelada, sem falha mostrada', async () => {
+    const t = setup(
+      () => Promise.reject(new ApiError({ kind: 'unavailable' })),
+      () => false,
+    );
+    expect(await t.run()).toEqual({ status: 'cancelled' });
+  });
+
   it('erro que não é da API vira unusable', async () => {
     const t = setup(() => Promise.reject(new Error('<img onerror=x>')));
     expect(await t.run()).toEqual({ status: 'failed', failure: { kind: 'unusable' } });

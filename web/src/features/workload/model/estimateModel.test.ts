@@ -114,6 +114,14 @@ describe('impressão digital e desatualizada', () => {
     ],
     ['aresta removida', (d: typeof doc) => ({ ...d, edges: [] })],
     [
+      'tipo do bloco',
+      (d: typeof doc) => ({ ...d, blocks: d.blocks.map((b) => ({ ...b, type: 'aws.sqs' })) }),
+    ],
+    [
+      'ponta da aresta',
+      (d: typeof doc) => ({ ...d, edges: d.edges.map((e) => ({ ...e, source: 'blk_fn_api' })) }),
+    ],
+    [
       'tipo da aresta',
       (d: typeof doc) => ({ ...d, edges: d.edges.map((e) => ({ ...e, kind: 'logs' as const })) }),
     ],
