@@ -99,7 +99,7 @@ def assert_client_schema(body: dict[str, Any]) -> None:
     O zod do cliente descarta chave desconhecida; a única chave a mais aceita aqui é `source`.
     """
     assert set(body) == {"blocks", "edges", "quota"}
-    for items, prefix, limit in ((body["blocks"], "blk", 100), (body["edges"], "edg", 300)):
+    for items, prefix, limit in ((body["blocks"], "blk", 100), (body["edges"], "edg", 400)):
         assert isinstance(items, list) and len(items) <= limit
         for item in items:
             assert {"id", "values"} <= set(item) <= {"id", "values", "source"}

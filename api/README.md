@@ -2,7 +2,7 @@
 
 API em Python + FastAPI + Pydantic v2, executada em AWS Lambda atrás do API Gateway HTTP API. Stack e decisões: `docs/architecture/aws-cost-playground/ADR-0001-stack.md`. Nível de arquitetura: `simple`.
 
-As nove rotas do contrato estão declaradas, com corpo e resposta validados. Criar, ler e listar designs (#53) e `GET /quota` (#60) estão implementadas; as outras cinco respondem 501 até as Issues de cada uma (seção Rotas). O OpenAPI (`/docs`, `/redoc`, `/openapi.json`) está desligado.
+As nove rotas do contrato estão declaradas, com corpo e resposta validados. Criar, ler e listar designs (#53), `GET /quota` (#60) e `POST /estimates` (#62) estão implementadas; as outras quatro respondem 501 até as Issues de cada uma (seção Rotas). O OpenAPI (`/docs`, `/redoc`, `/openapi.json`) está desligado.
 
 ## Pré-requisitos
 
@@ -50,7 +50,7 @@ Nenhum segredo vai em código nem em variável commitada.
 - `dynamo.py` — acesso à tabela única (`get_table()`).
 - `design_document.py` — modelos Pydantic do documento do design, equivalentes ao schema zod do `web/`.
 - `contracts.py` — leitor de `contracts/blocks.json` e `contracts/edges.json` (`load_contracts()`, `get_contracts()`).
-- `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade. `designs/` segue `router` → `service` → `repository`, com `schemas.py` (entradas e saídas) e `errors.py` (`DesignError` e subclasses, com status e `detail` fixos). A `DesignRoute`, em `designs/router.py`, converte `DesignError` em problem details. `quotas/` também segue `router` → `service.py` → `repository.py`. Os demais têm só `router.py` (handlers que respondem 501) e `schemas.py` (`account/` não tem schemas); seguirão o mesmo desenho quando as rotas forem implementadas.
+- `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade. `designs/` segue `router` → `service` → `repository`, com `schemas.py` (entradas e saídas) e `errors.py` (`DesignError` e subclasses, com status e `detail` fixos). A `DesignRoute`, em `designs/router.py`, converte `DesignError` em problem details. `quotas/` também segue `router` → `service.py` → `repository.py`. `estimates/` tem `router.py`, `service.py` e `schemas.py`. `account/` tem só `router.py` (handler que responde 501) e nenhum schema; seguirá o mesmo desenho quando a rota for implementada.
 - `estimates/prompt.py` — system prompt fixo, JSON Schema da saída e `build_plan()`, que monta a mensagem para a LLM. Puro: sem rede, SDK nem AWS.
 - `estimates/revalidation.py` — `revalidate()`, que trata a saída da LLM como entrada hostil e monta o resultado do zero. Puro.
 - `estimates/claude_client.py` — `ClaudeClient` (`prepare()` e `estimate()`), `EstimateError`, `UsageEstimate` e `get_claude_client()`. Único ponto que chama o SSM e a Claude API.
@@ -78,11 +78,11 @@ Nenhum segredo vai em código nem em variável commitada.
 1. ao lado de `app/` — no zip da Lambda, `/var/task/contracts/`;
 2. um nível acima — a raiz do repositório, no desenvolvimento e nos testes (`api/app/contracts.py` → `contracts/`).
 
-Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **o zip precisa levar `contracts/blocks.json` e `contracts/edges.json` na raiz, ao lado de `app/`**. O `scripts/build-functions.sh` da #22 (PR #218) hoje copia só `app/` e as dependências: enquanto ele não copiar `contracts/`, `get_contracts()` levanta `RuntimeError` na Lambda (falha fechada: arquivo ausente, cortado ou fora do contrato nunca vira contrato vazio). Nenhuma rota chama `get_contracts()` ainda; as primeiras são as de estimativa (#61, #62).
+Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **o zip precisa levar `contracts/blocks.json` e `contracts/edges.json` na raiz, ao lado de `app/`**. O `scripts/build-functions.sh` da #22 (PR #218) hoje copia só `app/` e as dependências: enquanto ele não copiar `contracts/`, `get_contracts()` levanta `RuntimeError` na Lambda (falha fechada: arquivo ausente, cortado ou fora do contrato nunca vira contrato vazio). `POST /estimates` (#62) é a primeira rota que depende de `get_contracts()`.
 
 ## Estimativa de uso: pedido e revalidação
 
-`estimates/prompt.py` e `estimates/revalidation.py` preparam a chamada à Claude API e conferem a resposta. O cliente que faz a chamada está em `claude_client.py` (próxima subseção). A rota `POST /estimates` ainda responde 501: quem a liga ao cliente é a #62.
+`estimates/prompt.py` e `estimates/revalidation.py` preparam a chamada à Claude API e conferem a resposta. O cliente que faz a chamada está em `claude_client.py` (próxima subseção). A rota `POST /estimates` liga os dois ao cliente (seção Rota de estimativa).
 
 **O que vai para a LLM.** O `SYSTEM_PROMPT` constante e uma mensagem com duas seções: `<usage_catalog>` (dado confiável, de `contracts/`: chaves de uso com unidade, mínimo, máximo e se é inteiro) e `<input_data>` (dado do usuário: descrição, blocos com tipo e atributos, arestas). Blocos e arestas são citados pela posição `n`, nunca pelo id. Não vão região, rótulo, nome do design, `sub` nem e-mail. Atributo só vai se a chave e o valor forem do contrato; bloco de tipo fora do contrato não vai. O JSON sai compacto, com `<` e `>` escapados, para o texto do usuário não fechar o delimitador. `MAX_TOKENS` fixa o teto da saída em 4.096.
 
@@ -132,9 +132,38 @@ Toda falha é um `EstimateError` com `code` e mensagem fixos; os tokens vêm pre
 - **Chave.** Lida do SSM com `WithDecryption` na primeira chamada de cada execução fria e mantida só dentro do cliente do SDK. Um 401 descarta o cliente, e a chamada seguinte relê o SSM (chave trocada ou revogada). A chave não aparece em log, erro nem `repr`.
 - **Log.** Cada falha grava só `llm estimate failed` (WARNING) com `error_type` igual ao `code`: nada da descrição, do diagrama, da AWS nem da Anthropic.
 
+### Rota de estimativa
+
+`POST /estimates` (`estimates/service.py`, `estimate_usage`) é onde o teto de gasto com a LLM é aplicado. Ordem: 401 → 413 (corpo) → 422 (`ProtectedRoute` e Pydantic) → `prepare` (interruptor e tamanho, sem rede) → `consume` (quota) → `estimate` (uma chamada, sem nova tentativa).
+
+- Entrada inválida e interruptor desligado não consomem quota.
+- Quota recusada ou indisponível nunca chama a LLM.
+- Falha da LLM depois do consumo NÃO devolve a quota: devolver abriria repetição gratuita, bastaria provocar a falha.
+
+**Resposta 200.** `blocks` e `edges` trazem `{id, values, source}`, com os ids do pedido na ordem de entrada. `source` é `llm` ou `default` e é calculado na API. O `web/` ainda não lê `source` (o zod descarta). `quota` é `{limit, remaining, resetsAt}`.
+
+```json
+{"blocks": [{"id": "blk_fn", "values": {"requestsPerMonth": 1200000}, "source": "llm"}],
+ "edges":  [{"id": "edg_out", "values": {"gbPerMonth": 10}, "source": "default"}],
+ "quota":  {"limit": 20, "remaining": 19, "resetsAt": "2026-11-27T00:00:00Z"}}
+```
+
+**Erros.** `detail` é fixo por status; nada da LLM, da Anthropic ou da AWS chega ao cliente. O cliente do `web/` lê só o status: 413 vira `too-large`, 502 e 503 viram `unavailable`, 429 vira `quota-exhausted`.
+
+| Código ou causa | Status |
+|---|---|
+| `too_large` | 413 |
+| `disabled`, `unavailable` | 503 |
+| `timeout`, `rate_limited`, `overloaded` | 503 com `Retry-After: 30` |
+| `refused`, `truncated`, `invalid_output` | 502 |
+| Quota esgotada | 429 com `scope` e `resetsAt` |
+| Quota indisponível | 503 |
+
+**Log.** O logger `app.estimate` grava um evento por chamada: `estimate completed` (INFO), `estimate rejected` (WARNING: recusada antes da LLM, inclusive pela quota; `result` `quota_unavailable` pode ter consumido, se a leitura do restante falhou depois do incremento) e `estimate failed after quota consumed` (ERROR). Campos: `result`, `duration_ms`, `input_tokens`, `output_tokens`, `block_count`, `edge_count`, `sub` e `request_id`. Nunca vão descrição, ids, rótulos nem e-mail.
+
 ## Rotas
 
-Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo em camelCase; `design_id` é ULID (fora do formato: 422). Todas exigem identidade. As três da #53 e `GET /quota` (#60) estão implementadas; as outras respondem 501 em problem details.
+Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo em camelCase; `design_id` é ULID (fora do formato: 422). Todas exigem identidade. As três da #53, `GET /quota` (#60) e `POST /estimates` (#62) estão implementadas; as outras respondem 501 em problem details.
 
 | Método e caminho | Corpo | Sucesso | Issue |
 |---|---|---|---|
@@ -144,7 +173,7 @@ Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo
 | `PATCH /designs/{design_id}` | `{expectedVersion, name?, doc?}` | 200, design | #54 |
 | `DELETE /designs/{design_id}` | — | 204 | #54 |
 | `POST /designs/{design_id}/duplicate` | `{name}` | 201, design | #54 |
-| `POST /estimates` | `{region, description, blocks, edges}` | 200, estimativa | #62 |
+| `POST /estimates` | `{region, description, blocks, edges}` | 200, estimativa (implementada) | #62 |
 | `GET /quota` | — | 200, quota (implementada) | #60 |
 | `DELETE /me` | — | 204 | #55 |
 
@@ -212,7 +241,7 @@ Toda resposta de erro segue o problem details (RFC 9457), com `Content-Type: app
 
 ## Logs
 
-Uma linha JSON por registro, em stdout (`app/logs.py`). Campos fixos: `timestamp`, `level`, `logger`, `message` e `request_id`. Campos extras só entram se estiverem na allowlist `ALLOWED_FIELDS`: `method`, `route`, `status`, `duration_ms`, `error_type`, `stack`, `scope`, `count`, `limit` e `sub`. Qualquer outro é descartado.
+Uma linha JSON por registro, em stdout (`app/logs.py`). Campos fixos: `timestamp`, `level`, `logger`, `message` e `request_id`. Campos extras só entram se estiverem na allowlist `ALLOWED_FIELDS`: `method`, `route`, `status`, `duration_ms`, `error_type`, `stack`, `scope`, `count`, `limit`, `sub`, `result`, `input_tokens`, `output_tokens`, `block_count` e `edge_count`. Qualquer outro é descartado.
 
 - Nunca vão para o log cabeçalhos, corpo, query string nem e-mail.
 - `route` é o template da rota (`/designs/{design_id}`), nunca o path cru, que pode trazer dado pessoal. Sem rota casada (404), vale `<unmatched>`.

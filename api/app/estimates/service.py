@@ -75,6 +75,8 @@ def estimate_usage(sub: str, body: EstimateIn, client: ClaudeClient) -> Estimate
         result = "quota_exhausted"
         raise
     except QuotaUnavailable:
+        # Pode ter consumido: se a leitura do restante falha depois do incremento, a #60 responde
+        # 503 e a quota fica gasta. O evento `quota read failed` do mesmo request_id diz qual foi.
         result = "quota_unavailable"
         raise
     finally:
