@@ -33,4 +33,4 @@ O documento do design é o JSON que o anônimo baixa e o logado salva. A API (#1
 - `schemaVersion` muda quando o formato muda de modo incompatível.
 - `scenarios` ganha conteúdo na release 3. Publique primeiro um leitor que o aceite e só depois a escrita: o build anterior recusa `scenarios` não vazio, e descartar o conteúdo em silêncio perderia dado.
 - Não mostre crua na UI a mensagem de erro do schema: a chave recusada aparece no `path`. A #50 mostra mensagem própria.
-- O limite de tamanho `maxDocBytes` (350 KB, o mesmo da API) entra com a #50.
+- O limite de tamanho `maxDocBytes` (350 KB, o mesmo da API) vale para o arquivo aberto na UI (#50): arquivo maior é recusado sem ser lido.

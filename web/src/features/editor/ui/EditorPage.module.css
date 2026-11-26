@@ -116,3 +116,11 @@
   font-size: var(--fs-read);
   line-height: var(--lh-read);
 }
+
+/* Ações da barra superior, à direita; cada feature põe os seus botões dentro dela. */
+.actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
