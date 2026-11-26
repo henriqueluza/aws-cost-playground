@@ -116,6 +116,12 @@ def test_build_accepts_aws_variants(products: list[Product]) -> None:
     assert SERVICE.build(REGIONS[0], products) == EXPECTED
 
 
+def test_regional_product_of_another_family_is_ignored() -> None:
+    # `USE1-activePipeline` na família dos minutos não é o produto do item: o SKU não sai.
+    moved = [replace(p, family="Action Execution Minutes") if p.sku == ACTIVE_US else p for p in US]
+    assert SERVICE.build(REGIONS[0], moved) == EXPECTED[1:]
+
+
 def test_unknown_region() -> None:
     message = "região sem prefixo de usagetype do CodePipeline"
     with pytest.raises(PricingError) as info:
