@@ -74,14 +74,10 @@ export type CanvasEdge = {
   readonly data: { readonly kind: EdgeKind };
 };
 
-/** Seta no destino; `arrowclosed` é o `MarkerType.ArrowClosed` do React Flow. */
 const ARROW = { type: 'arrowclosed', width: 16, height: 16 } as const;
 const CELL = { x: 248, y: 144 };
 
-/**
- * Posição de quem não tem entrada no layout: uma coluna por profundidade (o maior caminho desde
- * um bloco sem entrada) e o `client` na última coluna, para o desenho ler da esquerda para a direita.
- */
+/** Posição de quem não tem entrada no layout: coluna = maior caminho desde um bloco sem entrada; o `client` fica na última. */
 export function defaultLayout(doc: DesignDocument): Record<string, { x: number; y: number }> {
   const depth = new Map<string, number>();
   const visiting = new Set<string>();
