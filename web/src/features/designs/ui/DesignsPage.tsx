@@ -1,10 +1,16 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { isApiError, type DesignSummary } from '../../../shared/lib/api';
+import { designNameSchema, isApiError, type DesignSummary } from '../../../shared/lib/api';
 import { hasUnsavedChanges, useDesignStore } from '../../editor';
-import { Button, Dialog, EmptyState, Notice } from '../../../shared/ui';
-import { useDesignsList, useOpenDesign } from '../hooks/useDesigns';
-import { DESIGN_LIMIT, designErrorMessage, isRetryable } from '../model/designMessages';
+import { Button, Dialog, EmptyState, Notice, TextField } from '../../../shared/ui';
+import {
+  useDeleteDesign,
+  useDesignsList,
+  useDuplicateDesign,
+  useOpenDesign,
+  useRenameDesign,
+} from '../hooks/useDesigns';
+import { DESIGN_LIMIT, copyName, designErrorMessage, isRetryable } from '../model/designMessages';
 import { blockCountLabel, formatUpdatedAt } from '../model/format';
 import styles from './DesignsPage.module.css';
 
@@ -26,7 +32,13 @@ function LoadingRows() {
   );
 }
 
-function DesignsTable(props: { designs: DesignSummary[]; onOpen: (d: DesignSummary) => void }) {
+type RowAction = 'rename' | 'duplicate' | 'delete';
+
+function DesignsTable(props: {
+  designs: DesignSummary[];
+  onOpen: (d: DesignSummary) => void;
+  onAction: (action: RowAction, d: DesignSummary) => void;
+}) {
   return (
     <div className={styles.scroll}>
       <table className={styles.table}>
@@ -59,6 +71,25 @@ function DesignsTable(props: { designs: DesignSummary[]; onOpen: (d: DesignSumma
                 <Button onClick={() => props.onOpen(d)} aria-label={`Abrir ${d.name}`}>
                   Abrir
                 </Button>
+                <Button
+                  onClick={() => props.onAction('rename', d)}
+                  aria-label={`Renomear ${d.name}`}
+                >
+                  Renomear
+                </Button>
+                <Button
+                  onClick={() => props.onAction('duplicate', d)}
+                  aria-label={`Duplicar ${d.name}`}
+                >
+                  Duplicar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => props.onAction('delete', d)}
+                  aria-label={`Apagar ${d.name}`}
+                >
+                  Apagar
+                </Button>
               </td>
             </tr>
           ))}
@@ -80,6 +111,47 @@ function SignInInvite({ action }: { action?: ReactNode }) {
   );
 }
 
+/** Pede um nome (renomear ou duplicar); o nome passa pelo mesmo schema do salvar. */
+function NameForm(props: {
+  title: string;
+  initial: string;
+  submitLabel: string;
+  busy: boolean;
+  onCancel: () => void;
+  onSubmit: (name: string) => void;
+}) {
+  const [name, setName] = useState(props.initial);
+  const [error, setError] = useState<string | undefined>();
+  return (
+    <Dialog open onClose={props.onCancel} title={props.title}>
+      <form
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          const parsed = designNameSchema.safeParse(name);
+          if (!parsed.success) return setError('Use um nome de 1 a 80 caracteres.');
+          props.onSubmit(parsed.data);
+        }}
+      >
+        <TextField
+          label="Nome do design"
+          density="form"
+          value={name}
+          error={error}
+          maxLength={80}
+          onChange={(e) => setName(e.currentTarget.value)}
+        />
+        <div className={styles.dialogActions}>
+          <Button onClick={props.onCancel}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={props.busy}>
+            {props.submitLabel}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 /** "Meus designs" (F23): lista os designs da conta e abre um no editor. */
 export function DesignsPage({ signInAction }: { signInAction?: ReactNode }) {
   const navigate = useNavigate();
@@ -87,6 +159,25 @@ export function DesignsPage({ signInAction }: { signInAction?: ReactNode }) {
   const open = useOpenDesign();
   const unsaved = useDesignStore((s) => hasUnsavedChanges(s.document, s.baseline));
   const [pending, setPending] = useState<DesignSummary | null>(null);
+  const [action, setAction] = useState<{ kind: RowAction; design: DesignSummary } | null>(null);
+  const rename = useRenameDesign();
+  const duplicate = useDuplicateDesign();
+  const remove = useDeleteDesign();
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const close = () => setAction(null);
+  const fail = (error: unknown) => {
+    close();
+    setActionError(designErrorMessage(isApiError(error) ? error.kind : 'unavailable'));
+  };
+  const request_ = (kind: RowAction, design: DesignSummary) => {
+    setActionError(null);
+    // No limite, duplicar não pode funcionar: avisa já, sem pedir nome.
+    if (kind === 'duplicate' && (list.data?.length ?? 0) >= DESIGN_LIMIT) {
+      return setActionError(designErrorMessage('design-limit'));
+    }
+    setAction({ kind, design });
+  };
 
   const run = (id: string) => {
     setPending(null);
@@ -118,7 +209,7 @@ export function DesignsPage({ signInAction }: { signInAction?: ReactNode }) {
         action={<Link to="/">Ir para o editor</Link>}
       />
     );
-  } else body = <DesignsTable designs={list.data} onOpen={request} />;
+  } else body = <DesignsTable designs={list.data} onOpen={request} onAction={request_} />;
 
   return (
     <main className={styles.page}>
@@ -147,8 +238,57 @@ export function DesignsPage({ signInAction }: { signInAction?: ReactNode }) {
               )}
           </div>
         )}
+        {actionError !== null && (
+          <div className={styles.block}>
+            <Notice tone="negative" message={actionError} />
+          </div>
+        )}
         {body}
       </div>
+      {action?.kind === 'rename' && (
+        <NameForm
+          title="Renomear design"
+          initial={action.design.name}
+          submitLabel="Renomear"
+          busy={rename.isPending}
+          onCancel={close}
+          onSubmit={(name) =>
+            rename.mutate(
+              { id: action.design.id, version: action.design.version, name },
+              { onSuccess: close, onError: fail },
+            )
+          }
+        />
+      )}
+      {action?.kind === 'duplicate' && (
+        <NameForm
+          title="Duplicar design"
+          initial={copyName(action.design.name)}
+          submitLabel="Duplicar"
+          busy={duplicate.isPending}
+          onCancel={close}
+          onSubmit={(name) =>
+            duplicate.mutate({ id: action.design.id, name }, { onSuccess: close, onError: fail })
+          }
+        />
+      )}
+      <Dialog open={action?.kind === 'delete'} onClose={close} title="Apagar design?">
+        <p className={styles.text}>
+          {action?.design.name ?? 'O design'} será apagado da sua conta. Isso não pode ser desfeito.
+        </p>
+        <div className={styles.dialogActions}>
+          <Button onClick={close}>Cancelar</Button>
+          <Button
+            variant="destructive"
+            disabled={remove.isPending}
+            onClick={() =>
+              action && remove.mutate(action.design.id, { onSuccess: close, onError: fail })
+            }
+          >
+            Apagar
+          </Button>
+        </div>
+      </Dialog>
       <Dialog
         open={pending !== null}
         onClose={() => setPending(null)}

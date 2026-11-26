@@ -4,8 +4,8 @@ import { designStore, hasUnsavedChanges, useDesignStore } from '../../editor';
 import { designNameSchema } from '../../../shared/lib/api';
 import { Button, Dialog, Notice, TextField } from '../../../shared/ui';
 import { savedDesignStore, useSavedDesign } from '../hooks/savedDesignStore';
-import { useSaveDesign } from '../hooks/useDesigns';
-import { designErrorMessage, isRetryable } from '../model/designMessages';
+import { useOpenDesign, useSaveDesign } from '../hooks/useDesigns';
+import { copyName, designErrorMessage, isRetryable } from '../model/designMessages';
 import { SAVE_STATUS_LABEL, saveStatus, type SaveStatus } from '../model/saveState';
 import styles from './SaveControls.module.css';
 
@@ -123,6 +123,7 @@ export function SaveControls({ signInAction }: { signInAction?: ReactNode } = {}
   const saving = useSavedDesign((s) => s.saving);
   const error = useSavedDesign((s) => s.error);
   const save = useSaveDesign();
+  const reload = useOpenDesign();
   const [naming, setNaming] = useState(false);
   const lastName = useRef(DEFAULT_NAME); // o nome do último envio, para "Tentar de novo"
 
@@ -170,6 +171,28 @@ export function SaveControls({ signInAction }: { signInAction?: ReactNode } = {}
         <div className={styles.dialogActions}>
           <Button onClick={() => savedDesignStore.getState().clearError()}>Fechar</Button>
           {error === 'unauthenticated' && signInAction}
+          {error === 'version-conflict' && saved !== null && (
+            <>
+              <Button
+                onClick={() => {
+                  savedDesignStore.getState().clearError();
+                  reload.mutate(saved.id);
+                }}
+              >
+                Recarregar versão salva
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  savedDesignStore.getState().clearError();
+                  lastName.current = copyName(saved.name);
+                  save.mutate({ name: lastName.current, doc: document, asCopy: true });
+                }}
+              >
+                Salvar como cópia
+              </Button>
+            </>
+          )}
           {error !== null && isRetryable(error) && (
             <Button variant="primary" onClick={retry}>
               Tentar de novo
