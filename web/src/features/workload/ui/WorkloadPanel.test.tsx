@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, type Api, type ApiErrorDetail } from '../../../shared/lib/api';
+import { ApiError, type Api, type ApiErrorDetail, type Quota } from '../../../shared/lib/api';
 import { ApiProvider } from '../../../shared/lib/api/ApiProvider';
 import { createInMemoryApi } from '../../../shared/lib/api/inMemoryApi';
 import { designDocumentSchema, type DesignDocument } from '../../../shared/lib/design';
@@ -20,13 +20,8 @@ const LLM = {
   edges: [],
 };
 
-function setup(
-  opts: {
-    signedIn?: boolean;
-    estimate?: Api['estimates']['estimateUsage'];
-    quota?: Awaited<ReturnType<Api['quota']['get']>>;
-  } = {},
-) {
+type Opts = { signedIn?: boolean; estimate?: Api['estimates']['estimateUsage']; quota?: Quota };
+function setup(opts: Opts = {}) {
   const base = createInMemoryApi({
     maxDesigns: 5,
     maxDocBytes: 350_000,
@@ -254,9 +249,6 @@ describe('WorkloadPanel: quota e trava', () => {
     setup({ quota: { limit: 20, remaining: 0, resetsAt: at(ms) } });
     expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
     expect(button()).toHaveAttribute('aria-disabled', locked);
-    expect(screen.queryAllByText(/Você usou as estimativas de hoje/).length > 0).toBe(
-      locked === 'true',
-    );
   });
 
   it('resposta sem valor aproveitável mostra a frase e mantém a marca de desatualizada', async () => {

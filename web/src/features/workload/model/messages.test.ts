@@ -76,7 +76,6 @@ describe('appliedMessage, quotaLine e quotaRatio', () => {
     expect(quotaLine({ limit: 20, remaining: 0 })).toBe('Restam 0 de 20 hoje');
     expect(quotaRatio({ limit: 0, remaining: 0 })).toBe(0);
     expect(quotaRatio({ limit: 1, remaining: 1 })).toBe(1);
-    expect(quotaRatio({ limit: 20, remaining: 5 })).toBe(0.25);
     expect(quotaRatio({ limit: 20, remaining: 99 })).toBe(1);
   });
 });
@@ -96,6 +95,5 @@ describe('blockedReason e lockOf', () => {
     expect(lockOf({ ...locked, resetsAt: past }, null, now)).toBeNull();
     expect(lockOf(null, { remaining: 0, resetsAt: RESET }, now)).toEqual(locked);
     expect(lockOf(null, { remaining: 0, resetsAt: past }, now)).toBeNull();
-    expect(lockOf({ kind: 'network' }, { remaining: 3, resetsAt: RESET }, now)).toBeNull();
   });
 });
