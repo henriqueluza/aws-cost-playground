@@ -1,0 +1,163 @@
+/* DESIGN.md, "Tabela de comparação" e a faixa de totais. Só tokens. */
+
+/* Faixa dividida por réguas, como o carimbo do editor. */
+.strip {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  border-block: var(--border-width) solid var(--rule);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+}
+
+.cell + .cell {
+  border-inline-start: var(--border-width) solid var(--rule);
+}
+
+.cell p {
+  margin: 0;
+}
+
+.cell .diff {
+  align-self: flex-start;
+}
+
+.cellTitle {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+}
+
+.sides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A diferença se lê pelo sinal, pela palavra e pela forma do ícone; a cor não entra. */
+.diff {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.icon {
+  align-self: center;
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.word {
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.large .amount {
+  font-size: var(--fs-kpi);
+  line-height: var(--lh-kpi);
+  font-weight: var(--fw-semibold);
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.scroll:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--border-width) solid var(--rule);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  background-color: var(--surface);
+  height: var(--row-header);
+  padding-block: 0;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  color: var(--muted);
+}
+
+.table thead th:first-child,
+.name {
+  width: 40%;
+}
+
+.name {
+  font-weight: var(--fw-regular);
+}
+
+.group {
+  padding-top: var(--space-5);
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-semibold);
+}
+
+.table .num {
+  text-align: end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.money {
+  display: block;
+  font-family: var(--font-mono);
+}
+
+.count {
+  display: block;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+}
+
+.absent {
+  color: var(--faint);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
