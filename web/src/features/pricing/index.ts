@@ -19,7 +19,10 @@ export {
   type ChargeKind,
   type CostEstimate,
   type CostLine,
+  type CostNote,
   type CostStatus,
+  type CostWarning,
+  type CostWarningCode,
   type EdgeCost,
 } from './model/engine';
 export { PricingPanel } from './ui/PricingPanel';

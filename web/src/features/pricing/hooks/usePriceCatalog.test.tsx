@@ -181,6 +181,17 @@ describe('usePriceCatalog', () => {
     rerender({ design: { ...design, blocks: [{ ...lambda, type: 'aws.kinesis' }] } });
     expect(result.current).toEqual({ status: 'idle' });
     expect(seen).toEqual([]);
+    // Blocos de custo zero (nível C) não têm arquivo de preço: nem o manifest é lido.
+    const zeroCost = ['aws.iam', 'aws.cloudformation', 'aws.ecs'].map((type, i) => ({
+      ...lambda,
+      id: `blk_c${i}`,
+      type,
+      attributes: {},
+    }));
+    rerender({ design: { ...design, blocks: zeroCost } });
+    expect(result.current).toEqual({ status: 'idle' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(seen).toEqual([]);
     // Ao ganhar um bloco, busca; ao perder todos, volta a `idle` sem mostrar o catálogo antigo.
     rerender({ design });
     await settled('ready');

@@ -3,7 +3,7 @@
 `estimate(design, catalog)` recebe um design já validado e o catálogo da região dele e devolve o custo mensal em USD. O painel de custo (#43) consome este resultado.
 
 - **Origem:** [ADR-0001](ADR-0001-stack.md). Formato do design em [design-document.md](design-document.md); do catálogo em [price-catalog.md](price-catalog.md).
-- **Onde mora:** `web/src/features/pricing/model/engine.ts` (função `estimate` e os tipos `CostEstimate`, `BlockCost`, `EdgeCost`, `CostLine`, `CostStatus` e `ChargeKind`). Importe pelo `index.ts` da feature. Se este texto e o código divergirem, vale o código.
+- **Onde mora:** `web/src/features/pricing/model/engine.ts` (função `estimate` e os tipos `CostEstimate`, `BlockCost`, `EdgeCost`, `CostLine`, `CostStatus`, `ChargeKind`, `CostNote`, `CostWarning` e `CostWarningCode`). Importe pelo `index.ts` da feature. Se este texto e o código divergirem, vale o código.
 - **Função pura:** não altera as entradas nem faz I/O.
 
 ## Campos
@@ -12,11 +12,13 @@
 | -------------- | ---------------------------- | ------------------------------------------------------------------------ |
 | `CostEstimate` | `total`, `fixed`, `variable` | Custo mensal do design                                                   |
 | `CostEstimate` | `blocks`, `edges`            | Um item por bloco e por aresta                                           |
+| `CostEstimate` | `warnings`                   | Avisos (`CostWarning`: `code` e `blockId`), na ordem de `design.blocks`  |
 | `BlockCost`    | `blockId`, `blockType`       | `Block.id` e `Block.type` do design                                      |
 | `EdgeCost`     | `edgeId`, `kind`             | `Edge.id` e tipo da aresta                                               |
 | item           | `status`                     | `priced` ou `unavailable` (`CostStatus`)                                 |
 | item           | `total`, `fixed`, `variable` | Custo mensal do item                                                     |
 | item           | `lines`                      | Cobranças (`CostLine`) que somam o item                                  |
+| `BlockCost`    | `note`                       | `CostNote`, só em bloco `priced` de custo zero; diz por que é zero       |
 | `CostLine`     | `sku`                        | SKU do catálogo (`Price.sku`)                                            |
 | `CostLine`     | `quantity`                   | Quantidade cobrada no mês, na unidade do SKU, já sem a franquia gratuita |
 | `CostLine`     | `unitPrice`, `amount`        | Preço de uma unidade e `quantity × unitPrice`, em USD por mês            |
@@ -67,7 +69,12 @@ Se uma cobrança do bloco não tem preço, o bloco inteiro sai `unavailable`. To
 
 ## Casos especiais
 
-- Bloco sem cobranças (nível C) sai `priced` com zero e sem linhas.
+- **Bloco de custo zero** (nível C: `aws.iam`, `aws.cloudformation`, `aws.ecs`) sai `priced`, com zero, sem linhas e com `note` dizendo o motivo. Vale com ou sem catálogo carregado: não depende de arquivo de preço (não existe arquivo para `iam`, `cloudformation` nem `ecs`). A função de preço vem de `zeroCostPricer` (`model/zeroCost.ts`), que carrega a regra `ZeroCostRule`.
+  - `no-direct-cost` (IAM e CloudFormation): a AWS não cobra pelos recursos que o produto modela. `note` é `{ kind: 'no-direct-cost' }`.
+  - `billed-on-host` (ECS): modo EC2; o custo está nas instâncias EC2 ligadas por `runs-on`. `note` é `{ kind: 'billed-on-host', hostBlockIds }`, com os ids dos hosts na ordem de `design.edges`, sem repetição. Só conta `runs-on` que parte do ECS e chega a um `aws.ec2`.
+  - ECS sem essa aresta não é erro: `hostBlockIds` vem vazio e `warnings` ganha `{ code: 'missing-runs-on', blockId }`.
+  - Fargate não é modelado (o PRD o lista em "blocos de expansão", fora do MVP).
+- `warnings` não depende do catálogo: o aviso sai mesmo com o bloco `unavailable` (por exemplo, região diferente da do catálogo).
 - Aresta sem custo sai `priced` com zero e sem linhas (veja [Custos de aresta](#custos-de-aresta)).
 - A classificação fixo/variável vem do `charge` de cada `BlockCharge`; `fixed` e `variable` do item somam as linhas de cada tipo.
 
@@ -75,14 +82,14 @@ Se uma cobrança do bloco não tem preço, o bloco inteiro sai `unavailable`. To
 
 Depois dos blocos, cada aresta de `design.edges`, na ordem do design, vira cobranças (`edgeCharges`, em `model/edgeCharges.ts`) que passam pelo mesmo `createRater` dos blocos. Bloco e aresta que cobram o mesmo SKU dividem franquia e faixas; os blocos consomem primeiro. Toda cobrança de aresta é `variable`. A quantidade vem de `gbPerMonth`, o uso efetivo da aresta (override vence), ajustado a `contracts/edges.json` como o uso dos blocos: ausente recebe o padrão (10 GB) e valor fora da faixa é limitado a ela.
 
-| Aresta | Serviço e SKU do catálogo | Quantidade | Regra da AWS |
-| --- | --- | --- | --- |
-| `data` com destino `client`, origem S3, ALB ou EC2 | `data-transfer` / `data-transfer-internet-out` | `gbPerMonth` | Saída da região para a internet: faixas por volume (10 TB, 50 TB, 150 TB) e franquia de 100 GB por mês. Faixas e franquia somam todos os serviços da conta |
-| `data` com destino `client`, origem CloudFront | `cloudfront` / `cloudfront-data-transfer-out` | `gbPerMonth` | Saída das bordas do CloudFront: tabela própria por geografia da borda e franquia própria de 1 TB (1.024 GB) por mês |
-| `data` com destino `aws.nat-gateway` | `nat-gateway` / `nat-gateway-data-processed` | `gbPerMonth` | GB processado pelo NAT Gateway, o mesmo SKU do `processedGbPerMonth` do bloco |
-| `data` entre blocos com `az` diferente | `data-transfer` / `data-transfer-inter-az` | 2 × `gbPerMonth` | Tráfego entre zonas da mesma região: US$ 0,01 por GB em cada direção (saída de uma zona e entrada na outra) |
-| `logs` | `cloudwatch` / `cloudwatch-logs-ingestion` | `gbPerMonth` | Ingestão de logs, o mesmo SKU e a mesma franquia do `logsIngestedGbPerMonth` do bloco |
-| `data` nos outros casos e `runs-on` | nenhum | | Sem custo: `priced`, zero, sem linhas |
+| Aresta                                             | Serviço e SKU do catálogo                      | Quantidade       | Regra da AWS                                                                                                                                               |
+| -------------------------------------------------- | ---------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data` com destino `client`, origem S3, ALB ou EC2 | `data-transfer` / `data-transfer-internet-out` | `gbPerMonth`     | Saída da região para a internet: faixas por volume (10 TB, 50 TB, 150 TB) e franquia de 100 GB por mês. Faixas e franquia somam todos os serviços da conta |
+| `data` com destino `client`, origem CloudFront     | `cloudfront` / `cloudfront-data-transfer-out`  | `gbPerMonth`     | Saída das bordas do CloudFront: tabela própria por geografia da borda e franquia própria de 1 TB (1.024 GB) por mês                                        |
+| `data` com destino `aws.nat-gateway`               | `nat-gateway` / `nat-gateway-data-processed`   | `gbPerMonth`     | GB processado pelo NAT Gateway, o mesmo SKU do `processedGbPerMonth` do bloco                                                                              |
+| `data` entre blocos com `az` diferente             | `data-transfer` / `data-transfer-inter-az`     | 2 × `gbPerMonth` | Tráfego entre zonas da mesma região: US$ 0,01 por GB em cada direção (saída de uma zona e entrada na outra)                                                |
+| `logs`                                             | `cloudwatch` / `cloudwatch-logs-ingestion`     | `gbPerMonth`     | Ingestão de logs, o mesmo SKU e a mesma franquia do `logsIngestedGbPerMonth` do bloco                                                                      |
+| `data` nos outros casos e `runs-on`                | nenhum                                         |                  | Sem custo: `priced`, zero, sem linhas                                                                                                                      |
 
 Premissas e limites:
 
