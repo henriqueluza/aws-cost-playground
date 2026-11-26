@@ -69,7 +69,41 @@ def _arch(blocks: Json) -> Json:
     return _lambda(blocks)["attributes"][0]
 
 
+def _attrs(count: int) -> list[Json]:
+    return [{"key": f"k{i}", "options": ["a"]} for i in range(count)]
+
+
+def _usages(blocks: Json, count: int) -> list[Json]:
+    return [{**_usage(blocks, "avgDurationMs"), "key": f"k{i}"} for i in range(count)]
+
+
+def _pairs(edges: Json, count: int) -> list[Json]:
+    return edges["kinds"][0]["pairs"][:1] * count
+
+
+def _at_limits(blocks: Json, edges: Json) -> None:
+    """32 atributos, 32 chaves de uso, 32 pares e textos de 40 caracteres: o teto de cada regra."""
+    usage = _usages(blocks, 32)
+    usage[0]["unit"] = "u" * 40
+    _lambda(blocks).update(attributes=_attrs(32), usage=usage, name="a" * 40)
+    edges["kinds"][0].update(pairs=_pairs(edges, 32), usage=usage)
+
+
+def test_aceita_contrato_nos_limites(tmp_path: Path) -> None:
+    contracts = load_contracts(_write(tmp_path, _at_limits))
+    block = contracts.blocks["aws.lambda"]
+    assert (len(block.attributes), len(block.usage), len(block.name)) == (32, 32, 40)
+    assert len(contracts.edges[RAW_EDGES["kinds"][0]["kind"]].pairs) == 32
+
+
 INVALID: dict[str, Mutation] = {
+    "33 atributos": lambda b, e: _lambda(b).update(attributes=_attrs(33)),
+    "33 chaves de uso no bloco": lambda b, e: _lambda(b).update(usage=_usages(b, 33)),
+    "33 chaves de uso na aresta": lambda b, e: e["kinds"][0].update(usage=_usages(b, 33)),
+    "33 pares": lambda b, e: e["kinds"][0].update(pairs=_pairs(e, 33)),
+    "33 opções": lambda b, e: _arch(b).update(options=[f"o{i}" for i in range(33)]),
+    "nome de 41 caracteres": lambda b, e: _lambda(b).update(name="a" * 41),
+    "opção de 65 caracteres": lambda b, e: _arch(b)["options"].append("a" * 65),
     "padrão fora da faixa": lambda b, e: _usage(b, "avgDurationMs").update(default=900001),
     "faixa vazia": lambda b, e: _usage(b, "avgDurationMs").update(min=120, max=120),
     "integer com fração": lambda b, e: _usage(b, "requestsPerMonth").update(default=1.5),
@@ -87,7 +121,6 @@ INVALID: dict[str, Mutation] = {
     "kind faltando": lambda b, e: e["kinds"].pop(),
     "kind repetido": lambda b, e: e["kinds"].append(e["kinds"][0]),
     "schemaVersion booleano": lambda b, e: b.update(schemaVersion=True),
-    "sem opções": lambda b, e: (_arch(b).pop("default"), _arch(b).update(options=[])),
     "unidade de 41 caracteres": lambda b, e: _usage(b, "avgDurationMs").update(unit="a" * 41),
     "kind sem pares": lambda b, e: e["kinds"][0].update(pairs=[]),
 }
@@ -99,11 +132,37 @@ def test_recusa_contrato_quebrado(tmp_path: Path, mutate: Mutation) -> None:
         load_contracts(_write(tmp_path, mutate))
 
 
-@pytest.mark.parametrize("damage", [Path.unlink, lambda p: p.write_text("{")])
-@pytest.mark.parametrize("name", ["blocks.json", "edges.json"])
-def test_arquivo_ausente_ou_cortado_falha_fechado(tmp_path: Path, name: str, damage: Any) -> None:
+def test_lista_de_opcoes_vazia_e_recusada_so_pela_regra_do_tamanho(tmp_path: Path) -> None:
+    """Sem `default` e sem outra regra quebrada: o único erro é o `min_length` de `options`."""
+
+    def empty(blocks: Json, edges: Json) -> None:
+        _arch(blocks).pop("default")
+        _arch(blocks).update(options=[])
+
+    with pytest.raises(ValidationError) as caught:
+        load_contracts(_write(tmp_path, empty))
+    assert [(e["type"], e["loc"][-1]) for e in caught.value.errors()] == [("too_short", "options")]
+
+
+def _cut(path: Path) -> None:
+    path.write_text("{")
+
+
+@pytest.mark.parametrize(
+    ("name", "damage", "error"),
+    [
+        ("blocks.json", Path.unlink, RuntimeError),
+        ("edges.json", Path.unlink, FileNotFoundError),
+        ("blocks.json", _cut, ValidationError),
+        ("edges.json", _cut, ValidationError),
+    ],
+    ids=["sem-blocks", "sem-edges", "blocks-cortado", "edges-cortado"],
+)
+def test_arquivo_ausente_ou_cortado_falha_fechado(
+    tmp_path: Path, name: str, damage: Callable[[Path], object], error: type[Exception]
+) -> None:
     damage(_write(tmp_path, lambda b, e: None) / name)
-    with pytest.raises((RuntimeError, OSError, ValidationError)):
+    with pytest.raises(error):
         load_contracts(tmp_path)
 
 

@@ -2,7 +2,7 @@
 
 API em Python + FastAPI + Pydantic v2, executada em AWS Lambda atrás do API Gateway HTTP API. Stack e decisões: `docs/architecture/aws-cost-playground/ADR-0001-stack.md`. Nível de arquitetura: `simple`.
 
-Hoje é só o esqueleto: não há rotas e o OpenAPI (`/docs`, `/redoc`, `/openapi.json`) está desligado.
+As nove rotas do contrato estão declaradas, com corpo e resposta validados, mas todas respondem 501 até as Issues de cada uma (seção Rotas). O OpenAPI (`/docs`, `/redoc`, `/openapi.json`) está desligado.
 
 ## Pré-requisitos
 
@@ -37,12 +37,14 @@ Nenhum segredo vai em código nem em variável commitada.
 - `main.py` — composition root: `create_app()` e o `handler` da Lambda.
 - `config.py` — `Settings`, lidas só do ambiente.
 - `auth.py` — identidade do usuário.
+- `routing.py` — `ProtectedRoute`, a `route_class` dos quatro routers: confere a identidade e o teto do corpo cru (`MAX_BODY_BYTES`, 1 MiB) antes de o FastAPI ler o corpo.
 - `errors.py` — erros no formato problem details (`install_error_handlers`).
 - `logs.py` — logs JSON, id da requisição e `RequestLogMiddleware`.
 - `dynamo.py` — acesso à tabela única (`get_table()`).
 - `design_document.py` — modelos Pydantic do documento do design, equivalentes ao schema zod do `web/`.
 - `contracts.py` — leitor de `contracts/blocks.json` e `contracts/edges.json` (`load_contracts()`, `get_contracts()`).
-- `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade (ainda vazios). Cada um segue `router` → `service` → repositório.
+- `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade. Hoje têm só `router.py` (handlers que respondem 501) e `schemas.py` (entradas e saídas; `account/` não tem schemas). Cada um seguirá `router` → `service` → repositório quando as rotas forem implementadas.
+- `designs/schemas.py` também guarda `MAX_DOC_BYTES` (350.000) e `doc_size_bytes()`, que mede o `doc` em bytes UTF-8 do JSON compacto.
 
 ## Documento do design e contratos
 
@@ -66,7 +68,29 @@ Nenhum segredo vai em código nem em variável commitada.
 1. ao lado de `app/` — no zip da Lambda, `/var/task/contracts/`;
 2. um nível acima — a raiz do repositório, no desenvolvimento e nos testes (`api/app/contracts.py` → `contracts/`).
 
-Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **o zip precisa levar `contracts/blocks.json` e `contracts/edges.json` na raiz, ao lado de `app/`**. O `scripts/build-functions.sh` da #22 (PR #218) hoje copia só `app/` e as dependências: enquanto ele não copiar `contracts/`, `get_contracts()` levanta `RuntimeError` na Lambda (falha fechada: arquivo ausente, cortado ou fora do contrato nunca vira contrato vazio). Nenhuma rota chama `get_contracts()` ainda; as primeiras são as de estimativa (#61, #62).
+Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **o zip precisa levar `contracts/blocks.json` e `contracts/edges.json` na raiz, ao lado de `app/`**. O `scripts/build-functions.sh` (#22, PR #218) copia esses dois arquivos, e só eles, para `contracts/` na raiz do zip (#242); exemplos e cenários ficam de fora, e arquivo ausente derruba o build. `api/tests/test_package.py` trava isso: roda o script e confere o conteúdo do zip e que `app.contracts` carrega do pacote extraído. Se o zip sair sem eles, `get_contracts()` levanta `RuntimeError` na Lambda (falha fechada: arquivo ausente, cortado ou fora do contrato nunca vira contrato vazio). Nenhuma rota chama `get_contracts()` ainda; as primeiras são as de estimativa (#61, #62).
+
+## Rotas
+
+Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo em camelCase; `design_id` é ULID (fora do formato: 422). Todas exigem identidade e hoje respondem 501 em problem details.
+
+| Método e caminho | Corpo | Sucesso | Issue |
+|---|---|---|---|
+| `GET /designs` | — | 200, array de resumos | #53 |
+| `POST /designs` | `{name, doc}` | 201, design | #53 |
+| `GET /designs/{design_id}` | — | 200, design | #53 |
+| `PATCH /designs/{design_id}` | `{expectedVersion, name?, doc?}` | 200, design | #54 |
+| `DELETE /designs/{design_id}` | — | 204 | #54 |
+| `POST /designs/{design_id}/duplicate` | `{name}` | 201, design | #54 |
+| `POST /estimates` | `{region, description, blocks, edges}` | 200, estimativa | #62 |
+| `GET /quota` | — | 200, quota | #60 |
+| `DELETE /me` | — | 204 | #55 |
+
+- `PATCH` exige ao menos um entre `name` e `doc` e recusa `null` explícito nos dois: omita a chave para não alterar.
+- Quando as rotas forem implementadas, 409 será `design-limit` em create/duplicate e `version-conflict` no update.
+- As rotas de designs ainda não estão no API Gateway (`infra/envs/*/main.tf`): é outra Issue.
+
+Ordem das respostas: 401 (sem `sub`) → 413 (corpo cru acima de 1 MiB, ou `doc` acima de 350.000 bytes) → 400 (JSON que o parser recusa, como inteiro com mais de 4.300 dígitos ou aninhamento extremo) / 422 (validação) → 501. A `ProtectedRoute` garante que o 401 saia sem olhar o corpo e que o 413 do corpo cru saia antes de o JSON ser decodificado. O limite de 350.000 bytes do `doc` é medido depois do parse completo do documento (sem as chaves desconhecidas) e tem precedência sobre o 422: se algum erro de validação for `doc_too_large`, a resposta é 413 mesmo que haja outros campos inválidos.
 
 ## Identidade
 
@@ -88,6 +112,8 @@ Toda resposta de erro segue o problem details (RFC 9457), com `Content-Type: app
 
 - `detail` é opcional e some quando repetiria o `title`.
 - No 422, `errors` lista só `loc` e `msg` de cada campo inválido. `input`, `ctx` e `url` ficam de fora, porque ecoariam o que o usuário enviou.
+- O 413 vale para corpo cru acima de `MAX_BODY_BYTES` e para `doc` acima de `MAX_DOC_BYTES`; neste último caso não há lista `errors`.
+- O 422 lista no máximo 20 erros (`MAX_REPORTED_ERRORS`) e trunca cada parte do `loc` em 40 caracteres (`MAX_LOC_PART_LENGTH`), porque o `loc` pode trazer chave enviada pelo usuário.
 - O 401 do `auth.py` usa o mesmo formato.
 - O 500 não tem `detail`: a mensagem da exceção nunca vai para o cliente.
 

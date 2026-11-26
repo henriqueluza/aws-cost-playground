@@ -5,7 +5,8 @@
 #   uso:    scripts/build-functions.sh <saida.zip>   (rodar da raiz do repositório)
 #   exige:  uv; acessa só o índice de pacotes do lock, nunca a AWS
 #   zip:    app/ e as dependências de runtime (sem as de dev) na raiz do zip, para
-#           Python $(cat api/.python-version) em aarch64 (Lambda arm64)
+#           Python $(cat api/.python-version) em aarch64 (Lambda arm64); e contracts/ só com
+#           blocks.json e edges.json, que app/contracts.py lê em execução (#242)
 #   stdout: só o sha256 do zip, em hex (a conversão para base64 do digest, que o S3 e o
 #           CodeSha256 da Lambda usam, fica com quem chama)
 #   saída:  0 com o zip criado; 2 para uso errado; 1 para qualquer outra falha
@@ -46,6 +47,11 @@ cp -R "$root/api/app" "$tmp/package/app"
 find "$tmp/package" -name __pycache__ -type d -prune -exec rm -rf {} +
 find "$tmp/package" -name '*.pyc' -delete
 rm -rf "$tmp/package/app/tests"
+
+# Contratos lidos em execução (app/contracts.py procura contracts/ ao lado de app/). Só os dois
+# arquivos, por nome: exemplos e cenários ficam fora do pacote. Arquivo ausente derruba o build.
+mkdir "$tmp/package/contracts"
+cp "$root/contracts/blocks.json" "$root/contracts/edges.json" "$tmp/package/contracts/"
 
 # Reprodutível (o zip grava mtime em hora local, daí o TZ=UTC): mtimes fixos (1980-01-01 UTC), ordem estável e sem atributos extras (-X).
 find "$tmp/package" -exec touch -h -d @315532800 {} + 2>/dev/null \

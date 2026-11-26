@@ -89,9 +89,10 @@ describe.each([
   it('expõe as regiões e os painéis', () => {
     renderPage(matches);
     expect(screen.getByRole('heading', { level: 1, name: 'Editor' })).toBeInTheDocument();
-    expect(
-      within(screen.getByRole('banner')).getByRole('heading', { name: 'Ações' }),
-    ).toBeVisible();
+    const banner = screen.getByRole('banner');
+    expect(within(banner).getByRole('heading', { name: 'Ações' })).toBeVisible();
+    expect(within(banner).getByRole('button', { name: 'Abrir arquivo' })).toBeVisible();
+    expect(within(banner).getByRole('button', { name: 'Baixar JSON' })).toBeVisible();
     const paleta = screen.getByRole('complementary', { name: 'Paleta' });
     expect(within(paleta).getByRole('heading', { name: 'Paleta' })).toBeVisible();
     expect(within(screen.getByRole('main')).getByRole('heading', { name: 'Canvas' })).toBeVisible();
@@ -109,7 +110,9 @@ describe.each([
     renderPage(matches);
     await userEvent.click(screen.getByRole('tab', { name: 'Bloco' }));
     expect(
-      within(screen.getByRole('tabpanel')).getByRole('heading', { name: 'Bloco' }),
+      within(screen.getByRole('tabpanel')).getByRole('heading', {
+        name: 'Nenhum bloco selecionado',
+      }),
     ).toBeVisible();
     expect(screen.getByRole('note')).toHaveTextContent(NOTICE);
   });
@@ -138,6 +141,27 @@ describe.each([
     expect(screen.getByRole('tabpanel')).toHaveFocus();
   });
 
+  it('liga as linhas do painel de custo à seleção da store, nos dois sentidos', async () => {
+    expect(designStore.getState().loadDesign(adrExampleDesign).ok).toBe(true);
+    const { document } = designStore.getState();
+    const services = catalogServices(document);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(
+      priceCatalogKey(document.region, services),
+      catalogOf(Object.fromEntries(services.map((service) => [service, []]))),
+    );
+    renderPage(matches, client);
+    const row = screen.getByRole('button', { name: /^API handler/ });
+    await userEvent.click(row);
+    expect(designStore.getState().selection).toEqual({ kind: 'block', id: 'blk_fn_api' });
+    act(() => void designStore.getState().select({ kind: 'edge', id: 'edg_1' }));
+    expect(screen.getByRole('button', { name: /^Uploads \u2192 Internet/ })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(row).not.toHaveAttribute('aria-current');
+  });
+
   it('não tem violações de acessibilidade', async () => {
     const { container } = renderPage(matches);
     await expectNoAxeViolations(container);
@@ -156,6 +180,8 @@ describe('EditorPage estreito', () => {
     expect(within(main).getByRole('heading', { level: 1, name: 'Editor' })).toBeInTheDocument();
     expect(within(main).getByRole('link', { name: 'Meus designs' })).toBeInTheDocument();
     expect(within(main).getByRole('note')).toBeInTheDocument();
+    expect(within(main).getByRole('button', { name: 'Baixar JSON' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abrir arquivo' })).toBeNull();
     expect(screen.queryByRole('banner')).toBeNull();
     expect(screen.queryByRole('complementary')).toBeNull();
     expect(screen.queryByRole('tablist')).toBeNull();

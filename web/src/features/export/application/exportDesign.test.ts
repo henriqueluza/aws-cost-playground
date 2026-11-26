@@ -90,6 +90,26 @@ describe('exportDesign', () => {
     expect(text).toContain('# Bloco aws.eks "x": não exportado, tipo de bloco fora do contrato.');
   });
 
+  it('bloco com atributo fora das opções do contrato sai como comentário com o motivo', () => {
+    const block = { ...adrExampleDesign.blocks[0], attributes: { architecture: 'x86"\n' } };
+    const text = mainTf({ ...adrExampleDesign, blocks: [block], edges: [] });
+    expect(text).toContain('# - aws.lambda "API handler": atributo fora das opções do contrato');
+    expect(text).toContain(
+      '# Bloco aws.lambda "API handler": não exportado, atributo fora das opções do contrato.',
+    );
+  });
+
+  it('chave herdada de Object.prototype em atributo, uso ou override não chega ao arquivo', () => {
+    const json = (fields: string) =>
+      JSON.parse(
+        JSON.stringify(withLabels('x')).replace('"attributes":{', `"attributes":{${fields}`),
+      );
+    expect(mainTf(json('"__proto__":"${file(1)}",'))).toBe(mainTf(withLabels('x')));
+    for (const key of ['constructor', 'toString']) {
+      expect(exportDesign(json(`"${key}":"x",`))).toEqual({ ok: false, error: 'invalid-design' });
+    }
+  });
+
   it('é determinístico e não depende da ordem dos blocos e das arestas no documento', () => {
     const edge = (id: string, source: string, target: string) => ({
       ...adrExampleDesign.edges[0],
