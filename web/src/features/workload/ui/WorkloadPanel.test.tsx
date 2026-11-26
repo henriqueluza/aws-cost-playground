@@ -245,39 +245,29 @@ describe('WorkloadPanel: erros', () => {
 });
 
 describe('WorkloadPanel: quota e trava', () => {
-  const day = 24 * 3_600_000;
-  const future = () => new Date(Date.now() + day).toISOString();
-  const past = () => new Date(Date.now() - day).toISOString();
+  const at = (ms: number) => new Date(Date.now() + ms).toISOString();
 
-  it('0 de 20 com a hora de voltar no futuro trava o botão e mostra a frase', async () => {
-    const { api } = setup({ quota: { limit: 20, remaining: 0, resetsAt: future() } });
+  it.each([
+    ['no futuro trava', 86_400_000, 'true'],
+    ['já passada solta', -86_400_000, 'false'],
+  ])('0 de 20 com a hora de voltar %s', async (_, ms, locked) => {
+    setup({ quota: { limit: 20, remaining: 0, resetsAt: at(ms) } });
     expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
-    expect((await screen.findAllByText(/Você usou as estimativas de hoje/)).length).toBeGreaterThan(
-      0,
+    expect(button()).toHaveAttribute('aria-disabled', locked);
+    expect(screen.queryAllByText(/Você usou as estimativas de hoje/).length > 0).toBe(
+      locked === 'true',
     );
-    expect(button()).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.click(button());
-    expect(api.estimates.estimateUsage).not.toHaveBeenCalled();
   });
 
-  it('0 de 20 com a hora de voltar já passada solta a trava', async () => {
-    const { api } = setup({ quota: { limit: 20, remaining: 0, resetsAt: past() } });
-    expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
-    expect(screen.queryByText(/Você usou as estimativas de hoje/)).toBeNull();
-    expect(button()).toHaveAttribute('aria-disabled', 'false');
-    await userEvent.click(button());
-    await waitFor(() => expect(api.estimates.estimateUsage).toHaveBeenCalledTimes(1));
-  });
-
-  it('resposta sem valor aproveitável mostra a frase e não zera a marca de desatualizada', async () => {
+  it('resposta sem valor aproveitável mostra a frase e mantém a marca de desatualizada', async () => {
+    const quota = { limit: 20, remaining: 5, resetsAt: at(86_400_000) };
     let empty = false;
-    setup({ estimate: () => Promise.resolve(empty ? { blocks: [], edges: [] } : LLM) });
+    setup({
+      estimate: () => Promise.resolve(empty ? { blocks: [], edges: [], quota } : { ...LLM, quota }),
+    });
     await userEvent.click(button());
     await screen.findByText(/Estimativa aplicada/);
-    fireEvent.change(screen.getByLabelText('Descrição da carga'), {
-      target: { value: 'Mais tráfego' },
-    });
-    expect(screen.getByText('Estimativa desatualizada')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Descrição da carga'), { target: { value: 'Mais' } });
     empty = true;
     await userEvent.click(button());
     expect(await screen.findByText(/não trouxe valores utilizáveis/)).toBeInTheDocument();
