@@ -5,7 +5,7 @@ As duas funções Lambda da API, os papéis IAM e os log groups, conforme o `doc
 | Característica | Valor |
 |---|---|
 | Funções | `acp-<stg\|prod>-api` (timeout 10 s) e `acp-<stg\|prod>-llm-proxy` (timeout 29 s), do mesmo pacote zip |
-| Runtime | Python 3.13, `arm64`, 256 MB fixos |
+| Runtime | Python 3.14, `arm64`, 256 MB fixos |
 | Logs | Formato JSON; um log group por função, criado pelo Terraform, com retenção por variável (padrão 7 dias; aceita 1, 3, 5, 7, 14 ou 30) |
 | Papéis IAM | Um por função, com o mesmo nome dela, políticas inline sem curinga em ação ou recurso, limite de permissões (`acp-ci-boundary-<env>`) e `prevent_destroy` |
 | Parâmetro da chave | `/acp/<env>/anthropic-api-key`. **Fora do Terraform:** o autor o cria à mão; o módulo só usa o nome |
@@ -52,6 +52,13 @@ module "functions" {
 | `function_invoke_arns` | ARN de invocação de cada função, para as integrações do API Gateway |
 | `role_names` | Nome do papel de cada função. O do `llm-proxy` é o alvo da ação de corte do Budgets |
 | `api_key_parameter_name` | Nome do parâmetro da chave, que o autor cria à mão. O parâmetro e o valor ficam fora do Terraform |
+
+## Runtime e pacote
+
+O runtime (`python3.14`, Amazon Linux 2023) acompanha `api/.python-version`. O zip é montado por `scripts/build-functions.sh` para essa versão e para `aarch64-manylinux_2_28` (arm64), só com wheels binárias (`--only-binary :all:`); a glibc 2.34 do runtime aceita essas wheels. A AWS lista `python3.14` entre os runtimes que aceitam `arm64` ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html)).
+
+- Trocar o Python da API exige trocar `api/.python-version` e o `runtime` no mesmo PR. O teste `infra/tools/tests/test_functions_runtime.py` reprova a divergência e confere os parâmetros do script de build.
+- Trocar o runtime é alteração in-place da função: ela não é recriada.
 
 ## Variáveis de ambiente das funções
 
@@ -111,6 +118,7 @@ Os testes usam provider simulado (`mock_provider`): não precisam de credenciais
 terraform -chdir=infra/modules/functions init -backend=false
 terraform -chdir=infra/modules/functions validate
 terraform -chdir=infra/modules/functions test
+python3 -m unittest discover -s infra/tools/tests   # runtime alinhado ao Python da API
 ```
 
 O `init` cria um `.terraform.lock.hcl` na pasta do módulo. Não o versione: o lockfile fica só nos ambientes.
