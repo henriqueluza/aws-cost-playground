@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "service": "s3",
+  "region": "us-east-1",
+  "currency": "USD",
+  "prices": []
+}
