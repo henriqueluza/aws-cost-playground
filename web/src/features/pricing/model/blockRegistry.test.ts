@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { adrExampleDesign } from '../../../test/designFixtures';
-import { PRD_BLOCK_LEVELS } from './blockContract';
+import { BLOCK_TYPES, PRD_BLOCK_LEVELS } from './blockContract';
 import {
   BLOCKS,
   EDGE_KIND_DEFINITIONS,
@@ -9,16 +9,23 @@ import {
   edgeKindsFor,
 } from './blockRegistry';
 
-/** PRD F10. Lista escrita à mão de propósito: não deriva do código testado. */
-const levelA = 'ec2 lambda rds dynamodb elasticache s3 sqs cloudfront alb cloudwatch nat-gateway'
-  .split(' ')
-  .map((name) => `aws.${name}`);
-const vpcBlocks = ['aws.ec2', 'aws.rds', 'aws.elasticache'];
+/** PRD F2, na ordem do texto. Lista escrita à mão de propósito: não deriva do código testado. */
+const prdBlocks =
+  'route53 cloudfront waf alb ec2 ecs lambda elasticache rds dynamodb s3 sqs cognito iam secrets-manager cloudwatch cloudtrail codepipeline cloudformation nat-gateway'
+    .split(' ')
+    .map((name) => `aws.${name}`);
+const vpcBlocks = ['aws.ec2', 'aws.ecs', 'aws.rds', 'aws.elasticache'];
 
 describe('contracts/blocks.json', () => {
-  it('traz os 11 blocos de nível A do PRD (F10); os níveis B e C entram na continuação', () => {
-    expect(BLOCKS.map((block) => block.type).sort()).toEqual([...levelA].sort());
-    for (const block of BLOCKS) expect(PRD_BLOCK_LEVELS[block.type]).toBe('A');
+  it('traz os 20 blocos do PRD, sem faltar nem sobrar', () => {
+    expect(BLOCKS.map((block) => block.type).sort()).toEqual([...prdBlocks].sort());
+    expect([...BLOCK_TYPES].sort()).toEqual([...prdBlocks].sort());
+  });
+
+  it('segue os níveis do PRD: 11 blocos A, 6 B e 3 C de custo zero', () => {
+    const count = (level: string) => BLOCKS.filter((block) => block.level === level).length;
+    expect([count('A'), count('B'), count('C')]).toEqual([11, 6, 3]);
+    expect(PRD_BLOCK_LEVELS['aws.ecs']).toBe('C');
   });
 
   it('só os blocos em VPC têm o atributo opcional az; os demais atributos têm padrão', () => {
@@ -81,12 +88,14 @@ describe('contracts/edges.json', () => {
   });
 
   it.each([
-    ['aws.ecs', 'aws.ec2', []],
+    ['aws.ecs', 'aws.ec2', ['data', 'runs-on']],
+    ['aws.ec2', 'aws.ecs', ['data']],
     ['aws.alb', 'aws.ec2', ['data']],
     ['aws.lambda', 'aws.cloudwatch', ['logs']],
     ['aws.cloudwatch', 'aws.lambda', []],
     ['aws.cloudwatch', 'aws.cloudwatch', []],
-    ['aws.s3', 'aws.cloudwatch', ['logs']],
+    ['aws.iam', 'aws.s3', []],
+    ['aws.iam', 'aws.cloudwatch', ['logs']],
     ['aws.lambda', 'aws.eks', []],
     ['aws.eks', 'aws.s3', []],
     ['client', 'aws.cloudfront', []],
@@ -100,5 +109,14 @@ describe('contracts/edges.json', () => {
       ['aws.alb', 'aws.cloudfront', 'aws.ec2', 'aws.s3'].sort(),
     );
     expect(edgeKindsFor('aws.s3', 'client')).toEqual(['data']);
+  });
+
+  it('runs-on só existe de ECS para EC2', () => {
+    const pairs = BLOCKS.flatMap((source) =>
+      BLOCKS.filter((target) => edgeKindsFor(source.type, target.type).includes('runs-on')).map(
+        (target) => [source.type, target.type],
+      ),
+    );
+    expect(pairs).toEqual([['aws.ecs', 'aws.ec2']]);
   });
 });
