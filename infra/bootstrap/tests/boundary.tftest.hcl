@@ -88,13 +88,39 @@ run "limite_de_permissoes" {
       for env in ["staging", "production"] : [
         for s in jsondecode(aws_iam_policy.apply_boundary[env].policy).Statement : [
           !strcontains(jsonencode(s.Action), "*"),
-          length(regexall("^(logs|dynamodb|cognito-idp|ssm):", join(" ", flatten([s.Action])))) == 1,
+          alltrue([for action in flatten([s.Action]) : can(regex("^(logs|dynamodb|cognito-idp|ssm):", action))]),
           s.Resource != "*",
           s.Sid == "FunctionLogs" || can(s.Condition.ArnEquals["lambda:SourceFunctionArn"]),
         ] if s.Effect == "Allow"
       ]
     ]))
     error_message = "Nenhum Allow do limite tem curinga em ação, Resource \"*\" nem serviço fora de logs, dynamodb, cognito-idp e ssm (nada de IAM, STS, KMS ou S3), e todo Allow de dado exige lambda:SourceFunctionArn."
+  }
+
+  # Contrato com o módulo `functions` (comentário da #166 e teste `politicas_inline_cabem_no_limite`
+  # do módulo): cada ação que os papéis das funções recebem, no recurso real e chamada pela
+  # função certa, tem de caber num Allow do limite. Ação fora do limite falha só em execução.
+  assert {
+    condition = alltrue(flatten([
+      for env, p in { staging = "stg", production = "prod" } : [
+        for need in concat(
+          flatten([for fn in ["api", "llm-proxy"] : [for action in ["logs:CreateLogStream", "logs:PutLogEvents"] : { fn = fn, action = action, resource = "arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/acp-${p}-${fn}:*" }]]),
+          [for action in ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:BatchWriteItem"] : { fn = "api", action = action, resource = "arn:aws:dynamodb:us-east-1:123456789012:table/acp-${p}-main" }],
+          [for action in ["dynamodb:GetItem", "dynamodb:UpdateItem"] : { fn = "llm-proxy", action = action, resource = "arn:aws:dynamodb:us-east-1:123456789012:table/acp-${p}-main" }],
+          [
+            { fn = "api", action = "cognito-idp:AdminDeleteUser", resource = "arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_AbCdEf123" },
+            { fn = "llm-proxy", action = "ssm:GetParameter", resource = "arn:aws:ssm:us-east-1:123456789012:parameter/acp/${env}/anthropic-api-key" },
+          ],
+        ) :
+        anytrue([
+          for s in jsondecode(aws_iam_policy.apply_boundary[env].policy).Statement :
+          s.Effect == "Allow" && contains(flatten([s.Action]), need.action)
+          && can(regex("^${replace(s.Resource, "*", ".*")}$", need.resource))
+          && contains(flatten([try(s.Condition.ArnEquals["lambda:SourceFunctionArn"], "arn:aws:lambda:us-east-1:123456789012:function:acp-${p}-${need.fn}")]), "arn:aws:lambda:us-east-1:123456789012:function:acp-${p}-${need.fn}")
+        ])
+      ]
+    ]))
+    error_message = "O limite tem de permitir tudo o que o módulo functions concede: logs das duas funções, GetItem, PutItem, DeleteItem, Query e BatchWriteItem para a api, GetItem e UpdateItem para o llm-proxy, AdminDeleteUser para a api e ssm:GetParameter na chave para o llm-proxy."
   }
 
   assert {
