@@ -35,12 +35,16 @@ jobs:
         run: terraform fmt -check -recursive infra
       - name: Testes do plan-guard
         run: python3 -m unittest discover -s infra/tools/tests
-      - name: terraform validate (sem backend)
+      # Ambientes, bootstrap e cada módulo de infra/modules/*: init sem backend, validate e
+      # terraform test (só mock_provider). Sem credenciais da AWS. O cache de plugins faz o
+      # provider ser baixado uma vez para todos os diretórios.
+      - name: terraform validate e test (sem backend, sem credenciais)
+        env:
+          AWS_EC2_METADATA_DISABLED: "true"
         run: |
-          for env in staging production; do
-            terraform -chdir="infra/envs/$env" init -backend=false -input=false -lockfile=readonly
-            terraform -chdir="infra/envs/$env" validate
-          done
+          export TF_PLUGIN_CACHE_DIR="$RUNNER_TEMP/tf-plugin-cache"
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          infra/tools/tf_checks.sh
       - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
         with:
           tflint_version: v0.66.0

@@ -5,6 +5,10 @@ resource "aws_iam_role" "this" {
 
   name = "${local.prefix}-${each.key}"
 
+  # Sem o limite, o papel de CI nega criar o papel e gravar as políticas inline dele. O limite não
+  # concede nada: a permissão efetiva é a interseção dele com as políticas inline abaixo.
+  permissions_boundary = local.permissions_boundary_arn
+
   assume_role_policy = jsonencode({
     Version   = "2012-10-17"
     Statement = [{ Effect = "Allow", Action = "sts:AssumeRole", Principal = { Service = "lambda.amazonaws.com" } }]

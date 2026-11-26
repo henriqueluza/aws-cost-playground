@@ -57,6 +57,24 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     expect(rules).not.toContain('no-restricted-imports');
   });
 
+  it('permite a pricing/api importar a porta de application/ e o contrato de shared', async () => {
+    const code =
+      "import { CatalogError } from '../application/loadCatalog';\nimport { REGIONS } from '../../../shared/lib/design';\nexport const deps = [CatalogError, REGIONS];\n";
+    expect(await errorRules(code, './features/pricing/api/x.ts')).toEqual([]);
+  });
+
+  it('permite a pricing/hooks usar React, TanStack Query e as camadas de dentro', async () => {
+    const code =
+      "import { useQuery } from '@tanstack/react-query';\nimport { useMemo } from 'react';\nimport { httpPriceFiles } from '../api/httpPriceFiles';\nimport { catalogServices } from '../application/catalogServices';\nexport const deps = [useQuery, useMemo, httpPriceFiles, catalogServices];\n";
+    expect(await errorRules(code, './features/pricing/hooks/x.ts')).toEqual([]);
+  });
+
+  it('proíbe outra feature de importar o adaptador de pricing/api direto', async () => {
+    const code =
+      "import { httpPriceFiles } from '../../pricing/api/httpPriceFiles';\nexport const p = httpPriceFiles;\n";
+    expect(await errorRules(code, designsUi)).toContain('boundaries/dependencies');
+  });
+
   it('proíbe importar um arquivo interno de outra feature', async () => {
     const code =
       "import { EditorPage } from '../../editor/ui/EditorPage';\nexport const p = EditorPage;\n";
