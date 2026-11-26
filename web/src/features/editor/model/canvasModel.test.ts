@@ -57,15 +57,16 @@ describe('toCanvasNodes', () => {
   });
 
   it('termina com um ciclo no design', () => {
-    const loop = {
-      ...doc,
-      blocks: ['blk_a', 'blk_b'].map((id) => ({ ...doc.blocks[0]!, id })),
-      edges: [
-        { ...doc.edges[0]!, id: 'edg_1', source: 'blk_a', target: 'blk_b' },
-        { ...doc.edges[0]!, id: 'edg_2', source: 'blk_b', target: 'blk_a' },
-      ],
-    };
-    expect(Object.keys(defaultLayout(loop))).toEqual(['blk_a', 'blk_b', 'client']);
+    const [a, b] = ['blk_a', 'blk_b'];
+    const edge = (id: string, source: string, target: string) => ({
+      ...doc.edges[0]!,
+      id,
+      source,
+      target,
+    });
+    const blocks = [a, b].map((id) => ({ ...doc.blocks[0]!, id: id! }));
+    const loop = { ...doc, blocks, edges: [edge('edg_1', a!, b!), edge('edg_2', b!, a!)] };
+    expect(Object.keys(defaultLayout(loop))).toEqual([a, b, 'client']);
   });
 
   it('marca só o bloco selecionado', () => {
