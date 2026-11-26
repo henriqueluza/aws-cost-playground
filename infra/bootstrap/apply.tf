@@ -12,8 +12,8 @@ locals {
     for env, prefix in local.environments : env => "${local.state_bucket_arn[env]}/acp-${prefix}/terraform.tfstate"
   }
 
-  # Limite de permissões dos papéis que o apply cria. A política nasce na continuação da
-  # #124; até lá a negação `DenyRoleWithoutBoundary` impede criar qualquer papel.
+  # Limite de permissões dos papéis que o apply cria. A política nasce na #166; até lá
+  # a negação `DenyRoleWithoutBoundary` impede criar qualquer papel.
   apply_boundary_arn = { for env in keys(local.environments) : env => "${local.iam_arn}:policy/acp-ci-boundary-${env}" }
 }
 
@@ -81,11 +81,8 @@ resource "aws_iam_role_policy" "apply_deny" {
         Sid    = "DenyDataDeletion"
         Effect = "Deny"
         Action = [
-          "cognito-idp:DeleteUserPool",
-          "dynamodb:DeleteTable",
-          "dynamodb:PutResourcePolicy",
-          "route53:DeleteHostedZone",
-          "s3:DeleteBucket",
+          "cognito-idp:DeleteUserPool", "dynamodb:DeleteTable", "dynamodb:PutResourcePolicy",
+          "route53:DeleteHostedZone", "s3:DeleteBucket",
         ]
         Resource = "*"
       },
