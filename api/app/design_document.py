@@ -18,7 +18,6 @@ from pydantic import (
     Field,
     StringConstraints,
     ValidationError,
-    field_validator,
     model_validator,
 )
 from pydantic.alias_generators import to_camel
@@ -27,7 +26,6 @@ from pydantic_core import InitErrorDetails, PydanticCustomError
 Region = Literal["us-east-1", "sa-east-1"]
 EdgeKind = Literal["data", "runs-on", "logs"]
 UsageSource = Literal["llm", "default"]
-REGIONS: tuple[Region, ...] = ("us-east-1", "sa-east-1")
 CLIENT_NODE_ID = "client"
 """Nó fixo, sem preço, que representa a internet. É o destino das arestas de egress."""
 
@@ -55,14 +53,13 @@ _TIME = r"(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]+)?"
 
 
 class ContractModel(BaseModel):
-    """Base dos modelos de contrato: tipos estritos (como o zod), JSON em camelCase, imutável."""
+    """Base dos contratos: tipos estritos (como o zod), JSON só em camelCase, imutável."""
 
     model_config = ConfigDict(
         strict=True,
         extra="ignore",
         frozen=True,
         alias_generator=to_camel,
-        validate_by_name=True,
         validate_by_alias=True,
     )
 
@@ -98,6 +95,14 @@ def _not_bool(value: object) -> object:
     return value
 
 
+def _not_null(value: object) -> object:
+    if value is None:
+        raise PydanticCustomError("not_null", "Input should not be null")
+    return value
+
+
+NotNull = BeforeValidator(_not_null)
+"""Campo opcional que recusa `null` explícito, como o `.optional()` do zod."""
 SchemaVersion = Annotated[Literal[1], BeforeValidator(_not_bool)]
 """`schemaVersion` dos arquivos de contrato: o literal 1, nunca `true`."""
 # Regex só com classes ASCII explícitas (`[0-9]`, nunca `\d`). O `$` do motor Rust não casa `\n`.
@@ -135,16 +140,8 @@ Attributes = Annotated[
 
 class Usage(ContractModel):
     source: UsageSource
-    estimated_at: UtcTimestamp | None = None
+    estimated_at: Annotated[UtcTimestamp | None, NotNull] = None
     values: UsageValues
-
-    @field_validator("estimated_at", mode="before")
-    @classmethod
-    def _absent_not_null(cls, value: object) -> object:
-        """Opcional, mas `null` explícito é recusado, como no `.optional()` do zod."""
-        if value is None:
-            raise PydanticCustomError("string_type", "Input should be a valid string")
-        return value
 
 
 class Block(ContractModel):
@@ -175,8 +172,10 @@ class DesignDocument(ContractModel):
     schema_version: SchemaVersion
     region: Region
     workload: Workload
-    blocks: Annotated[list[Block], Field(max_length=MAX_BLOCKS)]
-    edges: Annotated[list[Edge], Field(max_length=MAX_EDGES)]
+    # `fail_fast`: para no primeiro item inválido. O veredito é o do zod; só a lista de erros
+    # encurta, para entrada adversarial não gerar dezenas de milhares de erros (T1).
+    blocks: Annotated[list[Block], Field(max_length=MAX_BLOCKS, fail_fast=True)]
+    edges: Annotated[list[Edge], Field(max_length=MAX_EDGES, fail_fast=True)]
     scenarios: Annotated[list[object], Field(max_length=0)]
 
     @model_validator(mode="after")

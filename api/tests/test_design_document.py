@@ -95,7 +95,9 @@ def test_chave_desconhecida_e_descartada() -> None:
     d = doc(extra=1)
     for part in (d["blocks"][0], d["edges"][0], d["blocks"][0]["usage"]):
         part["extra"] = 1
-    assert DesignDocument.model_validate(d).model_dump(by_alias=True, exclude_none=True) == ADR
+    out = DesignDocument.model_validate(d).model_dump(by_alias=True, exclude_none=True)
+    assert out == ADR  # saída em camelCase, igual à entrada
+    assert "estimatedAt" not in out["blocks"][1]["usage"]  # ausente continua ausente
 
 
 def test_proto_em_usage_values_e_descartado() -> None:
@@ -105,12 +107,6 @@ def test_proto_em_usage_values_e_descartado() -> None:
         DesignDocument.model_validate_json(raw),
     ):
         assert "__proto__" not in parsed.blocks[0].usage.values
-
-
-def test_saida_em_camel_case_repete_a_entrada() -> None:
-    out = DesignDocument.model_validate(ADR).model_dump(by_alias=True, exclude_none=True)
-    assert out == ADR
-    assert "estimatedAt" not in out["blocks"][1]["usage"]
 
 
 @pytest.mark.parametrize(
@@ -157,3 +153,19 @@ def test_float_integral_conta_como_inteiro(literal: str) -> None:
     esperado["blocks"][0]["usage"]["values"]["avgDurationMs"] = int(float(literal))
     parsed = DesignDocument.model_validate(json.loads(raw))
     assert doc_size_bytes(parsed) == js_size(esperado)
+
+
+def test_entrada_adversarial_nao_multiplica_os_erros() -> None:
+    """`fail_fast` nas listas: só o primeiro bloco e a primeira aresta inválidos geram erros."""
+    bad = {f"k{i}": [1] for i in range(32)}
+    usage = {"source": "default", "values": bad}
+    d = doc(
+        blocks=[
+            {**ADR["blocks"][0], "id": f"blk_{i}", "attributes": bad, "overrides": bad}
+            for i in range(100)
+        ],
+        edges=[{**ADR["edges"][0], "id": f"edg_{i}", "usage": usage} for i in range(400)],
+    )
+    with pytest.raises(ValidationError) as caught:
+        DesignDocument.model_validate(d)
+    assert caught.value.error_count() < 500

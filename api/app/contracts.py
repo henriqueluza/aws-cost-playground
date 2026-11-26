@@ -15,7 +15,6 @@ from pydantic import (
     AfterValidator,
     Field,
     StringConstraints,
-    field_validator,
     model_validator,
 )
 
@@ -25,6 +24,7 @@ from app.design_document import (
     ContractModel,
     EdgeKind,
     FieldKey,
+    NotNull,
     SchemaVersion,
     UsageNumber,
 )
@@ -70,15 +70,7 @@ class AttributeDefinition(ContractModel):
 
     key: FieldKey
     options: Annotated[list[OptionValue], Field(min_length=1, max_length=MAX_OPTIONS)]
-    default: OptionValue | None = None
-
-    @field_validator("default", mode="before")
-    @classmethod
-    def _absent_not_null(cls, value: object) -> object:
-        """Opcional, mas `null` explícito é recusado, como no `.optional()` do zod."""
-        if value is None:
-            raise ValueError("O padrão não pode ser null.")
-        return value
+    default: Annotated[OptionValue | None, NotNull] = None
 
     @model_validator(mode="after")
     def _check(self) -> Self:
