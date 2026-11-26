@@ -20,8 +20,15 @@ const seed: PriceCatalog = {
   manifest: { schemaVersion: 1, source: 'seed', generatedAt: '2026-11-23T12:00:00Z', files: [] },
   services: new Map(files.map((file) => [file.service, file])),
 };
-const inSeed = (service: string, sku: string) =>
-  seed.services.get(service)?.prices.some((price) => price.sku === sku) ?? false;
+const skusOf = (service: string) =>
+  seed.services.get(service)?.prices.map((price) => price.sku) ?? [];
+/**
+ * A semente do serviço ainda não chegou: arquivo ausente ou com `prices: []`. `data-transfer`
+ * chega pela #233, `cloudwatch` pela #37 e `nat-gateway` pela #36, em outros PRs. Enquanto isso a
+ * aresta sai `unavailable`; quando o arquivo é preenchido, a exigência de preço passa a valer
+ * sem editar este teste. Arquivo preenchido sem o SKU da aresta (nome trocado) é falha.
+ */
+const pending = (service: string) => skusOf(service).length === 0;
 
 const INTERNET = ['data-transfer', 'data-transfer-internet-out'] as const;
 const CLOUDFRONT = ['cloudfront', 'cloudfront-data-transfer-out'] as const;
@@ -63,10 +70,8 @@ const scenarios = [
 ] as const;
 
 describe('custos de aresta dos cenários de referência com as sementes versionadas', () => {
-  it('a semente de transferência de dados e a de saída do CloudFront existem', () => {
-    for (const [service, sku] of [INTERNET, INTER_AZ, CLOUDFRONT]) {
-      expect(inSeed(service, sku), `${service}/${sku}`).toBe(true);
-    }
+  it('a saída do CloudFront está na semente dele (#31)', () => {
+    expect(skusOf(CLOUDFRONT[0])).toContain(CLOUDFRONT[1]);
   });
 
   it.each(scenarios)('$name: toda aresta que custa tem preço', ({ design, paid }) => {
@@ -82,13 +87,11 @@ describe('custos de aresta dos cenários de referência com as sementes versiona
       }
       const [service, sku, grossGb] = charge;
       expect(catalogServices(document), edge.edgeId).toContain(service);
-      // As sementes de `cloudwatch` (#37) e `nat-gateway` (#36) chegam por outros PRs: enquanto
-      // o SKU não estiver na semente a aresta sai `unavailable`; quando chegar, passa a valer a
-      // exigência de preço, sem editar este teste.
-      if (!inSeed(service, sku)) {
+      if (pending(service)) {
         expect([edge.edgeId, edge.status]).toEqual([edge.edgeId, 'unavailable']);
         continue;
       }
+      expect(skusOf(service), `${service} sem o SKU da aresta ${edge.edgeId}`).toContain(sku);
       expect([edge.edgeId, edge.status]).toEqual([edge.edgeId, 'priced']);
       expect(edge.lines.map((line) => line.sku)).toEqual(edge.lines.map(() => sku));
       // Cobrado = bruto menos a franquia que a aresta usou: nunca mais que o bruto, e igual a ele
