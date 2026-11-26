@@ -35,12 +35,16 @@ jobs:
         run: terraform fmt -check -recursive infra
       - name: Testes do plan-guard
         run: python3 -m unittest discover -s infra/tools/tests
-      - name: terraform validate (sem backend)
+      # Ambientes, bootstrap e cada módulo de infra/modules/*: init sem backend, validate e
+      # terraform test (só mock_provider). Sem credenciais da AWS. O cache de plugins faz o
+      # provider ser baixado uma vez para todos os diretórios.
+      - name: terraform validate e test (sem backend, sem credenciais)
+        env:
+          AWS_EC2_METADATA_DISABLED: "true"
         run: |
-          for env in staging production; do
-            terraform -chdir="infra/envs/$env" init -backend=false -input=false -lockfile=readonly
-            terraform -chdir="infra/envs/$env" validate
-          done
+          export TF_PLUGIN_CACHE_DIR="$RUNNER_TEMP/tf-plugin-cache"
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          infra/tools/tf_checks.sh
       - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
         with:
           tflint_version: v0.66.0
@@ -92,9 +96,22 @@ jobs:
           aws-region: us-east-1
       - name: terraform plan
         working-directory: infra/envs/${{ matrix.env }}
+        # Variáveis sem default das raízes (infra/README.md, "Variáveis do job plan"). O job
+        # não usa `environment:` (o trust do papel `plan` é preso ao evento `pull_request`),
+        # então os valores vêm do repositório. Zona e e-mail são os reais: o plano lê a zona
+        # no Route 53 e um e-mail diferente do aplicado viraria `replace` da assinatura do SNS.
+        # O pacote é fictício e fixo: o plano não lê o S3. O e-mail é o único secret e só
+        # entra neste passo; o GitHub o mascara e o Terraform o trata como `sensitive`.
         env:
           TF_STATE_BUCKET: ${{ vars[matrix.bucket_var] }}
+          TF_VAR_zone_name: ${{ vars.TF_VAR_ZONE_NAME }}
+          TF_VAR_alarm_email: ${{ secrets.TF_VAR_ALARM_EMAIL }}
+          TF_VAR_package_bucket: acp-plan-placeholder
+          TF_VAR_package_key: plan/placeholder.zip
         run: |
+          # Falha fechada e sem imprimir valor: a mensagem só cita o nome do que falta.
+          : "${TF_VAR_zone_name:?cadastre a variável de repositório TF_VAR_ZONE_NAME}"
+          : "${TF_VAR_alarm_email:?cadastre o secret de repositório TF_VAR_ALARM_EMAIL}"
           terraform init -input=false -lockfile=readonly -backend-config="bucket=$TF_STATE_BUCKET"
           terraform plan -input=false -lock=false -out="$RUNNER_TEMP/tfplan"
           terraform show -json "$RUNNER_TEMP/tfplan" > "$RUNNER_TEMP/plan.json"

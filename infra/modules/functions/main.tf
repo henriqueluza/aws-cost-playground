@@ -8,6 +8,11 @@ locals {
   api_key_parameter_name = "/acp/${var.environment}/anthropic-api-key"
   api_key_parameter_arn  = "arn:aws:ssm:${element(split(":", var.table_arn), 3)}:${element(split(":", var.table_arn), 4)}:parameter${local.api_key_parameter_name}"
 
+  # Limite de permissões que os papéis de CI `acp-ci-apply-<env>` exigem em todo papel que criam
+  # (`local.apply_boundary_arn` em infra/bootstrap/apply.tf). A política nasce no bootstrap, fora
+  # deste módulo; aqui só o ARN, com o nome completo do ambiente e a conta do ARN da tabela.
+  permissions_boundary_arn = "arn:aws:iam::${element(split(":", var.table_arn), 4)}:policy/acp-ci-boundary-${var.environment}"
+
   # Configuração das funções. Nenhum segredo aqui: o proxy recebe só o NOME do parâmetro e lê o valor em execução.
   functions = {
     "api" = {
