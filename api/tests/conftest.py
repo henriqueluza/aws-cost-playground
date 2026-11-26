@@ -4,8 +4,10 @@ import logging
 from collections.abc import Iterator
 from typing import Any
 
+import boto3
 import pytest
 from fastapi import FastAPI
+from moto import mock_aws
 
 from app.config import get_settings
 from app.dynamo import get_table
@@ -82,3 +84,22 @@ def app() -> FastAPI:
     from app.main import create_app
 
     return create_app()
+
+
+@pytest.fixture
+def table() -> Iterator[Any]:
+    """Tabela única num DynamoDB simulado (moto), com as chaves de `infra/modules/database`."""
+    with mock_aws():
+        boto3.client("dynamodb", region_name="us-east-1").create_table(
+            TableName="acp-test",
+            KeySchema=[
+                {"AttributeName": "PK", "KeyType": "HASH"},
+                {"AttributeName": "SK", "KeyType": "RANGE"},
+            ],
+            AttributeDefinitions=[
+                {"AttributeName": "PK", "AttributeType": "S"},
+                {"AttributeName": "SK", "AttributeType": "S"},
+            ],
+            BillingMode="PAY_PER_REQUEST",
+        )
+        yield get_table()

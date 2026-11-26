@@ -314,7 +314,7 @@ def test_sub_fora_do_formato_nunca_vira_chave(sub: str) -> None:
         with pytest.raises(QuotaUnavailable):
             call(sub, table=fake, settings=settings(), now=at())
     assert (fake.transactions, fake.gets) == ([], 0)
-    assert service.SUB_PATTERN.pattern == auth._SUB_PATTERN.pattern
+    assert service.SUB_PATTERN.pattern == auth.SUB_PATTERN.pattern
 
 
 def test_relogio_sem_fuso_nao_autoriza() -> None:
