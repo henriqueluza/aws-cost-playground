@@ -45,6 +45,16 @@ run "compoe_sem_ciclo_com_nomes_de_staging" {
   }
 
   assert {
+    condition     = output.llm_api_key_parameter_name == "/acp/staging/anthropic-api-key"
+    error_message = "O parâmetro da chave é criado à mão; a raiz só expõe o nome."
+  }
+
+  assert {
+    condition     = length(module.alarms.alarm_names) == 5
+    error_message = "Cinco alarmes por ambiente: os dois somam a franquia de 10 do CloudWatch."
+  }
+
+  assert {
     condition     = output.site_config.apiBaseUrl == "https://api.staging.exemplo.com"
     error_message = "O /config.json de staging deve apontar para api.staging.<domínio>."
   }

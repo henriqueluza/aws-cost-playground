@@ -64,7 +64,7 @@ module "functions" {
   user_pool_arn  = module.auth.user_pool_arn
   package_bucket = var.package_bucket
   package_key    = var.package_key
-  # Único entrypoint existente: api/app/main.py (linha 19); as duas funções usam o mesmo pacote.
+  # Único entrypoint existente: `handler` em api/app/main.py; as duas funções usam o mesmo pacote.
   api_handler       = "app.main.handler"
   llm_proxy_handler = "app.main.handler"
   llm_enabled       = var.llm_enabled

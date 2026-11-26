@@ -25,7 +25,8 @@ SHARED = {
 }
 AUTHOR_VARS = ["zone_name", "alarm_email", "package_bucket", "package_key"]
 MODULES = {f"../../modules/{m}" for m in "alarms auth database dns functions http-api site".split()}
-OUTPUTS = {"site_bucket_name", "site_distribution_id", "function_names", "site_config"}
+DEPLOY_OUTPUTS = {"site_bucket_name", "site_distribution_id", "function_names", "site_config"}
+RUNBOOK_OUTPUTS = {"api_id", "function_role_names", "llm_api_key_parameter_name", "alarm_topic_arn"}
 
 
 def read(env: str, name: str) -> str:
@@ -90,7 +91,7 @@ class EnvsTest(unittest.TestCase):
         self.assertEqual(keys, {"apiBaseUrl", "cognitoAuthority", "cognitoClientId"})
         for env in ENVS:
             text = read(env, "outputs.tf")
-            self.assertEqual(set(re.findall(r'^output "(\w+)"', text, re.M)), OUTPUTS)
+            self.assertEqual(set(re.findall(r'^output "(\w+)"', text, re.M)), DEPLOY_OUTPUTS | RUNBOOK_OUTPUTS)
             site_config = block(text, "output", "site_config")
             config = re.search(r"value = \{(.*?)^  \}", site_config, re.S | re.M)
             assert config, f"{env}: site_config sem objeto"
