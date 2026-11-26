@@ -155,7 +155,7 @@ Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `mod
 - Listagem: `Query` em `PK` com `begins_with(SK, "DESIGN#")`, projetando tudo menos `doc`.
 - Limites validados na API: 50 designs por usuário, `doc` até 350 KB, 100 blocos por design.
 - O ponteiro para S3 previsto no discovery fica fora do MVP: um design de 20 blocos tem poucos KB. Acima de 350 KB a API responde 413. O ponteiro vira Issue quando alguém bater no limite.
-- Consistência forte só na quota. Os dois contadores sobem numa `TransactWriteItems` com `ADD count :1` e `ConditionExpression count < :limite` em cada item: ou os dois incrementam, ou a chamada é recusada com 429. Sem leitura antes da escrita.
+- Consistência forte só na quota. Os dois contadores sobem numa `TransactWriteItems` com `ADD count :1` e `ConditionExpression count < :limite` em cada item: ou os dois incrementam, ou a chamada é recusada com 429. Sem leitura antes da escrita. A condição implementada é `attribute_not_exists(count) OR count < :limite` (o item nasce no primeiro `Update` do dia) e o `ttl` entra por `if_not_exists`.
 - `ttl` de 35 dias nos itens de quota, para sobrar histórico do gatilho de revisão (100 estimativas/mês por não-autor).
 - Exclusão de conta: apaga a partição `USER#<sub>` inteira e depois o usuário no Cognito.
 

@@ -34,6 +34,7 @@ NOON = datetime(2026, 11, 26, 12, 0, tzinfo=UTC)
 RESETS = "2026-11-27T00:00:00Z"
 DAY = "QUOTA#2026-11-26"
 FAILED = "ConditionalCheckFailed"
+CONDITION = "attribute_not_exists(#count) OR #count < :limit"
 LEAKS = ("acp-test", "USER#", "GLOBAL", "QUOTA#", "Dynamo", "Requested resource")
 
 
@@ -61,7 +62,7 @@ class FakeTable:
 
     name = "acp-test"
 
-    def __init__(self, *, transact_error: Exception | None = None, get: Any = None) -> None:
+    def __init__(self, *, transact_error: Exception | None = None, get: Any = ...) -> None:
         self.items: dict[tuple[str, str], dict[str, int]] = {}
         self.transactions: list[list[dict[str, Any]]] = []
         self.gets = 0
@@ -73,6 +74,8 @@ class FakeTable:
         if self._transact_error:
             raise self._transact_error
         updates = [item["Update"] for item in TransactItems]
+        # O dublê aplica "abaixo do limite" sem interpretar a expressão: se ela mudar, ele recusa.
+        assert all(u["ConditionExpression"] == CONDITION for u in updates)
         with self._lock:  # o DynamoDB serializa a transação; o que roda fora dela é o serviço
             keys = [(u["Key"]["PK"], u["Key"]["SK"]) for u in updates]
             limits = [u["ExpressionAttributeValues"][":limit"] for u in updates]
@@ -92,7 +95,7 @@ class FakeTable:
         self.gets += 1
         if isinstance(self._get, Exception):
             raise self._get
-        if self._get is not None:
+        if self._get is not ...:
             return self._get
         item = self.items.get((Key["PK"], Key["SK"]))
         return {"Item": {"count": Decimal(item["count"])}} if item else {}
@@ -192,7 +195,7 @@ def test_transacao_unica_com_dois_updates_condicionais() -> None:
             "TableName": "acp-test",
             "Key": key,
             "UpdateExpression": "SET #ttl = if_not_exists(#ttl, :ttl) ADD #count :one",
-            "ConditionExpression": "attribute_not_exists(#count) OR #count < :limit",
+            "ConditionExpression": CONDITION,
             "ExpressionAttributeNames": {"#count": "count", "#ttl": "ttl"},
             "ExpressionAttributeValues": {":one": 1, ":limit": limit, ":ttl": ttl},
         }
@@ -299,7 +302,7 @@ def test_erro_ou_resposta_duvidosa_da_transacao_nao_autoriza(error: Exception) -
 )
 def test_leitura_com_erro_ou_resposta_inesperada_e_indisponivel(response: Any) -> None:
     for call in (read, consume):  # no consumo, a quota já foi gasta e a resposta ainda é 503
-        fake = FakeTable(get=response if response is not None else 0)
+        fake = FakeTable(get=response)
         with pytest.raises(QuotaUnavailable):
             call(SUB, table=fake, settings=settings(), now=at())
 
@@ -369,6 +372,7 @@ def quota_event(sub: str = SUB, path: str = "/quota") -> dict[str, Any]:
 
 
 def test_get_quota_le_sem_consumir_e_so_o_proprio_usuario(app: FastAPI, table: Any) -> None:
+    """Com `LLM_ENABLED` desligado (padrão do ambiente de teste) a leitura continua respondendo."""
     today = datetime.now(UTC)
     for _ in range(3):
         consume(OTHER, table=table, settings=settings(), now=at(today))
