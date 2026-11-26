@@ -1,0 +1,1 @@
+{"schemaVersion":1,"region":"us-east-1","workload":{"description":""},"blocks":[{"id":"blk_a","type":"aws.lambda","label":"A","attributes":{},"usage":{"source":"default","values":{}},"overrides":{}},{"id":"blk_a","type":"aws.lambda","label":"A","attributes":{},"usage":{"source":"default","values":{}},"overrides":{}}],"edges":[],"scenarios":[]}

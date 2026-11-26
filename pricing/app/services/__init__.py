@@ -1,6 +1,7 @@
 """Registro dos serviços com preço: um módulo por serviço, cada um exporta `SERVICE`.
 
-Os 17 blocos de nível A e B. IAM, CloudFormation e ECS custam zero e não têm arquivo.
+Os 17 blocos de nível A e B, mais `data-transfer` (custos de aresta, sem bloco). IAM,
+CloudFormation e ECS custam zero e não têm arquivo.
 """
 
 from app.model import ServiceSpec
@@ -11,6 +12,7 @@ from app.services import (
     cloudwatch,
     codepipeline,
     cognito,
+    data_transfer,
     dynamodb,
     ec2,
     elasticache,
@@ -31,6 +33,7 @@ SERVICES: tuple[ServiceSpec, ...] = (
     cloudwatch.SERVICE,
     codepipeline.SERVICE,
     cognito.SERVICE,
+    data_transfer.SERVICE,
     dynamodb.SERVICE,
     ec2.SERVICE,
     elasticache.SERVICE,
