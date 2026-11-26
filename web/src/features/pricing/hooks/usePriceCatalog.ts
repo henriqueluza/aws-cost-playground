@@ -45,7 +45,7 @@ export type PriceCatalogState =
  * Erro nunca é lançado na renderização: chega como estado.
  */
 export function usePriceCatalog(
-  design: Pick<DesignDocument, 'region' | 'blocks'>,
+  design: Pick<DesignDocument, 'region' | 'blocks' | 'edges'>,
   load: LoadCatalog = sessionLoad,
 ): PriceCatalogState {
   const { region } = design;

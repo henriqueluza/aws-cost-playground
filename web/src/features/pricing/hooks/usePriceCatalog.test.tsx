@@ -19,7 +19,7 @@ import { designDocumentSchema, type Block, type DesignDocument } from '../../../
 import { adrExampleDesign } from '../../../test/designFixtures';
 
 type Bytes = Uint8Array<ArrayBuffer>;
-type Design = Pick<DesignDocument, 'region' | 'blocks'>;
+type Design = Pick<DesignDocument, 'region' | 'blocks' | 'edges'>;
 const SERVER_TEXT = '<img src=x onerror=alert(1)>';
 const GENERATED_AT = '2026-11-23T12:00:00Z';
 
@@ -196,8 +196,10 @@ describe('usePriceCatalog', () => {
       .getQueryCache()
       .getAll()
       .map((query) => query.queryKey);
-    expect(keys).toEqual([['pricing', 'catalog', 'us-east-1', ['lambda', 's3']]]);
-    expect(keys).toEqual([priceCatalogKey('us-east-1', ['lambda', 's3'])]);
+    // `data-transfer` vem da aresta S3 → `client` do exemplo do ADR.
+    const services = ['data-transfer', 'lambda', 's3'];
+    expect(keys).toEqual([['pricing', 'catalog', 'us-east-1', services]]);
+    expect(keys).toEqual([priceCatalogKey('us-east-1', services)]);
     // `JSON.stringify` lança com `bigint`: a key é só texto.
     expect(JSON.parse(JSON.stringify(keys))).toEqual(keys);
   });
