@@ -2,6 +2,7 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 import {
   CLIENT_NODE_ID,
   type DesignDocument,
+  type EdgeKind,
   type Region,
   type Usage,
 } from '../../../shared/lib/design';
@@ -41,6 +42,7 @@ export type DesignActions = {
   editBlock(id: string, patch: BlockPatch): Result<void>;
   connect(edge: NewEdge): Result<string>;
   removeEdge(id: string): Result<void>;
+  setEdgeKind(id: string, kind: EdgeKind): Result<void>;
   setUsage(target: ElementRef, usage: Usage): Result<void>;
   setOverride(target: ElementRef, key: string, value: number | null): Result<void>;
   select(selection: Selection): Result<void>;
@@ -170,6 +172,8 @@ export function createDesignStore(
         return apply(act.connect(doc(), full), id, 'connect');
       },
       removeEdge: (id) => apply(act.removeEdge(doc(), id), undefined, 'remove-edge', prune),
+      setEdgeKind: (id, kind) =>
+        apply(act.setEdgeKind(doc(), id, kind), undefined, 'set-edge-kind'),
       setUsage: (target, usage) =>
         apply(act.setUsage(doc(), target, usage), undefined, 'set-usage'),
       setOverride: (target, key, value) =>
