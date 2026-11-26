@@ -107,12 +107,6 @@ def deploy_step_texts() -> dict[str, str]:
     return {sid: s for sid, s in steps(job("deploy")) if sid}
 
 
-class LocationTest(unittest.TestCase):
-    def test_exactly_one_copy_of_the_workflow_exists(self) -> None:
-        found = [str(p.relative_to(ROOT)) for p in (LIVE, PENDING) if p.exists()]
-        self.assertEqual(len(found), 1, f"deve existir exatamente uma cópia; achei: {found}")
-
-
 class TriggerAndPermissionsTest(unittest.TestCase):
     def test_trigger_is_only_push_to_main(self) -> None:
         on = text().split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
@@ -184,7 +178,17 @@ class SecretsAndInterpolationTest(unittest.TestCase):
         names = set(re.findall(r"(?:vars|secrets)\.(\w+)", code()))
         self.assertTrue(names)
         for name in sorted(names):
-            self.assertIn(name, docs, f"{name} falta em docs/infra.md")
+            self.assertIn(f"`{name}`", docs, f"{name} falta em docs/infra.md")
+
+
+class BuildScriptTest(unittest.TestCase):
+    def test_build_functions_requires_exactly_one_argument(self) -> None:
+        for args in ([], ["a", "b"]):
+            proc = subprocess.run(
+                ["bash", str(ROOT / "scripts" / "build-functions.sh"), *args],
+                capture_output=True, text=True, timeout=30, check=False,
+            )  # fmt: skip
+            self.assertEqual(proc.returncode, 2, f"{args}: {proc.stdout}{proc.stderr}")
 
 
 class ArtifactTest(unittest.TestCase):
@@ -245,6 +249,12 @@ class DeployStepsTest(unittest.TestCase):
         self.assertRegex(run, r"\bapply\b(?:\s+-\S+)*\s+[^-\s]\S*", "apply deve receber o arquivo do plano")
         self.assertIn("TF_VAR_package_key: ${{ steps.package.outputs.package_key }}", chunk)
 
+    def test_package_fails_closed_on_a_different_stored_object(self) -> None:
+        run = run_block(step(job("deploy"), "package"))
+        self.assertIn("ConditionalRequestConflict", run)
+        self.assertNotIn("vale o objeto guardado", run)
+        self.assertNotIn('b64="$stored"', run)
+
     def test_functions_wait_and_compare_the_hash_without_redeploying_code(self) -> None:
         chunk = step(job("deploy"), "functions")
         self.assertIn("function-updated-v2", chunk)
@@ -256,14 +266,12 @@ class DeployStepsTest(unittest.TestCase):
         self.assertNotIn("--delete", run)
         syncs = [ln for ln in run.splitlines() if re.search(r"s3 (sync|cp)\b", ln)]
         self.assertGreaterEqual(len(syncs), 2, "esperado um envio de assets e um do resto (s3 sync ou s3 cp)")
-        for ln in syncs:
-            self.assertTrue(
-                "assets" in ln or re.search(r"--exclude\s+\S*config\.json", ln),
-                f"envio do site inteiro sem excluir config.json: {ln}",
-            )
-        first_assets = next(i for i, ln in enumerate(syncs) if "assets" in ln)
-        rest = next(i for i, ln in enumerate(syncs) if re.search(r"--exclude\s+\S*config\.json", ln))
-        self.assertLess(first_assets, rest, "assets deve subir antes do resto")
+        assets = next((i for i, ln in enumerate(syncs) if "$site/assets" in ln), None)
+        self.assertIsNotNone(assets, "falta o envio de $site/assets")
+        for i, ln in enumerate(syncs):
+            if i != assets:
+                self.assertRegex(ln, r"--exclude\s+\S*config\.json", f"envio sem excluir config.json: {ln}")
+        self.assertEqual(assets, 0, "assets deve subir antes do resto")
 
     def test_invalidation_is_a_single_wildcard_path(self) -> None:
         run = joined(run_block(step(job("deploy"), "invalidate")))

@@ -6,7 +6,7 @@ Terraform e módulos: ver [`infra/README.md`](../infra/README.md). Este document
 
 Workflow `deploy-staging.yml`, disparado por `push` em `main`.
 
-- **Concorrência** no nível do workflow (`deploy-staging`, sem cancelar o que está rodando): nunca há dois deploys ao mesmo tempo, e staging nunca volta para um commit mais velho. Um push novo substitui o que estiver pendente.
+- **Concorrência** no nível do workflow (`deploy-staging`, sem cancelar o que está rodando): nunca há dois deploys ao mesmo tempo, e staging nunca volta para um commit mais velho. O GitHub guarda só um run pendente: um push novo substitui o pendente, e o último commit é o que fica publicado.
 - **Job `build`** (sem credencial AWS): gera o bundle do `web/` e o zip das Lambdas (`scripts/build-functions.sh`, Python de `api/.python-version`, arm64). Guarda tudo uma vez como artefato `release-<sha>`, por 90 dias:
 
 | Item | Conteúdo |
@@ -25,7 +25,7 @@ Workflow `deploy-staging.yml`, disparado por `push` em `main`.
 | `download` | Baixa o artefato `release-<sha>` |
 | `verify` | `sha256sum -c SHA256SUMS` |
 | `aws` | OIDC no papel `acp-ci-apply-staging`, sem chave estática |
-| `package` | Sobe o zip para `functions/<sha>.zip` no bucket de artefatos. A primeira escrita vence, inclusive em "re-run all jobs"; se o zip refeito diferir do guardado, só avisa e usa o hash do objeto guardado |
+| `package` | Sobe o zip para `functions/<sha>.zip` no bucket de artefatos, sem sobrescrever (`--if-none-match`). Se a chave já existe com outro conteúdo, o deploy falha fechado: a função só roda o zip conferido pelo `SHA256SUMS`. Para repetir um deploy, use "Re-run failed jobs", que reaproveita o artefato |
 | `terraform` | `init`, `plan`, plan-guard e `apply` do plano salvo. O plan-guard aqui não tem liberação por label: `delete`, `replace` ou `forget` param o deploy |
 | `functions` | Espera as funções atualizarem e confere o `CodeSha256` |
 | `site` | Sobe `assets/` antes, sem apagar o que é antigo e sem o `config.json` do bundle |

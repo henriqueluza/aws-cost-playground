@@ -39,17 +39,20 @@ uv pip install --quiet --target "$tmp/package" -r "$tmp/requirements.txt" \
   --python-version "$(tr -d '[:space:]' < "$root/api/.python-version")" \
   --only-binary :all: --require-hashes --no-deps >&2
 
+# Console scripts não servem na Lambda e o shebang deles leva o caminho do interpretador local.
+rm -rf "$tmp/package/bin"
+
 cp -R "$root/api/app" "$tmp/package/app"
 find "$tmp/package" -name __pycache__ -type d -prune -exec rm -rf {} +
 find "$tmp/package" -name '*.pyc' -delete
 rm -rf "$tmp/package/app/tests"
 
-# Reprodutível: mtimes fixos (1980-01-01 UTC), ordem estável e sem atributos extras (-X).
+# Reprodutível (o zip grava mtime em hora local, daí o TZ=UTC): mtimes fixos (1980-01-01 UTC), ordem estável e sem atributos extras (-X).
 find "$tmp/package" -exec touch -h -d @315532800 {} + 2>/dev/null \
   || find "$tmp/package" -exec env TZ=UTC touch -h -t 198001010000 {} +
 (
   cd "$tmp/package"
-  find . -mindepth 1 ! -type d | sed 's|^\./||' | LC_ALL=C sort | zip -X -q "$out" -@ >&2
+  find . -mindepth 1 ! -type d | sed 's|^\./||' | LC_ALL=C sort | TZ=UTC zip -X -q "$out" -@ >&2
 )
 
 shasum -a 256 "$out" | cut -d' ' -f1

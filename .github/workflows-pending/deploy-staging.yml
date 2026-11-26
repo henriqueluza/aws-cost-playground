@@ -26,8 +26,8 @@ on:
 permissions:
   contents: read
 
-# Sem cancelamento: dois merges seguidos entram em fila, e staging nunca regride para um
-# commit mais velho no meio de um deploy.
+# Sem cancelamento: um deploy em andamento nunca é interrompido. O GitHub mantém só um run
+# pendente; num terceiro merge o pendente é substituído e o último commit é o implantado.
 concurrency:
   group: deploy-staging
   cancel-in-progress: false
@@ -76,6 +76,8 @@ jobs:
           path: ${{ runner.temp }}/release
           retention-days: 90
           if-no-files-found: error
+          include-hidden-files: true # o SHA256SUMS cobre arquivos ocultos e o verify os exige
+          overwrite: true # "Re-run all jobs" sobe de novo com o mesmo nome; o passo package garante o zip publicado
 
   deploy:
     name: deploy (staging)
@@ -158,7 +160,7 @@ jobs:
             --checksum-algorithm SHA256 --checksum-sha256 "$b64" --if-none-match '*' \
             > /dev/null 2> "$RUNNER_TEMP/put.err"; then
             :
-          elif grep -q 'PreconditionFailed' "$RUNNER_TEMP/put.err"; then
+          elif grep -qE 'PreconditionFailed|ConditionalRequestConflict' "$RUNNER_TEMP/put.err"; then
             stored=$(aws s3api head-object --bucket "$TF_VAR_PACKAGE_BUCKET" --key "$key" \
               --checksum-mode ENABLED --query ChecksumSHA256 --output text)
             if [ -z "$stored" ] || [ "$stored" = "None" ]; then
@@ -166,9 +168,9 @@ jobs:
               exit 1
             fi
             if [ "$stored" != "$b64" ]; then
-              echo "::warning::o pacote $key já existia com outro conteúdo; vale o objeto guardado"
+              echo "::error::$key já existe com outro conteúdo; use Re-run failed jobs (reaproveita o artefato) ou um commit novo"
+              exit 1
             fi
-            b64="$stored"
           else
             cat "$RUNNER_TEMP/put.err" >&2
             echo "::error::falha ao gravar o pacote $key no bucket de artefatos"
@@ -195,7 +197,6 @@ jobs:
           TF_VAR_alarm_email: ${{ secrets.TF_VAR_ALARM_EMAIL }}
           TF_VAR_package_bucket: ${{ vars.TF_VAR_PACKAGE_BUCKET }}
           TF_VAR_package_key: ${{ steps.package.outputs.package_key }}
-          TF_IN_AUTOMATION: "true"
         run: |
           terraform init -input=false -lockfile=readonly -backend-config="bucket=$TF_STATE_BUCKET"
           terraform plan -input=false -out="$RUNNER_TEMP/tfplan"
@@ -211,11 +212,11 @@ jobs:
           terraform apply -input=false "$RUNNER_TEMP/tfplan"
           terraform output -json > "$RUNNER_TEMP/outputs.json"
           {
-            echo "site_bucket=$(jq -r '.site_bucket_name.value' "$RUNNER_TEMP/outputs.json")"
-            echo "distribution_id=$(jq -r '.site_distribution_id.value' "$RUNNER_TEMP/outputs.json")"
-            echo "site_url=$(jq -r '.site_url.value' "$RUNNER_TEMP/outputs.json")"
-            echo "api_base_url=$(jq -r '.site_config.value.apiBaseUrl' "$RUNNER_TEMP/outputs.json")"
-            echo "function_names=$(jq -r '[.function_names.value[]] | join(" ")' "$RUNNER_TEMP/outputs.json")"
+            echo "site_bucket=$(jq -er '.site_bucket_name.value' "$RUNNER_TEMP/outputs.json")"
+            echo "distribution_id=$(jq -er '.site_distribution_id.value' "$RUNNER_TEMP/outputs.json")"
+            echo "site_url=$(jq -er '.site_url.value' "$RUNNER_TEMP/outputs.json")"
+            echo "api_base_url=$(jq -er '.site_config.value.apiBaseUrl' "$RUNNER_TEMP/outputs.json")"
+            echo "function_names=$(jq -er '[.function_names.value[]] | join(" ")' "$RUNNER_TEMP/outputs.json")"
           } >> "$GITHUB_OUTPUT"
 
       - name: Conferir o código das funções
@@ -226,6 +227,7 @@ jobs:
           FUNCTION_NAMES: ${{ steps.terraform.outputs.function_names }}
           EXPECTED: ${{ steps.package.outputs.code_sha256 }}
         run: |
+          [ -n "$FUNCTION_NAMES" ] || { echo "::error::nenhuma função nas saídas do Terraform"; exit 1; }
           for fn in $FUNCTION_NAMES; do
             aws lambda wait function-updated-v2 --function-name "$fn"
             actual=$(aws lambda get-function-configuration --function-name "$fn" --query CodeSha256 --output text)
