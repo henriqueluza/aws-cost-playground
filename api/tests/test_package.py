@@ -38,7 +38,8 @@ import json
 from app import contracts
 loaded = contracts.get_contracts()
 print(json.dumps({"module": contracts.__file__, "blocks": len(loaded.blocks),
-                  "edges": sorted(loaded.edges)}))
+                  "edges": sorted(loaded.edges),
+                  "found": [str(d) for d in contracts._SEARCH_DIRS if d.is_dir()]}))
 """
 
 
@@ -106,5 +107,6 @@ def test_extracted_package_loads_the_contracts(package: Path, tmp_path: Path) ->
     assert proc.returncode == 0, proc.stderr
     result = json.loads(proc.stdout)
     assert Path(result["module"]).resolve() == (root / "app" / "contracts.py").resolve()
+    assert [Path(found).resolve() for found in result["found"]] == [(root / "contracts").resolve()]
     assert result["blocks"] == 20
     assert result["edges"] == ["data", "logs", "runs-on"]
