@@ -217,6 +217,23 @@ def test_parametro_ausente_ou_vazio_vira_indisponivel_sem_vazar_o_erro_da_aws(
         assert leaked not in str(caught.value) + caplog.text
 
 
+def test_chave_recusada_pela_anthropic_e_relida_do_ssm_na_proxima_chamada() -> None:
+    fakes = Fakes(status_error(anthropic.AuthenticationError, 401))
+    client = fakes.client()
+    plan = client.prepare(body())
+    for _ in range(2):
+        with pytest.raises(EstimateError):
+            client.estimate(plan)
+    assert fakes.ssm_reads == 2  # rotação da chave não exige reiniciar a função
+
+
+def test_diagrama_sem_nada_a_estimar_devolve_padroes_sem_chamar_a_api() -> None:
+    fakes = Fakes()
+    result = estimate(fakes, blocks=[BODY["blocks"][2]], edges=[])
+    assert result == module.UsageEstimate((module.ItemUsage("blk_role", {}, "default"),), (), 0, 0)
+    assert (fakes.ssm_reads, fakes.calls) == (0, [])
+
+
 def test_sem_nome_de_parametro_nao_le_o_ssm() -> None:
     fakes = Fakes()
     client = fakes.client(parameter=None)

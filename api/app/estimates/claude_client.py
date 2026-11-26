@@ -43,7 +43,10 @@ LLM_TIMEOUT = anthropic.Timeout(20.0, connect=3.0)
 # Sem nova tentativa: uma segunda chamada depois de um timeout não cabe nos 29 s, e repetir
 # sozinho multiplicaria o custo de uma estimativa que já consumiu quota. O padrão do SDK é 2.
 LLM_MAX_RETRIES = 0
-_SSM_CONFIG = Config(connect_timeout=2, read_timeout=3, retries={"max_attempts": 1})
+_SSM_CONFIG = Config(connect_timeout=2, read_timeout=3, retries={"total_max_attempts": 1})
+# Tuplas nomeadas: `except A, B:` sem parênteses só existe a partir do Python 3.14.
+_SSM_ERRORS = (BotoCoreError, ClientError, KeyError)
+_OUTPUT_ERRORS = (ValueError, RecursionError)
 _logger = logging.getLogger("app.estimates.claude_client")
 
 
@@ -119,6 +122,10 @@ class ClaudeClient:
 
     def estimate(self, plan: EstimatePlan) -> UsageEstimate:
         """Uma chamada à Claude API, sem nova tentativa. Resposta parcial nunca é usada."""
+        if plan.expected_output_tokens == 0:  # nada a estimar: só padrões, sem chamada nem custo
+            return UsageEstimate(
+                *revalidate({"blocks": [], "edges": []}, plan.blocks, plan.edges), 0, 0
+            )
         sdk = self._client()
         failure: ErrorCode | None = None
         try:
@@ -135,6 +142,8 @@ class ClaudeClient:
             )
         except anthropic.APIError as exc:
             failure = _failure(exc)
+            if isinstance(exc, anthropic.AuthenticationError):
+                self._sdk = None  # chave trocada ou revogada: a próxima chamada relê o SSM
         if failure is not None:  # fora do `except`: a exceção do SDK não fica encadeada
             raise self._fail(failure)
         tokens = (response.usage.input_tokens, response.usage.output_tokens)
@@ -144,7 +153,7 @@ class ClaudeClient:
         texts = [block.text for block in response.content if block.type == "text"]
         try:
             usage = revalidate(json.loads("".join(texts)), plan.blocks, plan.edges)
-        except ValueError, RecursionError:
+        except _OUTPUT_ERRORS:
             usage = None
         if usage is None:
             raise self._fail("invalid_output", *tokens)
@@ -162,7 +171,7 @@ class ClaudeClient:
                     Name=self._key_parameter, WithDecryption=True
                 )
                 key = str(parameter["Parameter"]["Value"]).strip()
-            except BotoCoreError, ClientError, KeyError:
+            except _SSM_ERRORS:
                 key = ""  # parâmetro ausente, sem permissão ou SSM fora do ar: falha fechada
         if not key:
             raise self._fail("unavailable")
