@@ -5,8 +5,9 @@ capacidade Used e mercado On-Demand; o gp3 por GB-mês, com o IOPS e a vazão in
 Sem franquia: a de 12 meses do EC2 não entra.
 
 Filtros: cada tipo tem cerca de 60 produtos por região (SO, tenancy, software, capacidade).
-Used, UnusedCapacityReservation e AllocatedCapacityReservation têm o mesmo preço e passariam em
-silêncio; `marketoption=OnDemand` barra o CapacityBlock. No EBS, `group` separa o gp3 Storage do
+Sem `capacitystatus` viriam também UnusedCapacityReservation (mesmo preço do Used) e
+AllocatedCapacityReservation (preço 0), e o `build` recusaria por duplicidade;
+`marketoption=OnDemand` barra o CapacityBlock. No EBS, `group` separa o gp3 Storage do
 IOPS e do Throughput, que dividem `volumeApiName`; `usagetype` muda por região e não serve. O
 `GetProducts` real traz também os termos Reserved, que `parse_product` ignora.
 

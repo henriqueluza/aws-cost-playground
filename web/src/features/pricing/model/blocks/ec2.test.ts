@@ -40,7 +40,9 @@ const charges = (instanceType: string, hours: string, gb: string) => [
 ];
 /** Linhas (`sku quantidade valor`) e total em USD do bloco. */
 function rate(rater: Rater, block: BlockPriceInput) {
-  const lines = rater.rate(priceEc2(block).map((c) => ({ ...c, service: 'ec2' }))) ?? [];
+  const lines = rater.rate(priceEc2(block).map((c) => ({ ...c, service: 'ec2' })));
+  // `undefined` é SKU fora do catálogo: falha aqui, em vez de virar total zero.
+  if (lines === undefined) throw new Error('cobrança sem preço no catálogo do teste');
   return {
     lines: lines.map((l) => `${l.sku} ${toFixed(l.quantity, 6)} ${toFixed(l.amount, 6)}`),
     total: toFixed(sum(lines.map((l) => l.amount)), 6),
