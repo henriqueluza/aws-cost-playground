@@ -40,7 +40,21 @@ Nenhum segredo vai em código nem em variável commitada.
 - `errors.py` — erros no formato problem details (`install_error_handlers`).
 - `logs.py` — logs JSON, id da requisição e `RequestLogMiddleware`.
 - `dynamo.py` — acesso à tabela única (`get_table()`).
+- `design_document.py` — modelos Pydantic do documento do design, equivalentes ao schema zod do `web/`.
+- `contracts.py` — leitor de `contracts/blocks.json` e `contracts/edges.json` (`load_contracts()`, `get_contracts()`).
 - `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade (ainda vazios). Cada um segue `router` → `service` → repositório.
+
+## Documento do design e contratos
+
+`app/design_document.py` valida o documento do design com as mesmas regras do `designDocumentSchema` (`web/src/shared/lib/design/designDocument.ts`), que é a fonte da verdade. Os dois lados leem os exemplos de `contracts/examples/design/{valid,invalid}/` e precisam dar o mesmo veredito: `tests/test_design_document.py` aqui e `designExamples.test.ts` no `web/`. Uma divergência quebra um dos testes.
+
+`app/contracts.py` lê `contracts/blocks.json` e `contracts/edges.json`, os mesmos arquivos do `web/` (`docs/architecture/aws-cost-playground/block-contract.md`). `get_contracts()` carrega na primeira chamada e guarda o resultado em cache; `load_contracts(directory)` lê de uma pasta explícita. Contrato inválido levanta `ValidationError`; sem `blocks.json`, `RuntimeError`. A pasta `contracts/` é procurada em `/var/task/contracts` (zip da Lambda) e, depois, na raiz do repositório.
+
+- **Leitura tolerante.** Chave desconhecida no documento é descartada, não recusada, para permitir rollback entre builds.
+- **Divergências conhecidas** (nenhuma tem exemplo compartilhado):
+  - Substituto UTF-16 solto em texto: a API recusa, o zod aceita.
+  - Número entre 1e-6 e 1e-5: o Pydantic serializa com expoente (`1e-6`), o JS escreve `0.000001`. O `sizeBytes` do documento muda em alguns bytes conforme o lado que serializa.
+- **Empacotamento.** O zip da Lambda precisa incluir `contracts/` na raiz, ao lado de `app/`. Sem ela, `get_contracts()` falha.
 
 ## Identidade
 
