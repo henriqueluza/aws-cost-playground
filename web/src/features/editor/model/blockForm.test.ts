@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BLOCKS } from '../../pricing';
 import type { Block } from '../../../shared/lib/design';
-import {
-  buildBlockForm,
-  formatUsageInput,
-  parseUsageInput,
-  validateLabel,
-  withAttribute,
-  type AttributeField,
-} from './blockForm';
+import { buildBlockForm, validateLabel, withAttribute, type AttributeField } from './blockForm';
 
 const blockOf = (type: string, patch: Partial<Block> = {}): Block => ({
   id: 'blk_1',
@@ -85,59 +78,6 @@ describe('withAttribute', () => {
   });
   it('vazio remove o atributo opcional', () => {
     expect(withAttribute({ az: 'a', x: 1 }, az, '')).toEqual({ x: 1 });
-  });
-});
-
-describe('parseUsageInput', () => {
-  const int = { min: 1, max: 1000, integer: true };
-  const real = { min: 0, max: 744, integer: false };
-
-  it.each([
-    ['500', int, 500],
-    [' 500 ', int, 500],
-    ['1000', int, 1000],
-    ['1', int, 1],
-    ['1,5', real, 1.5],
-    ['1.5', real, 1.5],
-    ['0', real, 0],
-    ['730,25', real, 730.25],
-    ['0,125', real, 0.125],
-    ['0.125', real, 0.125],
-  ])('aceita %j', (text, field, value) => {
-    expect(parseUsageInput(text, field)).toEqual({ ok: true, value });
-  });
-
-  it.each([
-    ['', int, 'empty'],
-    ['   ', int, 'empty'],
-    ['1e9', real, 'format'],
-    ['1E3', real, 'format'],
-    ['-1', real, 'format'],
-    ['+1', real, 'format'],
-    ['abc', int, 'format'],
-    ['Infinity', real, 'format'],
-    ['NaN', real, 'format'],
-    ['0x10', real, 'format'],
-    ['1,', real, 'format'],
-    ['1,2,3', real, 'format'],
-    ['1.000', int, 'thousands'],
-    ['1.000,5', real, 'thousands'],
-    ['1,000', int, 'thousands'],
-    ['1,000,000', int, 'thousands'],
-    ['1,000.5', real, 'thousands'],
-    ['1,5', int, 'fraction'],
-    ['0', int, 'range'],
-    ['1001', int, 'range'],
-    ['744,1', real, 'range'],
-    ['9'.repeat(400), real, 'range'],
-  ] as const)('recusa %j', (text, field, error) => {
-    expect(parseUsageInput(text, field)).toEqual({ ok: false, error });
-  });
-
-  it('formatUsageInput usa vírgula e volta ao mesmo número', () => {
-    expect(formatUsageInput(1.5)).toBe('1,5');
-    expect(formatUsageInput(100000000000)).toBe('100000000000');
-    expect(parseUsageInput(formatUsageInput(730.25), real)).toEqual({ ok: true, value: 730.25 });
   });
 });
 

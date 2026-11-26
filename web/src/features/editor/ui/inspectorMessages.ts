@@ -1,21 +1,5 @@
 import { DESIGN_LIMITS } from '../../../shared/lib/design';
-import type { LabelError, UsageField, UsageInputError } from '../model/blockForm';
-import { formatRangeNumber, unitLabel } from './blockLabels';
-
-const REASONS: Record<UsageInputError, string> = {
-  empty: 'Digite um valor.',
-  format: 'Use só algarismos, com vírgula para os decimais.',
-  thousands: 'Digite sem separador de milhar.',
-  fraction: 'Use um número inteiro.',
-  range: 'Valor fora da faixa.',
-};
-
-/** Frase de erro de um campo de uso: o motivo e sempre a faixa permitida com a unidade. */
-export function usageErrorMessage(error: UsageInputError, field: UsageField): string {
-  const unit = unitLabel(field.unit) ?? field.unit;
-  const range = `${formatRangeNumber(field.min)} a ${formatRangeNumber(field.max)} ${unit}`;
-  return `${REASONS[error]} Faixa permitida: ${range}${field.integer ? ', número inteiro' : ''}.`;
-}
+import type { LabelError } from '../model/blockForm';
 
 /** Frase de erro do rótulo do bloco; fixa, para o leitor de tela não repeti-la a cada tecla. */
 export function labelErrorMessage(error: LabelError): string {
