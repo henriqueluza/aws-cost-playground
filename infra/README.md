@@ -8,7 +8,7 @@ Terraform da AWS (us-east-1, 100% serverless). Decisões em `docs/architecture/a
 |---|---|
 | `modules/` | Módulos reutilizáveis, cada um com README próprio (hoje: `alarms`, `auth`, `database`, `dns`, `functions`, `http-api` e `site`, o bucket privado + CloudFront da SPA) |
 | `envs/staging` | Raiz do ambiente `staging`: compõe os sete módulos (`main.tf`, `variables.tf` e `outputs.tf` genéricos; valores em `terraform.tfvars`) |
-| `envs/production` | Raiz do ambiente `production`: por ora só backend e versões; recebe os mesmos arquivos na #168 |
+| `envs/production` | Raiz do ambiente `production`: os mesmos `main.tf`, `variables.tf` e `outputs.tf` de staging, byte a byte; só o `terraform.tfvars` muda |
 | `tools/` | `plan_guard.py` e seus testes |
 | `bootstrap/` | Buckets de estado, provedor OIDC e papéis de CI, com README próprio; só o autor aplica. Agentes não tocam sem Issue que autorize |
 
@@ -23,12 +23,23 @@ terraform -chdir=infra/envs/<env> init -backend=false && terraform -chdir=infra/
 
 Módulo com testes (`tests/*.tftest.hcl`, provider simulado, sem credenciais): `terraform -chdir=infra/modules/<m> init -backend=false && terraform -chdir=infra/modules/<m> validate && terraform -chdir=infra/modules/<m> test`. O lockfile do módulo não é versionado, e o CI só roda `validate` nos ambientes.
 
-O ambiente também tem teste de composição com provider simulado (o CI ainda não roda `terraform test`, #117):
+Cada ambiente também tem teste de composição com provider simulado (o CI ainda não roda `terraform test`, #117):
 
 ```bash
-terraform -chdir=infra/envs/staging init -backend=false && terraform -chdir=infra/envs/staging test
+terraform -chdir=infra/envs/<env> init -backend=false && terraform -chdir=infra/envs/<env> test
 python3 -m unittest discover -s infra/tools/tests   # tfvars sem segredo e arquivos iguais entre ambientes
 ```
+
+## Diferença entre os ambientes
+
+`main.tf`, `variables.tf`, `outputs.tf` e `.terraform.lock.hcl` são iguais byte a byte nos dois ambientes (`test_envs.py` trava isso). Mudar a composição é editar os dois diretórios no mesmo PR. `backend.tf` e `versions.tf` diferem só na chave do estado e na tag `environment`. O resto é valor de `terraform.tfvars`:
+
+| Variável | staging | production |
+|---|---|---|
+| `environment` | `staging` (prefixo `acp-stg`, site em `staging.<zona>`) | `production` (prefixo `acp-prod`, site na própria zona) |
+| `point_in_time_recovery_enabled` | `false` | `true` |
+| `self_signup_enabled` | `false` | `false`, até o autor decidir a #139; para abrir o cadastro, troque essa linha para `true` por PR |
+| `llm_enabled`, `default_throttle`, `estimates_throttle` | iguais | iguais |
 
 ## Variáveis dos ambientes
 
