@@ -145,4 +145,4 @@ Liga o design ao catálogo. Camadas: `ui/ -> hooks/ -> application/ -> model/`.
 
 - Componente visual do aviso/erro de carga: fica com o editor (#12) e o painel de custo (#43).
 - Calcular custo com o catálogo: é o motor, em [cost-estimate.md](cost-estimate.md) (`PriceCatalog` é só o que ele recebe).
-- Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest. O gerador está em construção nas Issues #195 (cliente e parse), #202 (registro de serviços e render) e #196 (CLI e gravação). O contrato acima não muda.
+- Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest. O gerador está em construção nas Issues #195 (cliente e parse), #202 (registro de serviços e render), #196 (schema em Python, checagens e manifest) e #214 (geração, gravação, CLI e catálogo semente). O contrato acima não muda. `pricing/app/schema.py` é o espelho em Python destes schemas, igual ou mais estrito: quem mudar o zod muda o espelho no mesmo PR.
