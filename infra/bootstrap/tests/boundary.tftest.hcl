@@ -156,9 +156,10 @@ run "negacao_de_dado_do_papel_apply" {
         Resource = "*"
       },
       { Sid = "DenyFunctionInvoke", Effect = "Deny", Action = "lambda:Invoke*", Resource = "*" },
+      { Sid = "DenyFunctionUrl", Effect = "Deny", Action = ["lambda:CreateFunctionUrlConfig", "lambda:UpdateFunctionUrlConfig"], Resource = "*" },
       { Sid = "DenyAssumeRole", Effect = "Deny", Action = "sts:AssumeRole", Resource = "*" },
     ]])
-    error_message = "O papel apply não lê nem grava itens, usuários, segredos e eventos de log, não invoca função e não assume outro papel: só Deny, em qualquer recurso."
+    error_message = "O papel apply não lê nem grava itens, usuários, segredos e eventos de log, não invoca função, não cria nem altera URL de função e não assume outro papel: só Deny, em qualquer recurso."
   }
 
   assert {
