@@ -22,7 +22,13 @@ const ANY_IPV4 = '0.0.0.0/0';
 export const APP_PORT = 80;
 
 /** Tipos cujo gerador emite a rede. Cresce a cada gerador de bloco em VPC entregue. */
-const NETWORK_OWNERS: readonly BlockType[] = ['aws.ec2'];
+const NETWORK_OWNERS: readonly BlockType[] = [
+  'aws.alb',
+  'aws.ec2',
+  'aws.elasticache',
+  'aws.nat-gateway',
+  'aws.rds',
+];
 /** Tipos que escolhem zona pelo atributo `az` do contrato. */
 const ZONED: readonly BlockType[] = ['aws.ec2', 'aws.rds', 'aws.elasticache'];
 const ROLE_OF: Partial<Record<BlockType, NetworkRole>> = {
@@ -70,11 +76,20 @@ export const securityGroupId = (role: NetworkRole): HclValue =>
   hcl.ref('aws_security_group', role, 'id');
 export const VPC_ID = hcl.ref('aws_vpc', 'main', 'id');
 
+/**
+ * Identificador de recurso na AWS (letras minúsculas, dígitos e hífen): o prefixo fixo mais a
+ * posição do bloco entre os do mesmo tipo. Não usa o rótulo: cabe em qualquer limite e não colide.
+ */
+export function ordinalId(input: GeneratorInput, prefix: string): string {
+  const peers = input.blocks.filter((block) => block.type === input.block.type);
+  return `${prefix}-${peers.findIndex((block) => block.id === input.block.id) + 1}`;
+}
+
 const resource = (type: string, name: string, body: readonly HclNode[]): HclNode =>
   hcl.block('resource', [type, name], body);
 
 /** Nome real da zona: a região do provider mais a letra, sem interpolação escrita à mão. */
-const zoneName = (az: AzLetter): HclValue =>
+export const zoneName = (az: AzLetter): HclValue =>
   hcl.call('format', [hcl.string('%s%s'), hcl.ref('var', 'aws_region'), hcl.string(az)]);
 
 function subnetNodes(az: AzLetter): HclNode[] {
@@ -182,6 +197,7 @@ function securityGroupNodes(input: GeneratorInput): HclNode[] {
   }
   if (roles.includes('app')) {
     // Saída da aplicação: HTTPS (APIs da AWS e atualizações) e os bancos e caches ligados a ela.
+    // Sem bloco de NAT Gateway as sub-redes privadas não têm rota, e esta regra não alcança nada.
     nodes.push(rule('egress', 'app_https', 'app', 443, { cidr: ANY_IPV4 }, 'HTTPS para fora'));
   }
   const stores = [
@@ -214,6 +230,11 @@ function networkNodes(input: GeneratorInput): HclNode[] {
       'pública e uma privada por zona usada (no mínimo duas) e um security group por papel.',
     ),
     hcl.comment('Sem bloco de NAT Gateway, as sub-redes privadas não têm saída para a internet.'),
+    hcl.comment(
+      'Custo: EC2, RDS, ElastiCache, ALB e NAT Gateway cobram por hora mesmo sem tráfego.',
+    ),
+    hcl.comment('Identificadores como db-1 e cache-1 seguem a ordem dos blocos do design: quem já'),
+    hcl.comment('aplicou um export anterior deve ler o plano antes de aplicar um novo.'),
     resource('aws_vpc', 'main', [
       hcl.attr('cidr_block', hcl.string(VPC_CIDR)),
       hcl.attr('enable_dns_support', hcl.bool(true)),

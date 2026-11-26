@@ -15,20 +15,15 @@ describe('registro dos geradores', () => {
   it('lista os blocos que ainda estão no gerador provisório', () => {
     expect([...PROVISIONAL_BLOCK_TYPES].sort()).toEqual(
       [
-        'aws.alb',
         'aws.cloudformation',
         'aws.cloudfront',
         'aws.cloudtrail',
-        'aws.cloudwatch',
         'aws.codepipeline',
         'aws.cognito',
         'aws.dynamodb',
         'aws.ecs',
-        'aws.elasticache',
         'aws.iam',
         'aws.lambda',
-        'aws.nat-gateway',
-        'aws.rds',
         'aws.route53',
         'aws.s3',
         'aws.secrets-manager',

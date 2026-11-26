@@ -13,10 +13,11 @@ O que precisa existir antes de qualquer ambiente: os buckets de estado, o proved
 | Provedor OIDC | `token.actions.githubusercontent.com` | Audiência `sts.amazonaws.com`; `prevent_destroy` |
 | Papel `plan` | `acp-ci-plan` | Somente leitura; usado pelo job `plan` do `terraform.yml` |
 | Papéis `apply` | `acp-ci-apply-staging` e `acp-ci-apply-production` | Um por ambiente, sessão de 1 hora, `prevent_destroy`. Gravam o próprio estado, escrevem nos recursos com nome do ambiente (política abaixo) e carregam as negações |
+| Papel `prices` | `acp-ci-prices` | Só `pricing:GetProducts`, sessão de 1 hora, `prevent_destroy`. Usado pelo workflow semanal de preços (#222) |
 | Limite de permissões | `acp-ci-boundary-staging` e `acp-ci-boundary-production` | Política gerenciada pelo cliente (sem custo), uma por ambiente, `prevent_destroy`. Teto dos papéis que o apply cria |
 | Política de escrita do apply | `acp-ci-apply-named-staging` e `acp-ci-apply-named-production` | Política gerenciada pelo cliente (sem custo), uma por ambiente, `prevent_destroy`, anexada ao papel `apply` do ambiente pelo bootstrap. Só `Allow` |
 
-Os papéis `apply` ainda não completam um deploy: faltam os serviços cujo ARN leva um ID (a #169, que também liga o log do HTTP API e fecha a #124), o bucket de artefatos com o `s3:GetObject` do pacote das funções (#209) e o papel `prices` (#125). O módulo `functions` passa a declarar o limite na #165; sem ele, a negação `DenyRoleWithoutBoundary` impede o apply de criar ou alterar os papéis das funções (falha fechada).
+Os papéis `apply` ainda não completam um deploy: faltam os serviços cujo ARN leva um ID (a #169, que também liga o log do HTTP API e fecha a #124), o bucket de artefatos com o `s3:GetObject` do pacote das funções (#209). O módulo `functions` passa a declarar o limite na #165; sem ele, a negação `DenyRoleWithoutBoundary` impede o apply de criar ou alterar os papéis das funções (falha fechada).
 
 Nada aqui tem custo fixo: sem chave própria do KMS e sem tabela de lock (o lock é o nativo do S3). O ID da conta vem da credencial de quem aplica, nunca do código.
 
@@ -161,6 +162,21 @@ Limites conhecidos:
 - **Permissão nova numa função exige mudar o limite aqui**, por Issue que autorize o bootstrap, e o autor reaplica à mão. A região é fixa em `us-east-1`.
 - `#trivy:ignore:AVD-AWS-0057` na política: os curingas são o sufixo `:*` dos log streams, o prefixo `acp-<prefixo>-*` e o ID do user pool, que a AWS gera. Nenhuma ação tem curinga.
 
+## Papel `prices`
+
+| Pergunta | Resposta |
+|---|---|
+| Quem assume | Só um job do GitHub Actions deste repositório rodando no branch `main` sem `environment:`: `sub` igual a `repo:henriqueluza/aws-cost-playground:ref:refs/heads/main` e `aud` igual a `sts.amazonaws.com`, ambos por `StringEquals`. O workflow de preços (#222) roda por `schedule` semanal e `workflow_dispatch`. Um job de `pull_request` (`sub` `...:pull_request`), de outro branch, com `environment:` (`sub` `...:environment:<env>`) ou de outro repositório não casa |
+| O que pode | Só `pricing:GetProducts` (política inline `get-products`), a única chamada do gerador (`pricing/app/client.py`, paginador `get_products`, endpoint `us-east-1`). Sem política gerenciada |
+| O que não pode | Todo o resto: não lê nem escreve nada da conta. O PR do catálogo é aberto com o `GITHUB_TOKEN`, não com o papel |
+
+Limites conhecidos:
+
+- `Resource: "*"`: a [Service Authorization Reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_awspricelist.html) diz que o AWS Price List não suporta ARN no elemento `Resource` e o serviço não tem chave de condição própria. Por isso o `#trivy:ignore:AVD-AWS-0057`. A ação não tem curinga.
+- O trust não fixa evento nem arquivo de workflow: qualquer job sem `environment:` de um workflow rodando com `ref` igual a `refs/heads/main` assume o papel (push, `schedule`, `workflow_dispatch` e também `pull_request_target` e `workflow_run`, cujo `ref` é o branch base). O alcance é ler preço público: o papel não dá acesso a nada da conta. Fixar `job_workflow_ref` é possível quando o workflow existir em `.github/workflows/` (#222), por Issue que autorize o bootstrap.
+- Se o gerador passar a chamar outra ação da Price List (`DescribeServices`, `GetAttributeValues`, `ListPriceLists`, `GetPriceListFileUrl`), a política muda aqui, por Issue que autorize o bootstrap. Hoje o workflow falharia com `AccessDenied` (falha fechada).
+- O trust só é provado na primeira execução do workflow depois da #77: os testes usam provider simulado.
+
 ## Como aplicar (autor)
 
 Pré-requisitos: Terraform 1.16, credencial temporária de administrador da conta (SSO ou sessão de curta duração, nunca chave de acesso gravada em arquivo). Os guardrails de custo (`docs/runbooks/guardrails-de-custo.md`) vêm depois, por ambiente, com a infra dele já aplicada; antes do bootstrap só cabe a leitura da quota de concorrência da conta (guardrail 1 do runbook).
@@ -183,13 +199,14 @@ terraform import aws_iam_openid_connect_provider.github \
 
 ## Saídas que viram variáveis do GitHub
 
-A saída `github_variables` é um mapa cujas chaves são os nomes das variáveis de **repositório** (não são segredos) lidas pelo `.github/workflows/terraform.yml`:
+A saída `github_variables` é um mapa cujas chaves são os nomes das variáveis de **repositório** (não são segredos) lidas pelo `.github/workflows/terraform.yml` e pelo workflow de preços (#222):
 
 | Variável | Valor |
 |---|---|
 | `AWS_PLAN_ROLE_ARN` | ARN do papel `plan` |
 | `TF_STATE_BUCKET_STAGING` | Bucket de estado de `infra/envs/staging` |
 | `TF_STATE_BUCKET_PRODUCTION` | Bucket de estado de `infra/envs/production` |
+| `AWS_PRICES_ROLE_ARN` | ARN do papel `prices` (lida pelo workflow de preços, #222; sem ela o workflow termina com aviso e sem falhar) |
 
 ```bash
 terraform output -json github_variables | jq -r 'to_entries[] | "\(.key) \(.value)"' |
@@ -233,6 +250,8 @@ O bootstrap cria o bucket onde o estado dos ambientes mora, então o estado dele
 | `aws_iam_role.plan` | `acp-ci-plan` |
 | `aws_iam_role_policy_attachment.plan_read_only` | `acp-ci-plan/arn:aws:iam::aws:policy/ReadOnlyAccess` |
 | `aws_iam_role_policy.plan_deny_data` | `acp-ci-plan:deny-data-read` |
+| `aws_iam_role.prices` | `acp-ci-prices` |
+| `aws_iam_role_policy.prices_get_products` | `acp-ci-prices:get-products` |
 | `aws_iam_role.apply["<env>"]` | `acp-ci-apply-<env>` |
 | `aws_iam_role_policy.apply_state["<env>"]` | `acp-ci-apply-<env>:state` |
 | `aws_iam_role_policy.apply_deny["<env>"]` | `acp-ci-apply-<env>:deny-guardrails` |
@@ -249,6 +268,6 @@ terraform -chdir=infra/bootstrap validate
 terraform -chdir=infra/bootstrap test
 ```
 
-Os testes (`tests/bootstrap.tftest.hcl`, `tests/apply.tftest.hcl`, `tests/boundary.tftest.hcl` e `tests/named.tftest.hcl`) usam provider simulado. O CI roda `fmt`, `validate`, `terraform test`, `tflint` e `trivy config` neste diretório (`infra/tools/tf_checks.sh`). O `terraform test` não enxerga `lifecycle` nem recurso que não foi declarado: o `prevent_destroy` dos buckets e do provedor OIDC é conferido por leitura. Para os papéis `apply`, o limite e a política de escrita, isso fica com `infra/tools/tests/test_bootstrap_apply_roles.py`, que o CI roda com os testes do `plan-guard`: ele confere o `prevent_destroy` dos três (papéis, limite e política de escrita), a paridade do nome do bucket do site entre `infra/envs/*/main.tf` e `named.tf`, e compara os recursos de IAM do diretório com um inventário fechado. Política inline, política gerenciada, anexo ou papel novo reprova até entrar no inventário de propósito. O conteúdo das políticas dos papéis `apply` é travado por igualdade em `tests/apply.tftest.hcl`, o do limite e da negação de dado em `tests/boundary.tftest.hcl`, e o da política de escrita em `tests/named.tftest.hcl`: igualdade da lista, o teto de 6.144 caracteres, escopo por ambiente (com sondas do outro ambiente), bucket de estado fora, `PassRole` e `AddPermission` com condição, e nenhuma ação de dado, de exclusão ou já negada. É assim que o critério "sem `AdministratorAccess`" e o "único `Allow`" são verificados.
+Os testes (`tests/bootstrap.tftest.hcl`, `tests/apply.tftest.hcl`, `tests/boundary.tftest.hcl`, `tests/named.tftest.hcl` e `tests/prices.tftest.hcl`) usam provider simulado. O CI roda `fmt`, `validate`, `terraform test`, `tflint` e `trivy config` neste diretório (`infra/tools/tf_checks.sh`). O `terraform test` não enxerga `lifecycle` nem recurso que não foi declarado: o `prevent_destroy` dos buckets e do provedor OIDC é conferido por leitura. Para os papéis `apply`, o limite e a política de escrita, isso fica com `infra/tools/tests/test_bootstrap_apply_roles.py`, que o CI roda com os testes do `plan-guard`: ele confere o `prevent_destroy` dos três (papéis, limite e política de escrita) e do papel `prices`, a paridade do nome do bucket do site entre `infra/envs/*/main.tf` e `named.tf`, e compara os recursos de IAM do diretório com um inventário fechado. Política inline, política gerenciada, anexo ou papel novo reprova até entrar no inventário de propósito. O conteúdo das políticas dos papéis `apply` é travado por igualdade em `tests/apply.tftest.hcl`, o do limite e da negação de dado em `tests/boundary.tftest.hcl`, e o da política de escrita em `tests/named.tftest.hcl`: igualdade da lista, o teto de 6.144 caracteres, escopo por ambiente (com sondas do outro ambiente), bucket de estado fora, `PassRole` e `AddPermission` com condição, e nenhuma ação de dado, de exclusão ou já negada. É assim que o critério "sem `AdministratorAccess`" e o "único `Allow`" são verificados.
 
 `.terraform.lock.hcl` é versionado, com os hashes `h1:` de linux_amd64, linux_arm64 e darwin_arm64.

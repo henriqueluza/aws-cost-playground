@@ -13,21 +13,24 @@ IAM_RESOURCES = {
     "aws_iam_policy.apply_named",
     "aws_iam_role.apply",
     "aws_iam_role.plan",
+    "aws_iam_role.prices",
     "aws_iam_role_policy.apply_deny",
     "aws_iam_role_policy.apply_deny_data",
     "aws_iam_role_policy.apply_state",
     "aws_iam_role_policy.plan_deny_data",
+    "aws_iam_role_policy.prices_get_products",
     "aws_iam_role_policy_attachment.apply_named",
     "aws_iam_role_policy_attachment.plan_read_only",
 }
 FORBIDDEN = ("AdministratorAccess", "managed_policy_arns", "inline_policy")
 RESOURCE = re.compile(r'^resource\s+"(aws_iam_\w+)"\s+"(\w+)"', re.M)
 # Identidade que o apply não pode perder: o papel, o limite de permissões dos papéis que ele cria
-# e a política de escrita por nome.
+# e a política de escrita por nome. O papel `prices` é identidade do workflow de preços.
 PROTECTED = {
     "o papel apply": ("aws_iam_role", "apply"),
     "o limite de permissões": ("aws_iam_policy", "apply_boundary"),
     "a política de escrita por nome": ("aws_iam_policy", "apply_named"),
+    "o papel prices": ("aws_iam_role", "prices"),
 }
 # O nome do bucket do site é fixado em `named.tf` e definido de verdade em cada ambiente.
 ENVS = Path(__file__).resolve().parents[2] / "envs"
@@ -116,6 +119,7 @@ class BootstrapApplyRolesTest(unittest.TestCase):
             "o papel apply precisa de prevent_destroy = true",
             "o limite de permissões precisa de prevent_destroy = true",
             "a política de escrita por nome precisa de prevent_destroy = true",
+            "o papel prices precisa de prevent_destroy = true",
         ]
         self.assertEqual(violations(HOSTILE), expected)
 

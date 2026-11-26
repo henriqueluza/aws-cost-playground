@@ -28,10 +28,11 @@ describe('InspectorPanel', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
-  it('aresta selecionada: aviso, sem formulário', () => {
+  it('aresta selecionada: abre o inspetor de aresta, não o aviso', () => {
     designStore.getState().select({ kind: 'edge', id: 'edg_1' });
     render(<InspectorPanel />);
-    expect(screen.getByRole('heading', { name: 'Aresta selecionada' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Conexão' })).toBeInTheDocument();
+    expect(screen.queryByText(/não está disponível aqui/)).toBeNull();
   });
 
   it('bloco de tipo fora do contrato não monta formulário', () => {

@@ -62,3 +62,12 @@ export function takeDesignDraft(
     return null;
   }
 }
+
+/** Apaga o rascunho guardado, se houver (ex.: a conta foi excluída). Nunca lança. */
+export function discardDesignDraft(storage?: Storage): void {
+  try {
+    area(storage)?.removeItem(KEY);
+  } catch {
+    // Armazenamento bloqueado: não há o que apagar.
+  }
+}

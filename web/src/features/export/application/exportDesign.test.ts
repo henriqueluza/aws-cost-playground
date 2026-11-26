@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { adrExampleDesign } from '../../../test/designFixtures';
 import { INJECTION_PAYLOADS } from '../test/injectionPayloads';
 import { BLOCK_GENERATORS } from '../model/generators';
+import { notSupportedYet } from '../model/generators/provisional';
 import { hcl } from '../model/hcl';
 import { EXPORT_PATHS, createExporter, exportDesign } from './exportDesign';
 
@@ -9,6 +10,17 @@ const mainTf = (design: unknown): string => {
   const result = exportDesign(design);
   if (!result.ok) throw new Error(result.error);
   expect(result.files.map((file) => file.path)).toEqual(['main.tf']);
+  return result.files[0]?.content ?? '';
+};
+/** O núcleo sozinho: registro em que S3 e Lambda (os blocos destes testes) não têm gerador real. */
+const provisional = createExporter({
+  ...BLOCK_GENERATORS,
+  'aws.s3': notSupportedYet,
+  'aws.lambda': notSupportedYet,
+});
+const provisionalTf = (design: unknown): string => {
+  const result = provisional(design);
+  if (!result.ok) throw new Error(result.error);
   return result.files[0]?.content ?? '';
 };
 const withLabels = (...labels: string[]) => ({
@@ -67,7 +79,7 @@ describe('exportDesign', () => {
   });
 
   it('bloco sem gerador real vira comentário e entra na lista de não exportados', () => {
-    const text = mainTf(adrExampleDesign);
+    const text = provisionalTf(adrExampleDesign);
     expect(text).toContain(
       [
         '# Blocos exportados: 0 de 2. Não exportados:',
@@ -129,9 +141,9 @@ describe('exportDesign', () => {
 
   it.each(INJECTION_PAYLOADS)('rótulo com a carga "%s" só aparece em comentário', (_name, p) => {
     const label = p.slice(0, 80);
-    const text = mainTf(withLabels(label, label));
-    expect(code(text)).toEqual(code(mainTf(withLabels('ok', 'ok'))));
-    expect(text.split('\n')).toHaveLength(mainTf(withLabels('ok', 'ok')).split('\n').length);
+    const text = provisionalTf(withLabels(label, label));
+    expect(code(text)).toEqual(code(provisionalTf(withLabels('ok', 'ok'))));
+    expect(text.split('\n')).toHaveLength(provisionalTf(withLabels('ok', 'ok')).split('\n').length);
     expect(text.replaceAll('\n', '')).not.toMatch(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}]/u);
   });
 
