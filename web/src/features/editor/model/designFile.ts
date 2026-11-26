@@ -75,11 +75,8 @@ export function migrateDesign(
  * escapada) e para ao passar de `maxBlocks`: o limite de blocos vale antes do parse completo.
  */
 function exceedsBlockLimit(text: string): boolean {
-  let count = 0;
-  for (const _ of text.matchAll(/"id"\s*:\s*"blk_/g)) {
-    if (++count > DESIGN_LIMITS.maxBlocks) return true;
-  }
-  return false;
+  const ids = text.matchAll(/"id"\s*:\s*"blk_/g);
+  return Array.from(ids).length > DESIGN_LIMITS.maxBlocks;
 }
 
 /** JSON.parse puro e depois o schema; o primeiro erro vira só uma categoria. */
