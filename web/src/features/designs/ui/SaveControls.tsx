@@ -82,6 +82,8 @@ function NameDialog(props: { open: boolean; onCancel: () => void; onSubmit: (n: 
           density="form"
           value={name}
           error={error}
+          name="designName"
+          autoComplete="off"
           maxLength={80}
           onChange={(e) => setName(e.currentTarget.value)}
         />

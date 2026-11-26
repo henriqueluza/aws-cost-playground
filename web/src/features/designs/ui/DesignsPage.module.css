@@ -28,6 +28,7 @@
   margin: 0;
   font-size: var(--fs-title);
   line-height: var(--lh-title);
+  text-wrap: balance;
   font-weight: var(--fw-semibold);
 }
 
@@ -89,10 +90,12 @@
 .mono {
   font-family: var(--font-mono);
   font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.num {
+.table .num {
+  font-variant-numeric: tabular-nums;
   text-align: end;
   white-space: nowrap;
 }
