@@ -55,7 +55,7 @@ describe('EdgeInspector', () => {
     const ends = screen.getByText('De').parentElement!;
     expect(ends).toHaveTextContent('S3, Uploads');
     expect(screen.getByText('Para').parentElement).toHaveTextContent('Internet');
-    expect(screen.getByLabelText('Tipo da conexão')).toHaveValue('data');
+    expect(screen.getByText(/^Tipo: Dados \(traço contínuo\)\./)).toBeInTheDocument();
     expect(screen.getByLabelText('Volume de dados por mês')).toHaveValue('120');
     expect(screen.getByText(/estimado pela LLM/)).toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
@@ -94,10 +94,10 @@ describe('EdgeInspector', () => {
     expect(edge('edg_1').overrides).toEqual({});
   });
 
-  it('par com um só tipo: seleção travada com explicação', () => {
+  it('par com um só tipo: texto no lugar do campo, com a explicação', () => {
     open('edg_log');
-    const select = screen.getByLabelText('Tipo da conexão');
-    expect(select).toBeDisabled();
+    expect(screen.queryByLabelText('Tipo da conexão')).toBeNull();
+    expect(screen.getByText(/^Tipo: Logs \(pontilhado\)\./)).toBeInTheDocument();
     expect(screen.getByText(/só permite este tipo/)).toBeInTheDocument();
   });
 
@@ -181,5 +181,24 @@ describe('Conectar a… no inspetor do bloco', () => {
     designStore.setState({ document: { ...doc, blocks: [ecs], edges: [] } });
     pick('blk_ecs');
     expect(screen.queryByLabelText('Destino')).toBeNull();
+    expect(screen.getByText(/Nenhum destino disponível/)).toBeInTheDocument();
+  });
+
+  it('depois de conectar, o foco volta ao campo Destino', async () => {
+    const user = userEvent.setup();
+    pick('blk_ecs');
+    await user.selectOptions(screen.getByLabelText('Destino'), 'blk_logs');
+    await user.click(screen.getByRole('button', { name: 'Conectar' }));
+    expect(screen.getByLabelText('Destino')).toHaveFocus();
+  });
+
+  it('conectando o último destino, o foco vai para a seção', async () => {
+    const user = userEvent.setup();
+    designStore.setState({ document: { ...doc, blocks: [ecs, logs], edges: [] } });
+    pick('blk_ecs');
+    await user.selectOptions(screen.getByLabelText('Destino'), 'blk_logs');
+    await user.click(screen.getByRole('button', { name: 'Conectar' }));
+    expect(screen.queryByLabelText('Destino')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Conectar a…' })).toHaveFocus();
   });
 });

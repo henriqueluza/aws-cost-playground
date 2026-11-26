@@ -22,7 +22,10 @@ function End({ id, term }: { id: string; term: string }) {
   return (
     <div className={styles.end}>
       <dt>{term}</dt>
-      <dd>{label ? `${service}, ${label}` : service}</dd>
+      <dd>
+        {service}
+        {label ? <span className={styles.endLabel}>{`, ${label}`}</span> : null}
+      </dd>
     </div>
   );
 }
@@ -47,30 +50,30 @@ export function EdgeInspector({ edge }: { edge: Edge }) {
         <End id={edge.source} term="De" />
         <End id={edge.target} term="Para" />
       </dl>
-      <section className={styles.group} aria-labelledby={`${edge.id}-tipo`}>
-        <h3 id={`${edge.id}-tipo`} className={styles.section}>
-          Tipo
-        </h3>
-        <SelectField
-          label="Tipo da conexão"
-          value={edge.kind}
-          disabled={locked}
-          onChange={(e) => {
-            const next = kinds.find((kind) => kind === e.target.value);
-            if (next && setEdgeKind(edge.id, next).ok) {
-              announce(`Tipo da conexão: ${EDGE_STYLE[next].label}`);
-            }
-          }}
-        >
-          {(kinds.length > 0 ? kinds : [edge.kind]).map((kind: EdgeKind) => (
-            <option key={kind} value={kind}>
-              {`${EDGE_STYLE[kind].label} (${EDGE_STYLE[kind].stroke})`}
-            </option>
-          ))}
-        </SelectField>
+      <section className={styles.group} aria-label="Tipo">
         {locked ? (
-          <p className={styles.note}>O contrato só permite este tipo entre estes dois blocos.</p>
-        ) : null}
+          <p className={styles.note}>
+            <strong>{`Tipo: ${EDGE_STYLE[edge.kind].label} (${EDGE_STYLE[edge.kind].stroke}).`}</strong>
+            {' O contrato só permite este tipo entre estes dois blocos.'}
+          </p>
+        ) : (
+          <SelectField
+            label="Tipo da conexão"
+            value={edge.kind}
+            onChange={(e) => {
+              const next = kinds.find((kind) => kind === e.target.value);
+              if (next && setEdgeKind(edge.id, next).ok) {
+                announce(`Tipo da conexão: ${EDGE_STYLE[next].label}`);
+              }
+            }}
+          >
+            {kinds.map((kind: EdgeKind) => (
+              <option key={kind} value={kind}>
+                {`${EDGE_STYLE[kind].label} (${EDGE_STYLE[kind].stroke})`}
+              </option>
+            ))}
+          </SelectField>
+        )}
       </section>
       {form.usage.length > 0 ? (
         <section className={styles.group} aria-labelledby={`${edge.id}-uso`}>
