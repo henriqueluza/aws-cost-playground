@@ -21,7 +21,8 @@ export const priceCatalogKey = (region: Region, services: readonly string[]) =>
 
 /**
  * Estado do catálogo de preços do design.
- * - `idle`: o design não tem bloco do contrato; nada é buscado.
+ * - `idle`: o design não tem bloco do contrato com cobrança (vazio, ou só blocos de custo zero);
+ *   nada é buscado.
  * - `ready`: `catalog` vai para o motor; `source` e `generatedAt` (ISO 8601, UTC) vêm do manifest,
  *   para o aviso do editor. Com `updating`, o catálogo ainda é o do design anterior (outra região
  *   ou lista de serviços) e o novo está a caminho.
@@ -45,7 +46,7 @@ export type PriceCatalogState =
  * Erro nunca é lançado na renderização: chega como estado.
  */
 export function usePriceCatalog(
-  design: Pick<DesignDocument, 'region' | 'blocks'>,
+  design: Pick<DesignDocument, 'region' | 'blocks' | 'edges'>,
   load: LoadCatalog = sessionLoad,
 ): PriceCatalogState {
   const { region } = design;

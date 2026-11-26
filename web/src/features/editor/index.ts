@@ -11,3 +11,10 @@ export type {
   Result,
   Selection,
 } from './model/editorState';
+export {
+  BLOCK_DRAG_MIME,
+  dropBlock,
+  isBlockDrag,
+  newBlockFor,
+  readDraggedBlockType,
+} from './model/palette';

@@ -5,11 +5,11 @@
   "files": [
     {
       "path": "sa-east-1/alb.json",
-      "sha256": "3199085679874ccae96b6e481089f7b1be290044dc672943bd07d0a153c95d2a"
+      "sha256": "735a2a1fb27211dad61fcce9f36049bc74ba26300052186845c57072f09b0481"
     },
     {
       "path": "sa-east-1/cloudfront.json",
-      "sha256": "2d51e500e6984f397836b9803814114e478c569c3c4fef668c7dd9f51b1eecca"
+      "sha256": "a3a913d53ecad078431d0b00816a07b9b4235077851b52c75025d921bd045007"
     },
     {
       "path": "sa-east-1/cloudtrail.json",
@@ -17,7 +17,7 @@
     },
     {
       "path": "sa-east-1/cloudwatch.json",
-      "sha256": "4c865b5006eb67683eb643502dbcf71774eb55e4b89e5f3b12780e6c416dc93c"
+      "sha256": "6738add14831ac987a9621cd93d491c3ad6a51587198db9d138b0ba68f528203"
     },
     {
       "path": "sa-east-1/codepipeline.json",
@@ -28,16 +28,20 @@
       "sha256": "6a17687ab3e67ca2d769c676671353175eaa6be57d8f71a48a5c24ce001adfb7"
     },
     {
+      "path": "sa-east-1/data-transfer.json",
+      "sha256": "83d76d46f09fde9df349ea48e80d855f3fe7baff23c240dbd74123bcf52d50d4"
+    },
+    {
       "path": "sa-east-1/dynamodb.json",
       "sha256": "142a82baa54724200b779a6c3f4cee3f8b2e3fd17d5c0f8b9cc4c1f6760335e5"
     },
     {
       "path": "sa-east-1/ec2.json",
-      "sha256": "d648eef1570784362451e7f38f49eae73a2aa6de2440616b6759daf306807b6d"
+      "sha256": "e44ebd6f4962fa8e446a9babdc7071b78637ac8e4299ba405ab6408c22490e11"
     },
     {
       "path": "sa-east-1/elasticache.json",
-      "sha256": "bf3521874d1a4e1455c77783861b7a486ff73729bb49ac85feb6751de3089103"
+      "sha256": "12b84fef2fad8546bfd551f805ff1aff7a873d61ff1c1ec895145512bf3bb5d3"
     },
     {
       "path": "sa-east-1/lambda.json",
@@ -45,19 +49,19 @@
     },
     {
       "path": "sa-east-1/nat-gateway.json",
-      "sha256": "fa73355740f05ba4529b93656bb8656b34a92678e7117d3bd1cd3ca1544387c6"
+      "sha256": "9458e33e99def7fedbdfb26b2ebe3ed31d6e77cbd59bd3617af3c8955a186098"
     },
     {
       "path": "sa-east-1/rds.json",
-      "sha256": "27f8e5c56c4042b08cf15a9c16b3e27e85fe984672eb8d0806f1c6b89b4b813e"
+      "sha256": "73cbb18738ad10840b1955ad6b396110f3b6417fd623d5503d6c02c50d153eef"
     },
     {
       "path": "sa-east-1/route53.json",
-      "sha256": "e4d1b2f175fab25d9c06622aaa190387df98f2cd2c92b6d81544b9f22c88ab7d"
+      "sha256": "a41957abdc99530e9440d165f0dfa7abcacbeb6331bf7aa2abcc439a1291f1d7"
     },
     {
       "path": "sa-east-1/s3.json",
-      "sha256": "e8f48658804ef517cf6be3e3f4c94d27d1f883db637866c5f8671c4272ab8412"
+      "sha256": "231e8d0fcd6295c11f7945fb6e73d90d6fe54475a49aae06bd42e999bf90b606"
     },
     {
       "path": "sa-east-1/secrets-manager.json",
@@ -69,15 +73,15 @@
     },
     {
       "path": "sa-east-1/waf.json",
-      "sha256": "fbfb49ecb9a43910b79932151ec470c2b109499555e9298751e6aa3c5e7c2846"
+      "sha256": "ce6c08050b14afdead4936fc2e076153e2e25eb9f2e8849ea5cd9dfbe3357a1f"
     },
     {
       "path": "us-east-1/alb.json",
-      "sha256": "f61802200852d44a198f616e606408b77dd54fd9bd80a667d1f2706fc8295955"
+      "sha256": "2560d413e0ab97f3bea7ff1c717eee4761d2e3d7bf2c20c2af6270b9f18764f5"
     },
     {
       "path": "us-east-1/cloudfront.json",
-      "sha256": "7c15a1d741334778f0df14809a360e2f1113cd716527969c44e717e43ed87812"
+      "sha256": "d46187f127c6f0a6fd938e2ee325702ccffb65f1f75073e894125d61fa67f0f3"
     },
     {
       "path": "us-east-1/cloudtrail.json",
@@ -85,7 +89,7 @@
     },
     {
       "path": "us-east-1/cloudwatch.json",
-      "sha256": "58f7eee1c1d70d9b91306686b26df306374252885fd15c63d8609e792b718f53"
+      "sha256": "eb4cd9d8c9f9bd582cff4449751b7cf8caeabb7795f09fc3084011ef262e01ae"
     },
     {
       "path": "us-east-1/codepipeline.json",
@@ -96,16 +100,20 @@
       "sha256": "219a2e9c7de47a6ecde5a4e34fde0255a914d62b059935d46bb50416e5b6453d"
     },
     {
+      "path": "us-east-1/data-transfer.json",
+      "sha256": "965fd1833fee6e722d116a8ea3aac1793e06078c64dfe02afe7221ccf8356238"
+    },
+    {
       "path": "us-east-1/dynamodb.json",
       "sha256": "531e223f5cb1486e2736b750466b894de3428ea1673c78736aad7b4826529bad"
     },
     {
       "path": "us-east-1/ec2.json",
-      "sha256": "9645151e3bbbacb1a1f639466e2358d0e9dcefb7feb61e7e63c92e81d745137b"
+      "sha256": "a2fda58b16a48a74f1a2f36cf2dbd59a780837127aaa4360e5c30074d0c68624"
     },
     {
       "path": "us-east-1/elasticache.json",
-      "sha256": "2de923cfe699f57fc0effbceeec622ee73604eed84a70b2642bc6f014a799994"
+      "sha256": "7cad162b06551c2f0a7401da7e7220e96069f680beaccacd237dcd35af3d7fba"
     },
     {
       "path": "us-east-1/lambda.json",
@@ -113,19 +121,19 @@
     },
     {
       "path": "us-east-1/nat-gateway.json",
-      "sha256": "9a36887fe8fa4e3c827bbda2cf07e9bf64711bda34b01a88d1f216f2443aee48"
+      "sha256": "7cf6ed8924797f59b7b40c3bd376b9ef5b9dfb5d448a44172a4bfb8863552725"
     },
     {
       "path": "us-east-1/rds.json",
-      "sha256": "4efb91bd11e3d7e280e942ff4a962a2a95b4bdb1f636eaa38bec8c64e7b43bb4"
+      "sha256": "0429d4a59312524e1fce366d3a0737f505e3f03859af733aa9c4bd4bb29c3b0b"
     },
     {
       "path": "us-east-1/route53.json",
-      "sha256": "c2f9b5aff70ab83aabf16b24db71550654bff8ec697353e1a49704921b81de20"
+      "sha256": "b55658a79686a5823058c70fae8e8a68740e2c8f2910317f781e3f3d6dbbef01"
     },
     {
       "path": "us-east-1/s3.json",
-      "sha256": "7d2879f0837f85b17b5ccac5d53c8e662a7867eecb3c0588d04897926ac95c1e"
+      "sha256": "f16f42166b9dd5b4729f719e911a9bb6703fb92a4f0802e714ae4729683d435d"
     },
     {
       "path": "us-east-1/secrets-manager.json",
@@ -137,7 +145,7 @@
     },
     {
       "path": "us-east-1/waf.json",
-      "sha256": "749d911e738d8b280bda17c8263edce2fdc2e2b25863277f8f87ac52c1002a6b"
+      "sha256": "078bc4f4fd2bab668b3855e7d0bb86540efeedcfcc6ae54e7c7bf09f4430938b"
     }
   ]
 }
