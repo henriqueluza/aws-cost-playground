@@ -81,6 +81,7 @@ describe('estimate', () => {
       'storage 50.000000 1.150000 fixed',
       'gp3 10.000000 0.800000 variable',
     ]);
+    expect(result.blocks[1]!.lines.map((l) => toFixed(l.unitPrice, 3))).toEqual(['0.023', '0.080']);
     expect(totals(result.blocks[1]!)).toEqual(['1.950000', '1.150000', '0.800000']);
     expect(totals(result)).toEqual(['2.350000', '1.150000', '1.200000']);
   });

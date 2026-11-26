@@ -185,13 +185,19 @@ Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInp
 
 | Tipo              | Campo                      | Significado                                                           |
 | ----------------- | -------------------------- | --------------------------------------------------------------------- |
-| `BlockPriceInput` | `attributes`               | Atributos do bloco (`Block['attributes']`), já validados              |
-| `BlockPriceInput` | `usage`                    | Uso efetivo (`UsageValues`), já validado                              |
+| `BlockPriceInput` | `attributes`               | Atributos do bloco, só os do contrato (abaixo)                        |
+| `BlockPriceInput` | `usage`                    | Uso efetivo, só as chaves do contrato (abaixo)                        |
 | `BlockCharge`     | `sku`                      | SKU do catálogo (`Price.sku`)                                         |
-| `BlockCharge`     | `quantity`                 | Quantidade mensal do SKU (`Decimal`)                                  |
+| `BlockCharge`     | `quantity`                 | Quantidade bruta do mês (`Decimal`), não negativa: sem franquia, mínimo nem faixas |
 | `BlockCharge`     | `charge`                   | `fixed` ou `variable` (`ChargeKind`, de [cost-estimate.md](cost-estimate.md)) |
+| `BlockCharge`     | `service` (opcional)       | Serviço do catálogo que tem o SKU. Sem ele vale o tipo do bloco sem `aws.` (`aws.nat-gateway` vira `nat-gateway`) |
 
-**Provisório:** o motor (#26) aplica faixas, franquia gratuita e mínimo do catálogo às `BlockCharge` e monta as `CostLine`. Ele pode estender `BlockPriceInput` (por exemplo, com o catálogo ou o contexto da aresta); a função de cada bloco não muda por isso.
+`BlockPriceInput` chega conforme o contrato do tipo (`blockPriceInput`, em `blockInput.ts`):
+
+- **Uso:** o efetivo (override vence). Só as chaves do contrato; chave ausente recebe o padrão; valor fora da faixa é limitado a `min`/`max`; chave `integer` com fração é arredondada para cima.
+- **Atributos:** só os do contrato; ausente recebe o padrão, se houver (`az` ausente fica ausente). Valor fora das opções não chega à função: o bloco sai `unavailable`.
+
+O motor (#26) aplica mínimo, franquia e faixas às `BlockCharge` e monta as `CostLine`, como descrito em [cost-estimate.md](cost-estimate.md#algoritmo). As funções dos 20 blocos continuam provisórias (devolvem `[]`) até as #30 a #41.
 
 ## Convenções
 

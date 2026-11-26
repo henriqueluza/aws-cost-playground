@@ -31,6 +31,46 @@
 - `blocks` e `edges` seguem a ordem de `design.blocks` e `design.edges`.
 - `Decimal` sai por `toFixed`. Nunca vai a JSON, query key nem estado persistido.
 
-## Provisório
+## Algoritmo
 
-A implementação atual devolve zero com status `priced` para todo bloco e aresta, sem `lines`, e ignora o catálogo. Serve para fixar a interface e destravar o painel. As regras de preço por serviço chegam nas Issues do motor (#26 em diante); o contrato acima não muda com elas.
+Para cada bloco, na ordem de `design.blocks`:
+
+1. `blockPriceInput` ajusta a entrada ao contrato do tipo ([block-contract.md](block-contract.md#função-de-preço)).
+2. A função de preço do bloco devolve as `BlockCharge` (SKU, quantidade bruta do mês, `fixed`/`variable`).
+3. `createRater(catalog)` aplica as regras do catálogo a cada cobrança e devolve as `CostLine`.
+
+Regras do catálogo, nesta ordem, por cobrança:
+
+1. **Quantidade mínima:** quantidade maior que zero e menor que `minimumQuantity` vira `minimumQuantity`. Zero não cobra mínimo.
+2. **Franquia:** desconta `freeTier.quantity`.
+3. **Faixas**, sobre a quantidade já sem franquia: `upTo` é cumulativo e inclusivo (quantidade exatamente em `upTo` fica toda na faixa) e a última faixa é aberta. Gera uma `CostLine` por faixa usada, com `amount = quantity × unitPrice` arredondado meio-para-par na 12ª casa, por linha.
+
+Franquia e posição nas faixas são da conta, isto é, do design inteiro:
+
+- Dois blocos que cobram o mesmo SKU (mesmo serviço e mesmo SKU) dividem uma franquia só e somam volume para a faixa seguinte, consumindo na ordem do design.
+- Com `pool`, SKUs diferentes (inclusive de serviços diferentes) dividem a mesma franquia. Se as quantidades declaradas no `pool` divergem, vale a menor (lida do catálogo inteiro, não só dos SKUs usados).
+- Cobrança que resulta em quantidade zero (uso zero ou tudo coberto pela franquia) gera uma linha com `quantity` 0 e `amount` 0, no preço da faixa corrente, para o SKU aparecer no detalhamento.
+
+Exemplo: Lambda com 3.000.000 de requisições no mês, franquia de 1.000.000 e US$ 0,0000002 por requisição. Cobra-se 3.000.000 - 1.000.000 = 2.000.000, e 2.000.000 × 0,0000002 = US$ 0,40.
+
+## Item `unavailable`
+
+Sai `unavailable` (valores zero, `lines` vazio, fora dos totais, sem consumir franquia nem faixa) o bloco em que:
+
+- o tipo está fora do contrato;
+- um atributo tem valor fora das opções do contrato;
+- o serviço da cobrança não está carregado no catálogo;
+- o SKU da cobrança não existe no serviço;
+- a função de preço devolve quantidade negativa.
+
+Se uma cobrança do bloco não tem preço, o bloco inteiro sai `unavailable`. Todos os blocos saem `unavailable` quando `design.region` difere de `catalog.region`.
+
+## Casos especiais
+
+- Bloco sem cobranças (nível C) sai `priced` com zero e sem linhas.
+- Arestas saem `priced` com zero e sem linhas até a #42.
+- A classificação fixo/variável vem do `charge` de cada `BlockCharge`; `fixed` e `variable` do item somam as linhas de cada tipo.
+
+## Testes
+
+`createEstimator(blocks: BlockPricing)` monta o motor sobre um registro de blocos e existe para testá-lo com funções de preço de teste. `estimate` é o `createEstimator` ligado ao registro real (`blockRegistry.ts`). `createEstimator` não é exportado pelo `index.ts`.

@@ -170,7 +170,7 @@ describe('exatidão', () => {
     expect(total(rater.rate([charge('p', '0.0000035')]))).toBe('0.000000000004');
   });
 
-  it('dividir uma quantidade entre itens não muda o total nem a quantidade cobrada', () => {
+  it('dividir uma quantidade inteira entre itens não muda o total nem a quantidade cobrada', () => {
     const price = { ...tiered, freeTier: { quantity: '7' } };
     let seed = 20261125;
     const next = (max: number) => (seed = (seed * 1103515245 + 12345) % 2147483648) % max;
