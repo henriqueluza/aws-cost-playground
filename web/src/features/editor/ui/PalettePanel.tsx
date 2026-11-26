@@ -99,7 +99,7 @@ export function PalettePanel() {
           }}
         />
       </div>
-      <p role="status" className={palette.status}>
+      <p role="status" className={styles.hidden}>
         {notice}
       </p>
       <div ref={listRef} className={palette.results}>
