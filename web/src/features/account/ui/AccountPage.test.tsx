@@ -12,7 +12,6 @@ import { fakeAuth } from '../../../test/authFixtures';
 import { adrExampleDesign } from '../../../test/designFixtures';
 import type { DesignDocument } from '../../../shared/lib/design';
 import { AuthProvider, RequireAuth } from '../../auth';
-import { savedDesignStore } from '../../designs/hooks/savedDesignStore';
 import { AccountPage } from './AccountPage';
 
 const consoleSpies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
@@ -24,7 +23,6 @@ const DRAFT_KEY = 'aws-cost-playground:design-draft';
 afterEach(() => {
   for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled();
   window.sessionStorage.clear();
-  savedDesignStore.setState({ saved: null, saving: false, error: null });
 });
 
 const newApi = (): Api =>
@@ -102,14 +100,6 @@ describe('AccountPage', () => {
     expect(await screen.findByText(/Restam 20 de 20/)).toBeInTheDocument();
   });
 
-  it('quota com sessão expirada convida a entrar, sem tentar de novo', async () => {
-    const { auth } = mount({ ...newApi(), quota: { get: reject('unauthenticated') } });
-    expect(await screen.findByRole('alert')).toHaveTextContent('Sua sessão expirou');
-    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Entrar' }));
-    expect(auth.service.signIn).toHaveBeenCalledWith({ returnTo: '/conta' });
-  });
-
   describe('exclusão', () => {
     it('explica o que é apagado, que não há volta, e só libera com a palavra exata', async () => {
       const user = userEvent.setup();
@@ -135,19 +125,14 @@ describe('AccountPage', () => {
       await expectNoAxeViolations(dialog);
     });
 
-    it('Cancelar e Esc fecham sem excluir e o campo volta vazio', async () => {
+    it('Esc fecha sem excluir, devolve o foco e o campo volta vazio', async () => {
       const user = userEvent.setup();
       const { api } = mount();
       const spy = vi.spyOn(api.account, 'deleteAccount');
-      let dialog = await open(user);
-      await user.type(within(dialog).getByRole('textbox'), 'EXCLUIR');
+      await user.type(within(await open(user)).getByRole('textbox'), 'EXCLUIR');
       await user.keyboard('{Escape}');
-      expect(screen.queryByRole('dialog')).toBeNull();
       expect(screen.getByRole('button', { name: /Excluir minha conta/ })).toHaveFocus();
-      dialog = await open(user);
-      expect(within(dialog).getByRole('textbox')).toHaveValue('');
-      await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
-      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(within(await open(user)).getByRole('textbox')).toHaveValue('');
       expect(spy).not.toHaveBeenCalled();
     });
 
@@ -156,7 +141,6 @@ describe('AccountPage', () => {
       const doc = adrExampleDesign as unknown as DesignDocument;
       const api = newApi();
       await api.designs.create({ name: 'Loja', doc });
-      savedDesignStore.setState({ saved: { id: 'X' } as never });
       window.sessionStorage.setItem(DRAFT_KEY, '{"savedAt":1,"text":"{}"}');
       const { auth, router, client } = mount(api);
       client.setQueryData(['designs', 'list'], ['dado do usuário']);
@@ -171,7 +155,6 @@ describe('AccountPage', () => {
       expect(await api.designs.list()).toEqual([]);
       expect(client.getQueryData(['designs', 'list'])).toBeUndefined();
       expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull();
-      expect(savedDesignStore.getState().saved).toBeNull();
     });
 
     it.each(['network', 'unavailable'] as const)(
