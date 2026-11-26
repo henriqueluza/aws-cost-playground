@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ExportPanel } from '../../export';
 import { PricingPanel, usePriceCatalog } from '../../pricing';
-import { WorkloadPanel } from '../../workload';
 import { useHistoryShortcuts } from '../hooks/historyShortcuts';
 import { useRestoreDesignDraft } from '../hooks/designDraftSync';
 import { useDesignStore } from '../hooks/useDesignStore';
@@ -24,8 +23,11 @@ function HistoryShortcuts(): null {
   return null;
 }
 
-/** `actions`: botões de outras features para a barra superior (o app os injeta). */
-export function EditorPage({ actions }: { actions?: ReactNode } = {}) {
+/** `actions` e `workload`: peças de outras features (barra superior e aba Carga) que o app injeta. */
+export function EditorPage({
+  actions,
+  workload,
+}: { actions?: ReactNode; workload?: ReactNode } = {}) {
   useRestoreDesignDraft();
   const wide = useMediaQuery('(min-width: 1024px)', true);
   const design = useDesignStore((s) => s.document);
@@ -47,7 +49,7 @@ export function EditorPage({ actions }: { actions?: ReactNode } = {}) {
       ),
     },
     { id: 'block', label: 'Bloco', panel: <InspectorPanel /> },
-    { id: 'load', label: 'Carga', panel: <WorkloadPanel /> },
+    { id: 'load', label: 'Carga', panel: workload ?? <p>Carga indisponível.</p> },
     { id: 'export', label: 'Exportar', panel: <ExportPanel /> },
   ];
 
@@ -78,7 +80,7 @@ export function EditorPage({ actions }: { actions?: ReactNode } = {}) {
         <CanvasPanel />
       </main>
       <aside aria-label="Painéis do design" className={styles.rail}>
-        <RailTabs label="Custo, bloco e carga" tabs={railTabs} />
+        <RailTabs label="Custo, bloco, carga e exportação" tabs={railTabs} />
         <EstimateNotice stamp={stamp} />
       </aside>
     </div>

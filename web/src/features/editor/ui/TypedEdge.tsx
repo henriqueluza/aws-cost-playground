@@ -8,10 +8,15 @@ import {
 import { memo, type ReactElement } from 'react';
 import type { EdgeKind } from '../../../shared/lib/design';
 import { EDGE_STYLE } from '../model/edgeKinds';
+import { MIN_TAG_LENGTH, type PlannedEdge } from '../model/geometry/edgeRouting';
 import styles from './CanvasPanel.module.css';
 import { Icon, type IconName } from './CategoryIcon';
 
-export type TypedFlowEdge = Edge<{ kind: EdgeKind }, 'typed'>;
+/** `route`: corredor e etiqueta calculados para o diagrama todo (`planEdges`); sem ele, o traçado padrão. */
+/** Folga entre o bloco e o primeiro trecho vertical quando a aresta segue uma faixa planejada. */
+const LANE_OFFSET = 1;
+
+export type TypedFlowEdge = Edge<{ kind: EdgeKind; route?: PlannedEdge }, 'typed'>;
 
 /** Classe do traçado de cada tipo: contínuo, tracejado, pontilhado (DESIGN.md, "Arestas"). */
 export const STROKE_CLASS: Record<EdgeKind, string> = {
@@ -19,8 +24,6 @@ export const STROKE_CLASS: Record<EdgeKind, string> = {
   'runs-on': styles.strokeRunsOn ?? '',
   logs: styles.strokeLogs ?? '',
 };
-/** Abaixo disto (px do traço) a etiqueta não cabe sem cobrir os blocos. */
-const MIN_TAG_LENGTH = 48;
 export const EDGE_ICON: Record<EdgeKind, IconName> = {
   data: 'edge-data',
   'runs-on': 'edge-runs-on',
@@ -44,7 +47,8 @@ export const TypedEdge = memo(function TypedEdge({
   data,
 }: EdgeProps<TypedFlowEdge>): ReactElement {
   const kind = data?.kind ?? 'data';
-  const [path, labelX, labelY] = getSmoothStepPath({
+  const route = data?.route;
+  const [path, centerLabelX, centerLabelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
@@ -52,7 +56,13 @@ export const TypedEdge = memo(function TypedEdge({
     sourcePosition,
     targetPosition,
     borderRadius: 6,
+    centerX: route?.centerX,
+    // O React Flow só respeita `centerX` quando o corredor cabe nas duas folgas (20 px cada); em
+    // corredor estreito ele ignora a faixa e desenha um zigue-zague. A folga mínima mantém a faixa.
+    offset: route?.centerX === undefined ? undefined : LANE_OFFSET,
   });
+  const labelX = route?.label?.x ?? centerLabelX;
+  const labelY = route?.label?.y ?? centerLabelY;
   // DESIGN.md: em aresta com menos de 48px a etiqueta só aparece quando ela está selecionada.
   const short = Math.hypot(targetX - sourceX, targetY - sourceY) < MIN_TAG_LENGTH;
   return (

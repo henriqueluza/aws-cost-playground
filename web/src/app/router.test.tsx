@@ -22,7 +22,7 @@ describe('routes', () => {
   it.each([
     ['/', 'Editor'],
     ['/designs', 'Meus designs'],
-    ['/comparar', 'Comparar cenários'],
+    ['/comparar', 'Comparar designs'],
     ['/conta', 'Conta'],
     ['/privacidade', 'Política de privacidade'],
     ['/termos', 'Termos de uso'],
@@ -65,6 +65,7 @@ describe('routes', () => {
       </QueryClientProvider>,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Editor' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Comparar' })).toHaveAttribute('href', '/comparar');
     expect(auth.service.signIn).not.toHaveBeenCalled();
     expect(auth.service.getAccessToken).not.toHaveBeenCalled();
   });

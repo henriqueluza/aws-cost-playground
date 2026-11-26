@@ -15,6 +15,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent,
   type ReactElement,
@@ -38,6 +39,8 @@ import {
   toCanvasEdges,
   toCanvasNodes,
 } from '../model/canvasModel';
+import { planDiagram } from '../model/geometry/diagram';
+import { fitInsets } from '../model/geometry/fitInsets';
 import { dropBlock, isBlockDrag } from '../model/palette';
 import { BlockNode, ClientNode, type BlockFlowNode, type ClientFlowNode } from './BlockNode';
 import styles from './CanvasPanel.module.css';
@@ -50,8 +53,12 @@ type AppNode = BlockFlowNode | ClientFlowNode;
 
 const NODE_TYPES = { block: BlockNode, client: ClientNode };
 const EDGE_TYPES = { typed: TypedEdge };
-/** `minZoom` do ajuste: abaixo de ~0,7 o texto de 12 px passa a ~8 px e some; sobra o pan. */
-const FIT_OPTIONS = { padding: 0.2, minZoom: 0.7, maxZoom: 1 };
+/** O ajuste mostra o diagrama inteiro: o zoom que couber, entre estes limites. */
+const FIT_LIMITS = { minZoom: 0.1, maxZoom: 1, duration: 0 };
+/** Folga entre o diagrama e a borda do canvas, ou os controles e a legenda. */
+const FIT_MARGIN = 16;
+/** Marca o que fica sobre o canvas e sai da área útil do ajuste (legenda, controles). */
+const OBSTACLES = '[data-fit-obstacle], .react-flow__attribution';
 const GRID: [number, number] = [8, 8];
 
 /** O canvas: nós e arestas saem do design da store; cada gesto vira uma ação dela. */
@@ -71,6 +78,12 @@ function Canvas(): ReactElement {
   const flow = useReactFlow();
   const [refusal, setRefusal] = useState<string | null>(null);
   const [dropping, setDropping] = useState(false);
+  const baseline = useDesignStore((s) => s.baseline);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [fitted, setFitted] = useState(false);
+  const pendingFit = useRef(true);
+  const movedByUser = useRef(false);
+  const lastLoaded = useRef({ document, baseline });
 
   // Mudança de seleção (clique, teclado, painel de custo) é dita em voz alta.
   useEffect(() => {
@@ -82,17 +95,83 @@ function Canvas(): ReactElement {
     () => toCanvasNodes(document, layout, selection, costs) as unknown as AppNode[],
     [document, layout, selection, costs],
   );
-  const edges = useMemo(
-    () => toCanvasEdges(document, selection) as unknown as Edge[],
-    [document, selection],
-  );
+  const edges = useMemo(() => {
+    const canvasEdges = toCanvasEdges(document, selection);
+    const plan = planDiagram(nodes, canvasEdges);
+    return canvasEdges.map((edge) => ({
+      ...edge,
+      data: { ...edge.data, route: plan.get(edge.id) },
+    })) as unknown as Edge[];
+  }, [document, selection, nodes]);
 
-  // Design carregado de fora (sem layout): ajusta o zoom aos blocos novos.
-  const idsKey = document.blocks.map((block) => block.id).join();
-  const unplaced = Object.keys(layout).length === 0;
+  // Ajuste ao diagrama inteiro: a área útil é o canvas sem a legenda, os controles e a atribuição.
+  const fit = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const box = canvas.getBoundingClientRect();
+    const obstacles = [...canvas.querySelectorAll(OBSTACLES)].map((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x - box.x, y: r.y - box.y, width: r.width, height: r.height };
+    });
+    const inset = fitInsets(box, obstacles, FIT_MARGIN);
+    movedByUser.current = false;
+    void flow.fitView({
+      ...FIT_LIMITS,
+      padding: {
+        top: `${inset.top}px`,
+        right: `${inset.right}px`,
+        bottom: `${inset.bottom}px`,
+        left: `${inset.left}px`,
+      },
+    });
+  }, [flow]);
+
+  // Design aberto de outro lugar (arquivo, Novo design, Meus designs) troca o documento e a base
+  // juntos; salvar troca só a base. Só a troca pede um ajuste novo.
   useEffect(() => {
-    if (unplaced && idsKey) void flow.fitView(FIT_OPTIONS);
-  }, [flow, idsKey, unplaced]);
+    const last = lastLoaded.current;
+    if (document !== last.document && baseline === document && baseline !== last.baseline) {
+      pendingFit.current = true;
+    }
+    lastLoaded.current = { document, baseline };
+  }, [document, baseline]);
+  // O ajuste espera todos os nós medidos (até ~2 s; depois ajusta mesmo assim, para a folha nunca
+  // ficar escondida). Antes disso o diagrama fica invisível, sem "pulo" de zoom.
+  useEffect(() => {
+    if (!pendingFit.current) return;
+    let frame = 0;
+    let tries = 0;
+    const measured = () =>
+      flow.getNodes().every((node) => flow.getInternalNode(node.id)?.measured.width);
+    const attempt = () => {
+      if (!measured() && tries++ < 120) {
+        frame = requestAnimationFrame(attempt);
+        return;
+      }
+      pendingFit.current = false;
+      fit();
+      setFitted(true);
+    };
+    attempt();
+    return () => cancelAnimationFrame(frame);
+  }, [document, baseline, flow, fit]);
+  // Janela redimensionada: reajusta, a não ser que a pessoa já tenha movido a vista.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !fitted) return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!movedByUser.current) fit();
+      });
+    });
+    observer.observe(canvas);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [fit, fitted]);
 
   const onNodesChange = useCallback((changes: FlowChange[]) => {
     const { selection: current, ...actions } = designStore.getState();
@@ -162,7 +241,12 @@ function Canvas(): ReactElement {
   );
 
   return (
-    <div className={styles.canvas} data-dropping={dropping || undefined}>
+    <div
+      ref={canvasRef}
+      className={styles.canvas}
+      data-dropping={dropping || undefined}
+      data-fitting={(!fitted && document.blocks.length > 0) || undefined}
+    >
       <h2 className={styles.hidden}>Canvas</h2>
       <ReactFlow
         nodes={nodes}
@@ -188,33 +272,47 @@ function Canvas(): ReactElement {
         onDragLeave={onDragLeave}
         ariaLabelConfig={FLOW_ARIA_LABELS}
         onDrop={onDrop}
-        fitView
-        fitViewOptions={FIT_OPTIONS}
+        onMoveStart={(event) => {
+          if (event) movedByUser.current = true;
+        }}
         defaultMarkerColor={null}
-        minZoom={0.25}
+        minZoom={0.1}
         maxZoom={2}
-        attributionPosition="bottom-left"
+        attributionPosition="bottom-right"
         aria-label="Diagrama da arquitetura"
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
         {document.blocks.length > 0 && (
-          <Panel position="bottom-left" className={styles.legendPanel}>
+          <Panel position="bottom-left" data-fit-obstacle>
             <EdgeLegend />
           </Panel>
         )}
         <Panel
           position="top-right"
           className={styles.tools}
+          data-fit-obstacle
           role="group"
           aria-label="Zoom do diagrama"
         >
-          <IconButton aria-label="Aumentar o zoom" onClick={() => void flow.zoomIn()}>
+          <IconButton
+            aria-label="Aumentar o zoom"
+            onClick={() => {
+              movedByUser.current = true;
+              void flow.zoomIn();
+            }}
+          >
             <Icon name="plus" />
           </IconButton>
-          <IconButton aria-label="Diminuir o zoom" onClick={() => void flow.zoomOut()}>
+          <IconButton
+            aria-label="Diminuir o zoom"
+            onClick={() => {
+              movedByUser.current = true;
+              void flow.zoomOut();
+            }}
+          >
             <Icon name="minus" />
           </IconButton>
-          <IconButton aria-label="Ajustar à tela" onClick={() => void flow.fitView(FIT_OPTIONS)}>
+          <IconButton aria-label="Ajustar à tela" onClick={fit}>
             <Icon name="fit" />
           </IconButton>
         </Panel>

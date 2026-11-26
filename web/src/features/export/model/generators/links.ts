@@ -18,3 +18,13 @@ export function dataPeers(
   }
   return [...peers.values()];
 }
+
+/**
+ * O bloco ECS que roda neste EC2 (aresta `runs-on`), a partir das arestas do EC2. Com mais de um,
+ * vale o primeiro na ordem das arestas: um Auto Scaling group só serve a um capacity provider.
+ */
+export function ecsClusterOf(links: readonly ExportLink[]): ExportBlock | undefined {
+  return links.find(
+    (link) => link.kind === 'runs-on' && link.role === 'target' && link.peer?.type === 'aws.ecs',
+  )?.peer;
+}

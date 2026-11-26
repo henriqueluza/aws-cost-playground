@@ -1,9 +1,10 @@
 import type { RouteObject } from 'react-router';
 import { AccountPage } from '../features/account';
 import { AuthActions, AuthCallbackPage, RequireAuth, SignInButton } from '../features/auth';
-import { ComparePage } from '../features/compare';
+import { CompareLink, ComparePage } from '../features/compare';
 import { DesignsPage, SaveControls } from '../features/designs';
 import { EditorPage, keepDesignForLogin } from '../features/editor';
+import { WorkloadPanel } from '../features/workload';
 import { PrivacyPage, TermsPage } from '../features/legal';
 
 /** O app compõe a barra do editor: salvar (designs) e a conta (auth); o editor não conhece nenhum dos dois. */
@@ -12,10 +13,12 @@ function EditorRoute() {
     <EditorPage
       actions={
         <>
+          <CompareLink />
           <SaveControls signInAction={<SignInButton beforeSignIn={keepDesignForLogin} />} />
           <AuthActions beforeSignIn={keepDesignForLogin} />
         </>
       }
+      workload={<WorkloadPanel />}
     />
   );
 }

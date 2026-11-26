@@ -154,6 +154,9 @@ describe('renderHcl', () => {
   it('escreve chamada de função da lista fechada, com cada argumento escapado', () => {
     const value = hcl.call('format', [hcl.string('%s${a}'), hcl.ref('var', 'aws_region')]);
     expect(renderHcl([hcl.attr('zona', value)])).toBe('zona = format("%s$${a}", var.aws_region)\n');
+    expect(renderHcl([hcl.attr('dados', hcl.call('base64encode', [value]))])).toBe(
+      'dados = base64encode(format("%s$${a}", var.aws_region))\n',
+    );
   });
 
   it.each([
