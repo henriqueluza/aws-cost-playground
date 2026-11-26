@@ -39,7 +39,7 @@ A aresta `data` parte de quem chama e chega em quem é chamado (CloudFront para 
 
 As outras arestas `data` (mesma zona, ou serviços sem zona) não custam e não entram na calculadora. O volume delas serve à estimativa de carga e ao export.
 
-Para não contar duas vezes, os blocos NAT Gateway e CloudWatch têm `processedGbPerMonth` e `logsIngestedGbPerMonth` em zero: o volume vem só das arestas. O valor a digitar é a soma das arestas, já feita nas tabelas.
+Para não contar duas vezes, os blocos NAT Gateway e CloudWatch têm `processedGbPerMonth` e `logsIngestedGbPerMonth` em zero: o volume vem só das arestas. O valor a digitar é a soma das arestas, já feita nas tabelas. No motor, o custo aparece na aresta, com o mesmo SKU do bloco, e a aresta `logs` cobra só a ingestão; as regras estão em [Custos de aresta](architecture/aws-cost-playground/cost-estimate.md#custos-de-aresta).
 
 ## 1. `api-serverless`
 

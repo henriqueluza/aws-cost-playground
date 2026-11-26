@@ -28,7 +28,12 @@ export function catalogServices(
   }
   const blockById = new Map(design.blocks.map((block) => [block.id, block]));
   for (const edge of design.edges) {
-    const charges = edgeCharges(edge, (id) => blockById.get(id), blocks.definition) ?? [];
+    const charges =
+      edgeCharges(
+        edge,
+        (id) => blockById.get(id),
+        (type) => blocks.definition(type),
+      ) ?? [];
     for (const charge of charges) services.add(charge.service);
   }
   return [...services].sort();
