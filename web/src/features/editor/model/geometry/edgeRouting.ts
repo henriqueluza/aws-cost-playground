@@ -116,6 +116,19 @@ const around = (p: Point, size: Size, grow = 0): Rect => ({
 const hit = (a: Rect, b: Rect): boolean =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
+/** Ordem lexicográfica: a primeira diferença decide. */
+const lessThan = (a: readonly number[], b: readonly number[]): boolean => {
+  const k = a.findIndex((v, i) => v !== b[i]);
+  return k >= 0 && a[k]! < b[k]!;
+};
+
+/** O segmento (horizontal ou vertical) de `a` a `b` atravessa o retângulo? */
+const crosses = (a: Point, b: Point, r: Rect): boolean =>
+  Math.max(a.x, b.x) > r.x &&
+  Math.min(a.x, b.x) < r.x + r.width &&
+  Math.max(a.y, b.y) > r.y &&
+  Math.min(a.y, b.y) < r.y + r.height;
+
 export interface PlannedEdge {
   /** `x` do trecho vertical; ausente na aresta que volta (traçado padrão). */
   readonly centerX?: number;
@@ -135,30 +148,33 @@ export function planEdges(
   tag: Size,
 ): Map<string, PlannedEdge> {
   const lanes = corridorLanes(edges);
+  const routes = new Map(edges.map((e) => [e.id, routePoints(e, lanes.get(e.id))]));
+  /** Quantos traços de OUTRAS arestas passam por baixo da etiqueta: ela pareceria delas também. */
+  const strokesUnder = (box: Rect, own: string): number =>
+    [...routes].filter(
+      ([id, pts]) => id !== own && pts.slice(1).some((p, i) => crosses(pts[i]!, p, box)),
+    ).length;
   const placed: Rect[] = [];
   const plan = new Map<string, PlannedEdge>();
   for (const e of edges) {
     const centerX = lanes.get(e.id);
-    const route = routePoints(e, centerX);
+    const route = routes.get(e.id) ?? routePoints(e, centerX);
     if (Math.hypot(e.tx - e.sx, e.ty - e.sy) < MIN_TAG_LENGTH) {
       plan.set(e.id, centerX === undefined ? {} : { centerX });
       continue;
     }
-    let best: { point: Point; score: readonly [number, number] } | null = null;
+    let best: { point: Point; score: readonly [number, number, number] } | null = null;
     for (const t of SLIDES) {
       const point = pointAlong(route, t);
       const box = around(point, tag);
       const score = [
         placed.filter((other) => hit(box, other)).length,
         nodes.filter((node) => hit(box, node)).length,
+        strokesUnder(box, e.id),
       ] as const;
-      if (
-        best === null ||
-        score[0] < best.score[0] ||
-        (score[0] === best.score[0] && score[1] < best.score[1])
-      )
-        best = { point, score };
-      if (score[0] === 0 && score[1] === 0) break;
+      // etiquetas, depois blocos, depois traços alheios: a ordem de importância
+      if (best === null || lessThan(score, best.score)) best = { point, score };
+      if (score.every((v) => v === 0)) break;
     }
     const label = best?.point ?? pointAlong(route, 0.5);
     placed.push(around(label, tag, TAG_GAP / 2));

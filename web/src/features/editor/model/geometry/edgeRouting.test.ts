@@ -136,6 +136,16 @@ describe('planEdges (etiquetas)', () => {
     expect(hit(tagRect(label), block)).toBe(false);
   });
 
+  it('a etiqueta foge do traço de outra aresta quando há posição livre', () => {
+    const a = edge('a', 0, 200, 0, 100);
+    const alone = planEdges([a], [], TAG).get('a')!.label!; // sozinha, fica a meio caminho
+    const crossing = edge('b', alone.y, alone.y, 0, 100); // um traço horizontal por baixo dela
+    const label = planEdges([a, crossing], [], TAG).get('a')!.label!;
+    expect(Math.abs(label.y - alone.y)).toBeGreaterThanOrEqual(TAG.height / 2);
+    expect(label.y).toBeGreaterThan(50); // continua entre 25% e 75% do traço
+    expect(label.y).toBeLessThan(150);
+  });
+
   it('aresta curta (< 48 px) não ganha etiqueta', () => {
     expect(planEdges([edge('a', 0, 10, 216, 240)], [], TAG).get('a')!.label).toBeUndefined();
   });
