@@ -106,6 +106,48 @@ describe('gerador de ALB', () => {
   });
 });
 
+describe('bordas de ALB e NAT Gateway', () => {
+  it('a mesma instância ligada por duas arestas entra uma vez; o segundo ALB não herda anexos', () => {
+    const found = generate(
+      design(
+        [alb('blk_lb'), alb('blk_lb2'), ec2('blk_web', 'a')],
+        [edge('blk_lb', 'blk_web'), edge('blk_web', 'blk_lb')],
+      ),
+    );
+    expect(labels(found, 'aws_lb_target_group_attachment')).toEqual(['blk_lb_1']);
+    expect(blocksOf(found, 'certificate_arn', 'variable')).toHaveLength(1);
+    expect(labels(found, 'aws_lb')).toEqual(['blk_lb', 'blk_lb2']);
+  });
+
+  it('nome de 48 caracteres: os rótulos derivados cabem no limite do identificador', () => {
+    const long = 'n'.repeat(48);
+    const document = design(
+      [alb('blk_1', long), nat('blk_2', long), block('blk_3', 'aws.ec2', {}, {}, long)],
+      [edge('blk_1', 'blk_3')],
+    );
+    const found = generate(document);
+    expect(labels(found, 'aws_lb_listener')).toEqual([`${long}_https`, `${long}_http`]);
+    expect(labels(found, 'aws_lb_target_group_attachment')).toEqual([`${long}_1`]);
+    expect(labels(found, 'aws_route')).toContain(`${'n'.repeat(46)}_2_b`);
+    for (const node of blocksOf(found)) expect(node.labels[1]?.length).toBeLessThanOrEqual(64);
+    expect(exportDesign(document).ok).toBe(true);
+  });
+
+  it.each([
+    [1, ['blk_n1_a', 'blk_n1_b', 'blk_n1_c']],
+    [3, ['blk_n1_a', 'blk_n2_b', 'blk_n3_c']],
+    [4, ['blk_n1_a', 'blk_n2_b', 'blk_n3_c']],
+  ])('%i NAT Gateway(s) em três zonas repartem as rotas privadas', (count, routes) => {
+    const zones = ['a', 'b', 'c'].map((az) => ec2(`blk_web_${az}`, az));
+    const gateways = Array.from({ length: count }, (_, i) => nat(`blk_n${i + 1}`));
+    const found = generate(design([...zones, ...gateways]));
+    expect(labels(found, 'aws_route')).toEqual(['public_internet', ...routes]);
+    expect(found.some((n) => n.kind === 'comment' && n.text.includes('mais NAT Gateways'))).toBe(
+      count === 4,
+    );
+  });
+});
+
 describe('gerador de NAT Gateway', () => {
   it('fica numa sub-rede pública, com Elastic IP, e recebe a rota padrão das privadas', () => {
     const nodes = generate(design([nat('blk_nat'), ec2('blk_web', 'a'), ec2('blk_api', 'c')]));
@@ -151,6 +193,9 @@ describe('gerador de CloudWatch', () => {
     });
     expect(mainTf(document)).toContain('# Origens dos logs: aws.rds (blk_db).');
     expect(mainTf(document)).not.toMatch(/aws_cloudwatch_metric_alarm|aws_kms_key/);
+    const refused = block('blk_db', 'aws.rds', { engine: 'oracle' });
+    const text = mainTf(design([logs('blk_logs'), refused], [edge('blk_db', 'blk_logs', 'logs')]));
+    expect(text).not.toContain('Origens dos logs');
   });
 });
 
