@@ -139,6 +139,27 @@ describe.each([
     expect(screen.getByRole('tabpanel')).toHaveFocus();
   });
 
+  it('liga as linhas do painel de custo à seleção da store, nos dois sentidos', async () => {
+    expect(designStore.getState().loadDesign(adrExampleDesign).ok).toBe(true);
+    const { document } = designStore.getState();
+    const services = catalogServices(document);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(
+      priceCatalogKey(document.region, services),
+      catalogOf(Object.fromEntries(services.map((service) => [service, []]))),
+    );
+    renderPage(matches, client);
+    const row = screen.getByRole('button', { name: /^API handler/ });
+    await userEvent.click(row);
+    expect(designStore.getState().selection).toEqual({ kind: 'block', id: 'blk_fn_api' });
+    act(() => void designStore.getState().select({ kind: 'edge', id: 'edg_1' }));
+    expect(screen.getByRole('button', { name: /^Uploads \u2192 Internet/ })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(row).not.toHaveAttribute('aria-current');
+  });
+
   it('não tem violações de acessibilidade', async () => {
     const { container } = renderPage(matches);
     await expectNoAxeViolations(container);
