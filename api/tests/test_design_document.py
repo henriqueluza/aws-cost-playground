@@ -95,7 +95,9 @@ def test_chave_desconhecida_e_descartada() -> None:
     d = doc(extra=1)
     for part in (d["blocks"][0], d["edges"][0], d["blocks"][0]["usage"]):
         part["extra"] = 1
-    assert DesignDocument.model_validate(d).model_dump(by_alias=True, exclude_none=True) == ADR
+    out = DesignDocument.model_validate(d).model_dump(by_alias=True, exclude_none=True)
+    assert out == ADR  # saída em camelCase, igual à entrada
+    assert "estimatedAt" not in out["blocks"][1]["usage"]  # ausente continua ausente
 
 
 def test_proto_em_usage_values_e_descartado() -> None:
@@ -105,12 +107,6 @@ def test_proto_em_usage_values_e_descartado() -> None:
         DesignDocument.model_validate_json(raw),
     ):
         assert "__proto__" not in parsed.blocks[0].usage.values
-
-
-def test_saida_em_camel_case_repete_a_entrada() -> None:
-    out = DesignDocument.model_validate(ADR).model_dump(by_alias=True, exclude_none=True)
-    assert out == ADR
-    assert "estimatedAt" not in out["blocks"][1]["usage"]
 
 
 @pytest.mark.parametrize(

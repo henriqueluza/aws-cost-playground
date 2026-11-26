@@ -18,7 +18,6 @@ from pydantic import (
     Field,
     StringConstraints,
     ValidationError,
-    field_validator,
     model_validator,
 )
 from pydantic.alias_generators import to_camel
@@ -96,6 +95,14 @@ def _not_bool(value: object) -> object:
     return value
 
 
+def _not_null(value: object) -> object:
+    if value is None:
+        raise PydanticCustomError("not_null", "Input should not be null")
+    return value
+
+
+NotNull = BeforeValidator(_not_null)
+"""Campo opcional que recusa `null` explícito, como o `.optional()` do zod."""
 SchemaVersion = Annotated[Literal[1], BeforeValidator(_not_bool)]
 """`schemaVersion` dos arquivos de contrato: o literal 1, nunca `true`."""
 # Regex só com classes ASCII explícitas (`[0-9]`, nunca `\d`). O `$` do motor Rust não casa `\n`.
@@ -133,16 +140,8 @@ Attributes = Annotated[
 
 class Usage(ContractModel):
     source: UsageSource
-    estimated_at: UtcTimestamp | None = None
+    estimated_at: Annotated[UtcTimestamp | None, NotNull] = None
     values: UsageValues
-
-    @field_validator("estimated_at", mode="before")
-    @classmethod
-    def _absent_not_null(cls, value: object) -> object:
-        """Opcional, mas `null` explícito é recusado, como no `.optional()` do zod."""
-        if value is None:
-            raise PydanticCustomError("string_type", "Input should be a valid string")
-        return value
 
 
 class Block(ContractModel):
