@@ -21,7 +21,7 @@
     },
     {
       "path": "sa-east-1/codepipeline.json",
-      "sha256": "90d9390eda947ea5a0c00873af95ce76d253aeaf5f0f7c096e0dc65ecfd28c65"
+      "sha256": "b51f3a1cd5b76059613e08c7366d85a6997c4c331b68d48714039fd2024d5af3"
     },
     {
       "path": "sa-east-1/cognito.json",
@@ -93,7 +93,7 @@
     },
     {
       "path": "us-east-1/codepipeline.json",
-      "sha256": "0e7f62051941a2214879ab89872da46cd2ace9ee310a35f0f82cbb4aaa83e80d"
+      "sha256": "ac0a6de04b77605ab9ac69091e27dd5d3ee77e9ca088981c4b814d0cdcdebf1a"
     },
     {
       "path": "us-east-1/cognito.json",
