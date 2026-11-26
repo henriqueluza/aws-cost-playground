@@ -16,6 +16,8 @@
 # - O repositório precisa ter "Allow GitHub Actions to create and approve pull
 #   requests" ligado para o `gh pr create` funcionar.
 # - Sem a variável de repositório AWS_PRICES_ROLE_ARN o job avisa e termina verde.
+# - Se o gerador não gravou nada (nenhum serviço com consulta), o job avisa e o
+#   publish não roda: sem isso o script veria "igual a main" e fecharia o PR aberto.
 # - O checkout é sempre o de main por branch (sem `ref:`): o script de publicação
 #   exige HEAD = origin/main.
 name: Preços
@@ -35,12 +37,13 @@ jobs:
   generate:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15 # a sessão do papel dura 900 s
     permissions:
       contents: read
       id-token: write
     outputs:
       configured: ${{ steps.gate.outputs.configured }}
+      updated: ${{ steps.generate.outputs.updated }}
     steps:
       - name: Verificar configuração
         id: gate
@@ -99,6 +102,9 @@ jobs:
           uv run python -m app.summary < "$RUNNER_TEMP/report.txt" > "$out/body.md"
           if grep -qxF 'nenhum serviço com consulta: nada a gravar' "$RUNNER_TEMP/report.txt"; then
             echo "::warning::Nenhum serviço com consulta: o gerador não gravou nada e o catálogo não foi atualizado."
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=true" >> "$GITHUB_OUTPUT"
           fi
           cp -R ../web/public/prices "$out/prices"
           cat "$out/body.md" >> "$GITHUB_STEP_SUMMARY"
@@ -115,7 +121,7 @@ jobs:
 
   publish:
     needs: generate
-    if: github.ref == 'refs/heads/main' && needs.generate.outputs.configured == 'true'
+    if: github.ref == 'refs/heads/main' && needs.generate.outputs.configured == 'true' && needs.generate.outputs.updated == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -145,6 +151,10 @@ jobs:
           fi
           if [ -n "$(find "$src" -type l -print -quit)" ]; then
             echo "::error::Artefato com link simbólico: recusado."
+            exit 1
+          fi
+          if [ -n "$(find "$src/prices" \( -name '.*' -o -type f ! -name '*.json' \) -print -quit)" ]; then
+            echo "::error::Artefato com arquivo que não é .json em prices/: recusado."
             exit 1
           fi
           rm -rf web/public/prices

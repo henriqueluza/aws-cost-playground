@@ -68,6 +68,10 @@ Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 4. #77: bootstrap aplicado, Environment `staging` restrito a `main` e primeiro apply manual.
 5. As variáveis da seção anterior.
 
+## Workflow de preços
+
+Workflow `prices.yml` (#222, parte da #29), por `schedule` (segunda-feira, 09:17 UTC) e `workflow_dispatch`. Só roda em `main` e não usa `environment:`, como exige o trust do papel `acp-ci-prices`. O job `generate` assume o papel por OIDC (variável de repositório `AWS_PRICES_ROLE_ARN`) e gera o catálogo; o job `publish`, sem AWS, abre ou atualiza o PR único da branch `prices/catalogo`. Sem a variável, o workflow avisa e termina verde. O PR do `GITHUB_TOKEN` não roda o CI: o autor fecha e reabre antes de juntar. Passo a passo e validação: [`docs/runbooks/setup-aws.md`](runbooks/setup-aws.md), seção 8.
+
 ## Limites conhecidos
 
 - O smoke 401 vem do authorizer JWT do API Gateway e não invoca a Lambda (não há rota pública). Um zip que não importa passa verde.

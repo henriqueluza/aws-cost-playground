@@ -130,7 +130,7 @@ Limites conhecidos:
 Limites conhecidos:
 
 - `Resource: "*"`: a [Service Authorization Reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_awspricelist.html) diz que o AWS Price List não suporta ARN no elemento `Resource` e o serviço não tem chave de condição própria. Por isso o `#trivy:ignore:AVD-AWS-0057`. A ação não tem curinga.
-- O trust não fixa evento nem arquivo de workflow: qualquer job sem `environment:` de um workflow rodando com `ref` igual a `refs/heads/main` assume o papel (push, `schedule`, `workflow_dispatch` e também `pull_request_target` e `workflow_run`, cujo `ref` é o branch base). O alcance é ler preço público: o papel não dá acesso a nada da conta. Fixar `job_workflow_ref` é possível quando o workflow existir em `.github/workflows/` (#222), por Issue que autorize o bootstrap.
+- O trust não fixa evento nem arquivo de workflow: qualquer job sem `environment:` de um workflow rodando com `ref` igual a `refs/heads/main` assume o papel (push, `schedule`, `workflow_dispatch` e também `pull_request_target` e `workflow_run`, cujo `ref` é o branch base). O alcance é ler preço público: o papel não dá acesso a nada da conta. Fixar `job_workflow_ref` é possível agora que o workflow existe em `.github/workflows/prices.yml` (#222), por Issue que autorize o bootstrap.
 - Se o gerador passar a chamar outra ação da Price List (`DescribeServices`, `GetAttributeValues`, `ListPriceLists`, `GetPriceListFileUrl`), a política muda aqui, por Issue que autorize o bootstrap. Hoje o workflow falharia com `AccessDenied` (falha fechada).
 - O trust só é provado na primeira execução do workflow depois da #77: os testes usam provider simulado.
 

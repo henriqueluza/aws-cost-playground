@@ -131,7 +131,8 @@ class TriggerAndPermissionsTest(unittest.TestCase):
         self.assertRegex(
             job("publish"),
             r"(?m)^    if: github\.ref == 'refs/heads/main' && "
-            r"needs\.generate\.outputs\.configured == 'true'\s*$",
+            r"needs\.generate\.outputs\.configured == 'true' && "
+            r"needs\.generate\.outputs\.updated == 'true'\s*$",
         )
         self.assertNotRegex(code(), r"(?m)^\s*environment:")
 
@@ -156,6 +157,7 @@ class StepsTest(unittest.TestCase):
         for sid, chunk in steps(job("generate"))[1:]:
             self.assertIn(GATE_CONDITION, chunk, f"passo {sid} sem a condição do gate")
         self.assertIn("configured: ${{ steps.gate.outputs.configured }}", job("generate"))
+        self.assertIn("updated: ${{ steps.generate.outputs.updated }}", job("generate"))
 
     def test_gate_reads_role_from_a_variable_only(self) -> None:
         self.assertIn("ROLE: ${{ vars.AWS_PRICES_ROLE_ARN }}", step("generate", "gate"))
@@ -186,9 +188,9 @@ class StepsTest(unittest.TestCase):
         self.assertIn("python -m app.summary", run)
         self.assertIn('>> "$GITHUB_STEP_SUMMARY"', run)
 
-    def test_generate_warns_when_the_generator_wrote_nothing(self) -> None:
-        run = run_block(step("generate", "generate"))
-        self.assertRegex(run, rf"grep -qxF '{NOTHING}' .*\n\s+echo \"::warning::")
+    def test_aws_session_outlives_the_job(self) -> None:
+        self.assertRegex(step("generate", "aws"), r"(?m)^\s+role-duration-seconds: 900\s*$")
+        self.assertRegex(job("generate"), r"(?m)^    timeout-minutes: 15\b")
 
     def test_catalog_travels_between_jobs_as_a_short_lived_artifact(self) -> None:
         upload, download = step("generate", "upload"), step("publish", "download")
@@ -316,6 +318,71 @@ class ApplyExecutionTest(unittest.TestCase):
     def test_refuses_artifact_with_symlink(self) -> None:
         (self.catalog / "prices" / "link.json").symlink_to("/etc/hosts")
         self.assert_refused()
+
+    def test_refuses_artifact_with_a_file_that_is_not_json(self) -> None:
+        for name in ("us-east-1/index.html", ".hidden.json"):
+            with self.subTest(name=name):
+                extra = self.catalog / "prices" / name
+                extra.write_text("x")
+                self.assert_refused()
+                extra.unlink()
+
+
+FAKE_UV = """#!/usr/bin/env bash
+# uv falso: `run python -m app` imprime o relatório; `app.summary` copia o stdin.
+case "$*" in
+  "run python -m app") cat "$FAKE_REPORT" ;;
+  "run python -m app.summary") printf '## corpo\\n'; cat ;;
+  *) exit 64 ;;
+esac
+"""
+
+
+class GenerateExecutionTest(unittest.TestCase):
+    """O passo `generate` com um `uv` falso: artefato montado e saída `updated`."""
+
+    def run_generate(self, report: str) -> tuple[subprocess.CompletedProcess[str], str, Path]:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        (root / "repo" / "pricing").mkdir(parents=True)
+        prices = root / "repo" / "web" / "public" / "prices"
+        prices.mkdir(parents=True)
+        (prices / "manifest.json").write_text("{}")
+        (root / "bin").mkdir()
+        (root / "bin" / "uv").write_text(FAKE_UV)
+        (root / "bin" / "uv").chmod(0o755)
+        (root / "temp").mkdir()
+        (root / "report").write_text(report)
+        for name in ("output", "summary"):
+            (root / name).write_text("")
+        env = {
+            "PATH": f"{root / 'bin'}{os.pathsep}{os.environ['PATH']}",
+            "RUNNER_TEMP": str(root / "temp"),
+            "GITHUB_OUTPUT": str(root / "output"),
+            "GITHUB_STEP_SUMMARY": str(root / "summary"),
+            "FAKE_REPORT": str(root / "report"),
+        }
+        script = run_block(step("generate", "generate"))
+        proc = run_step(script, env, root / "repo" / "pricing")
+        return proc, (root / "output").read_text(), root
+
+    def test_report_with_changes_builds_the_artifact_and_marks_updated(self) -> None:
+        proc, out, root = self.run_generate("us-east-1/s3.json: SKU novo: ABC\n")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(out, "updated=true\n")
+        self.assertNotIn("::warning::", proc.stdout)
+        catalog = root / "temp" / "catalog"
+        self.assertTrue((catalog / "prices" / "manifest.json").is_file())
+        body = (catalog / "body.md").read_text()
+        self.assertIn("SKU novo: ABC", body)
+        self.assertEqual((root / "summary").read_text(), body)
+
+    def test_nothing_written_warns_and_blocks_the_publication(self) -> None:
+        proc, out, _ = self.run_generate(f"serviço provisório: s3\n{NOTHING}\n")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertRegex(proc.stdout, r"(?m)^::warning::")
+        self.assertEqual(out, "updated=false\n")
 
 
 if __name__ == "__main__":
