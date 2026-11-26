@@ -125,7 +125,7 @@ A porta lança `CatalogError` para `network`, `missing` e `too-large`; o carrega
 
 Liga o design ao catálogo. Camadas: `ui/ -> hooks/ -> application/ -> model/`.
 
-- **`catalogServices(design, blocks?)`** (`application/catalogServices.ts`, pura): serviços do catálogo que o design usa. Vem do serviço de cada tipo de bloco do contrato (tipo sem `aws.`, via `blockService` de `model/engine.ts`), mais o `service` declarado por alguma cobrança do bloco. Os blocos de custo zero (`aws.iam`, `aws.cloudformation`, `aws.ecs`) não têm arquivo de preço e não pedem serviço. Sem repetição, em ordem alfabética. Tipo fora do contrato não pede serviço; as arestas ficam de fora até a #42.
+- **`catalogServices(design, blocks?)`** (`application/catalogServices.ts`, pura): serviços do catálogo que o design usa. Vem do serviço de cada tipo de bloco do contrato (tipo sem `aws.`, via `blockService` de `model/engine.ts`) mais o `service` declarado por alguma cobrança do bloco. Sem repetição, em ordem alfabética. Tipo fora do contrato não pede serviço. Cada aresta pede o serviço da cobrança dela (`edgeCharges`): `data-transfer`, `cloudfront`, `nat-gateway` ou `cloudwatch`; veja [cost-estimate.md](cost-estimate.md#custos-de-aresta). Os blocos de custo zero (`aws.iam`, `aws.cloudformation`, `aws.ecs`) não têm arquivo de preço e não pedem serviço.
 - **`createCatalogSession(newLoader)`** (`application/catalogSession.ts`): devolve um `LoadCatalog` com um carregador por aplicação (o manifest é lido uma vez). Em erro `integrity` (catálogo republicado com a aba aberta), troca o carregador, relê o manifest e tenta uma única vez.
 - **`usePriceCatalog(design, load?)`** (`hooks/usePriceCatalog.ts`): devolve `PriceCatalogState`.
 

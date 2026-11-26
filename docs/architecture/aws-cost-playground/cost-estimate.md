@@ -27,7 +27,7 @@
 ## Invariantes
 
 - `total = fixed + variable`, no item e no design.
-- Os totais do design somam só itens `priced`.
+- Os totais do design somam só itens `priced`, blocos e arestas.
 - Item `unavailable` (falta preço no catálogo) tem valores zero e fica fora dos totais.
 - Preço em faixas gera uma linha por faixa usada.
 - `blocks` e `edges` seguem a ordem de `design.blocks` e `design.edges`.
@@ -75,8 +75,42 @@ Se uma cobrança do bloco não tem preço, o bloco inteiro sai `unavailable`. To
   - ECS sem essa aresta não é erro: `hostBlockIds` vem vazio e `warnings` ganha `{ code: 'missing-runs-on', blockId }`.
   - Fargate não é modelado (o PRD o lista em "blocos de expansão", fora do MVP).
 - `warnings` não depende do catálogo: o aviso sai mesmo com o bloco `unavailable` (por exemplo, região diferente da do catálogo).
-- Arestas saem `priced` com zero e sem linhas até a #42.
+- Aresta sem custo sai `priced` com zero e sem linhas (veja [Custos de aresta](#custos-de-aresta)).
 - A classificação fixo/variável vem do `charge` de cada `BlockCharge`; `fixed` e `variable` do item somam as linhas de cada tipo.
+
+## Custos de aresta
+
+Depois dos blocos, cada aresta de `design.edges`, na ordem do design, vira cobranças (`edgeCharges`, em `model/edgeCharges.ts`) que passam pelo mesmo `createRater` dos blocos. Bloco e aresta que cobram o mesmo SKU dividem franquia e faixas; os blocos consomem primeiro. Toda cobrança de aresta é `variable`. A quantidade vem de `gbPerMonth`, o uso efetivo da aresta (override vence), ajustado a `contracts/edges.json` como o uso dos blocos: ausente recebe o padrão (10 GB) e valor fora da faixa é limitado a ela.
+
+| Aresta                                             | Serviço e SKU do catálogo                      | Quantidade       | Regra da AWS                                                                                                                                               |
+| -------------------------------------------------- | ---------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data` com destino `client`, origem S3, ALB ou EC2 | `data-transfer` / `data-transfer-internet-out` | `gbPerMonth`     | Saída da região para a internet: faixas por volume (10 TB, 50 TB, 150 TB) e franquia de 100 GB por mês. Faixas e franquia somam todos os serviços da conta |
+| `data` com destino `client`, origem CloudFront     | `cloudfront` / `cloudfront-data-transfer-out`  | `gbPerMonth`     | Saída das bordas do CloudFront: tabela própria por geografia da borda e franquia própria de 1 TB (1.024 GB) por mês                                        |
+| `data` com destino `aws.nat-gateway`               | `nat-gateway` / `nat-gateway-data-processed`   | `gbPerMonth`     | GB processado pelo NAT Gateway, o mesmo SKU do `processedGbPerMonth` do bloco                                                                              |
+| `data` entre blocos com `az` diferente             | `data-transfer` / `data-transfer-inter-az`     | 2 × `gbPerMonth` | Tráfego entre zonas da mesma região: US$ 0,01 por GB em cada direção (saída de uma zona e entrada na outra)                                                |
+| `logs`                                             | `cloudwatch` / `cloudwatch-logs-ingestion`     | `gbPerMonth`     | Ingestão de logs, o mesmo SKU e a mesma franquia do `logsIngestedGbPerMonth` do bloco                                                                      |
+| `data` nos outros casos e `runs-on`                | nenhum                                         |                  | Sem custo: `priced`, zero, sem linhas                                                                                                                      |
+
+Premissas e limites:
+
+- **Uma cobrança por aresta.** A ordem da tabela é a de decisão: `client`, depois NAT, depois zonas.
+- **Zonas.** Só há cobrança quando as duas pontas têm `az` e eles diferem. Mesma zona, ponta sem `az` ou serviço sem zona (Lambda, S3, ALB, NAT...) não cobra. No RDS Multi-AZ, `az` é a zona da instância primária; a replicação para a zona reserva já está no preço Multi-AZ.
+- **Franquias por conta.** Os 100 GB de saída da região valem para S3, ALB e EC2 juntos, por ser um SKU só. O CloudFront não os consome: tem os 1.024 GB dele. O tráfego entre zonas não tem franquia no catálogo.
+- **Faixas sobre o volume já sem franquia.** É a regra geral do motor. Na AWS os primeiros 10 TB incluem os 100 GB grátis; a diferença só aparece a menos de 100 GB de uma troca de faixa e é de centavos por GB.
+- **CloudFront.** O preço é o das bordas do continente da região do design (Estados Unidos em us-east-1, América do Sul em sa-east-1), decisão da #31.
+- **Armazenamento de logs.** A aresta `logs` cobra só a ingestão. O armazenado é o `logsStoredGb` do bloco CloudWatch; a relação de 15% do ingerido em `docs/scenarios.md` é premissa dos cenários, não do motor.
+- **Sem contagem dupla.** O volume da aresta não é somado ao uso do bloco de destino: aparece só nas linhas da aresta. `BlockPriceInput` não recebe volume de arestas.
+- **Fora:** tráfego entre regiões, a saída para a internet do que passa pelo NAT (o contrato não tem aresta NAT → `client`) e a entrada de dados (gratuita).
+
+Aresta `unavailable` (valores zero, sem linhas, fora dos totais, sem consumir franquia nem faixa):
+
+- fora de `contracts/edges.json`: par origem/destino não aceito para o tipo da aresta, ponta de tipo fora do contrato ou ponta com atributo fora das opções;
+- serviço da cobrança não carregado no catálogo, ou SKU ausente nele;
+- `design.region` diferente de `catalog.region` (todas as arestas, inclusive as sem custo).
+
+Exemplo: S3 → `client` com 12.388 GB em us-east-1. Cobra-se 12.388 - 100 = 12.288 GB: 10.240 × 0,09 = US$ 921,60 na primeira faixa e 2.048 × 0,085 = US$ 174,08 na segunda, US$ 1.095,68 no total.
+
+`catalogServices(design)` inclui o serviço de cada cobrança de aresta, para o `usePriceCatalog` carregar `data-transfer` (e `cloudfront`, `nat-gateway`, `cloudwatch`) mesmo quando nenhum bloco o pede.
 
 ## Testes
 

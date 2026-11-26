@@ -17,7 +17,7 @@
     },
     {
       "path": "sa-east-1/cloudwatch.json",
-      "sha256": "4c865b5006eb67683eb643502dbcf71774eb55e4b89e5f3b12780e6c416dc93c"
+      "sha256": "6738add14831ac987a9621cd93d491c3ad6a51587198db9d138b0ba68f528203"
     },
     {
       "path": "sa-east-1/codepipeline.json",
@@ -26,6 +26,10 @@
     {
       "path": "sa-east-1/cognito.json",
       "sha256": "8530d83ebe2d7594af729cecc3cc8c207604db0111ef091e2d9b30518becb74e"
+    },
+    {
+      "path": "sa-east-1/data-transfer.json",
+      "sha256": "83d76d46f09fde9df349ea48e80d855f3fe7baff23c240dbd74123bcf52d50d4"
     },
     {
       "path": "sa-east-1/dynamodb.json",
@@ -85,7 +89,7 @@
     },
     {
       "path": "us-east-1/cloudwatch.json",
-      "sha256": "58f7eee1c1d70d9b91306686b26df306374252885fd15c63d8609e792b718f53"
+      "sha256": "eb4cd9d8c9f9bd582cff4449751b7cf8caeabb7795f09fc3084011ef262e01ae"
     },
     {
       "path": "us-east-1/codepipeline.json",
@@ -94,6 +98,10 @@
     {
       "path": "us-east-1/cognito.json",
       "sha256": "1b1565e81e302961734b6ab0ec52f27dfeeab8d837c6dc2daf29ecd9845d2993"
+    },
+    {
+      "path": "us-east-1/data-transfer.json",
+      "sha256": "965fd1833fee6e722d116a8ea3aac1793e06078c64dfe02afe7221ccf8356238"
     },
     {
       "path": "us-east-1/dynamodb.json",
