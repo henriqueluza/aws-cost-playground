@@ -25,7 +25,7 @@
     },
     {
       "path": "sa-east-1/cognito.json",
-      "sha256": "8530d83ebe2d7594af729cecc3cc8c207604db0111ef091e2d9b30518becb74e"
+      "sha256": "6a17687ab3e67ca2d769c676671353175eaa6be57d8f71a48a5c24ce001adfb7"
     },
     {
       "path": "sa-east-1/dynamodb.json",
@@ -61,7 +61,7 @@
     },
     {
       "path": "sa-east-1/secrets-manager.json",
-      "sha256": "df5bea6007f18b7ea258966b44e98f86bdad0e0c2cc8f59c90312fc801422d19"
+      "sha256": "39bc565d63b48fe8f35c3bb57a084ea475204a3871317a3e7d159d592916c992"
     },
     {
       "path": "sa-east-1/sqs.json",
@@ -93,7 +93,7 @@
     },
     {
       "path": "us-east-1/cognito.json",
-      "sha256": "1b1565e81e302961734b6ab0ec52f27dfeeab8d837c6dc2daf29ecd9845d2993"
+      "sha256": "219a2e9c7de47a6ecde5a4e34fde0255a914d62b059935d46bb50416e5b6453d"
     },
     {
       "path": "us-east-1/dynamodb.json",
@@ -129,7 +129,7 @@
     },
     {
       "path": "us-east-1/secrets-manager.json",
-      "sha256": "609f1a7406529e3119ce5dd7ff7185966d2b0520ccaee25550df8afbf756feab"
+      "sha256": "ae2504effb3ccf3868f2fd2725c2350eee8c75379366f33909a0d0f2ac257cd2"
     },
     {
       "path": "us-east-1/sqs.json",
