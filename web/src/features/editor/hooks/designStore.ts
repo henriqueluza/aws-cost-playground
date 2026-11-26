@@ -64,9 +64,18 @@ export type DesignActions = {
   beginGesture(): void;
   endGesture(): void;
 };
-/** Fora de `EditorState` (o que se desenha): o histórico e `baseline`, o último documento carregado ou salvo. */
+/**
+ * Fora de `EditorState` (o que se desenha): o histórico, `baseline` (o último documento carregado
+ * ou salvo) e `replacements`, que sobe a cada troca do design INTEIRO (abrir, "Novo design", e
+ * desfazer ou refazer uma delas). Quem guarda um vínculo com o documento (o design salvo no
+ * servidor) o solta quando o contador muda: o vínculo vale só para o documento que o originou.
+ */
 export type DesignStoreState = EditorState &
-  DesignActions & { readonly history: History; readonly baseline: DesignDocument };
+  DesignActions & {
+    readonly history: History;
+    readonly baseline: DesignDocument;
+    readonly replacements: number;
+  };
 export type DesignStore = StoreApi<DesignStoreState>;
 
 /** Ids aleatórios no formato do schema. */
@@ -131,6 +140,7 @@ export function createDesignStore(
         layout: move.snapshot.layout,
         selection: keepSelection(move.snapshot.document, s.selection),
         history: move.history,
+        replacements: s.replacements + (move.kind === 'replace-design' ? 1 : 0),
       }));
       return move.kind;
     };
@@ -142,6 +152,7 @@ export function createDesignStore(
     return {
       ...initial,
       baseline: initial.document,
+      replacements: 0,
       history: EMPTY_HISTORY,
       addBlock: (block, position) => {
         if (!finite(position)) return fail('invalid-position');
@@ -200,11 +211,13 @@ export function createDesignStore(
           selection: null,
           layout: {},
           baseline: loaded,
+          replacements: get().replacements + 1,
         })),
       replaceDocument: (next) =>
         apply(act.parseDesign(next), undefined, 'replace-design', (s, replaced) => ({
           ...prune(s, replaced),
           baseline: replaced,
+          replacements: get().replacements + 1,
         })),
       markSaved: (saved = get().document) => set({ baseline: saved }),
       newDesign: () => {
@@ -214,6 +227,7 @@ export function createDesignStore(
           baseline: template,
           layout: referenceLayout(),
           selection: null,
+          replacements: s.replacements + 1,
           history: record(s.history, s, 'replace-design'),
         }));
       },

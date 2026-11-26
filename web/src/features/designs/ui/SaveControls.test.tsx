@@ -14,7 +14,7 @@ const doc = adrExampleDesign as unknown as DesignDocument;
 const load = (d: DesignDocument) => act(() => void designStore.getState().loadDesign(d));
 
 afterEach(() => {
-  designStore.setState(EMPTY_STATE);
+  designStore.setState({ ...EMPTY_STATE, baseline: EMPTY_STATE.document });
   savedDesignStore.setState({ saved: null, saving: false, error: null });
 });
 
@@ -153,6 +153,7 @@ describe('SaveControls', () => {
 
   it('pede confirmação ao ir para Meus designs com alterações e deixa ficar', async () => {
     load(doc);
+    act(() => void designStore.getState().setRegion('sa-east-1')); // alteração além do carregado
     const user = userEvent.setup();
     const { router } = renderWithApp(newApi(), <SaveControls />);
     await user.click(screen.getByRole('link', { name: 'Meus designs' }));
