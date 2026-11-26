@@ -66,7 +66,9 @@ def test_resposta_valida_vira_valores_por_id_na_ordem_de_entrada() -> None:
     )
     assert edges[0] == ItemUsage("edg_out", {"gbPerMonth": 12.5}, "llm")
     # O resultado cabe no schema de saída da rota (#259).
-    EstimateBlockOut.model_validate({"id": blocks[0].id, "values": blocks[0].values})
+    EstimateBlockOut.model_validate(
+        {"id": blocks[0].id, "values": blocks[0].values, "source": blocks[0].source}
+    )
 
 
 def test_bloco_sem_resposta_recebe_o_padrao_do_contrato_com_source_default() -> None:

@@ -70,7 +70,15 @@ def _dynamo(table: Any) -> None:
 
 
 # Rotas já implementadas e o que respondem a um pedido válido com a tabela vazia.
-IMPLEMENTED = {("GET", "/designs"): 200, ("POST", "/designs"): 201, ("GET", f"/designs/{DID}"): 404}
+IMPLEMENTED = {
+    ("GET", "/designs"): 200,
+    ("POST", "/designs"): 201,
+    ("GET", f"/designs/{DID}"): 404,
+    (
+        "POST",
+        "/estimates",
+    ): 503,  # sem `LLM_ENABLED` a rota nasce desligada (`test_estimates_route`)
+}
 # (método, path, corpo válido, corpo malformado-mas-JSON, status de sucesso declarado)
 ROUTES = [
     ("GET", "/designs", None, None, 200),
@@ -277,7 +285,8 @@ def test_corpo_acima_do_teto_sem_identidade_responde_401(
 def test_estimativa_no_limite_e_aceita(app: FastAPI) -> None:
     blocks = [BLOCK | {"id": f"blk_{i}"} for i in range(100)]
     body = valid_estimate() | {"description": "d" * 2000, "blocks": blocks}
-    assert invoke(app, event("POST", "/estimates", body))[0] == 501
+    # Passou da validação: 503 é o interruptor desligado, padrão do ambiente de teste.
+    assert invoke(app, event("POST", "/estimates", body))[0] == 503
 
 
 @pytest.mark.parametrize(
