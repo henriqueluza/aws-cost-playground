@@ -10,6 +10,7 @@ on:
     paths:
       - "infra/**"
       - ".github/workflows/terraform.yml"
+      - ".github/workflows/prices.yml" # os testes dele ficam em infra/tools/tests
 
 permissions:
   contents: read
