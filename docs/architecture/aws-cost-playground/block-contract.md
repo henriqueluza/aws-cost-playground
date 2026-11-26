@@ -4,7 +4,7 @@
 
 - **Origem:** [ADR-0001](ADR-0001-stack.md) e o PRD (F2, F10 a F12). O design que referencia estes tipos está em [design-document.md](design-document.md); o catálogo de preços, em [price-catalog.md](price-catalog.md); o resultado do motor, em [cost-estimate.md](cost-estimate.md).
 - **Onde mora:** os dados em `contracts/blocks.json` e `contracts/edges.json`; os schemas zod (`blocksFileSchema`, `edgesFileSchema`), `PRD_BLOCK_LEVELS`, `BLOCK_TYPES`, `BLOCK_CATEGORIES`, `BLOCK_CONTRACT_LIMITS`, os tipos (`BlockDefinition`, `AttributeDefinition`, `UsageKeyDefinition`, `EdgeKindDefinition`) e a assinatura da função de preço (`BlockPricer`, `BlockPriceInput`, `BlockCharge`) em `web/src/features/pricing/model/blockContract.ts`; o registro (`BLOCKS`, `blockDefinition`, `blockPricer`, `edgeKindsFor`) em `blockRegistry.ts` e as funções de preço em `blocks/<bloco>.ts`. Se este texto e o código divergirem, vale o código.
-- **Estado:** a #175 (parte 1 de #9) traz `edges.json` e o contrato em código. A #176 (parte 2 de #9) traz o registro de blocos e os 11 blocos de nível A em `blocks.json`. A #177 (parte 3 de #9) traz os 9 de nível B e C: os 20 blocos do PRD estão em `blocks.json` e a #9 fecha.
+- **Estado:** a #175 (parte 1 de #9) traz `edges.json` e o contrato em código. A #176 (parte 2 de #9) traz o registro de blocos e os 11 blocos de nível A em `blocks.json`. A #177 (parte 3 de #9) traz os 9 de nível B e C: os 20 blocos do PRD estão em `blocks.json` e a #9 fecha. A #200 (parte 1 de #10) faz a API ler os dois arquivos (`api/app/contracts.py`).
 
 ## `contracts/blocks.json`
 
@@ -131,6 +131,8 @@ Valores copiados de `contracts/blocks.json`. Atributo sem `default` é opcional.
 | `aws.cloudwatch` | `customMetrics` | metrics | `10` | `0` | `1000000` | sim |
 | `aws.cloudwatch` | `alarms` | alarms | `10` | `0` | `100000` | sim |
 | `aws.nat-gateway` | `processedGbPerMonth` | GB | `100` | `0` | `100000000` | não |
+
+`backupStorageGb` do `aws.rds` é só o backup além do incluído (o campo "Additional backup storage" da AWS Pricing Calculator), cobrado inteiro por GB-mês: o backup gratuito, até 100% do armazenamento provisionado na região, não entra na chave.
 
 ## Blocos de nível B e C
 

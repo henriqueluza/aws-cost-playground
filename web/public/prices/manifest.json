@@ -37,7 +37,7 @@
     },
     {
       "path": "sa-east-1/elasticache.json",
-      "sha256": "bf3521874d1a4e1455c77783861b7a486ff73729bb49ac85feb6751de3089103"
+      "sha256": "12b84fef2fad8546bfd551f805ff1aff7a873d61ff1c1ec895145512bf3bb5d3"
     },
     {
       "path": "sa-east-1/lambda.json",
@@ -49,7 +49,7 @@
     },
     {
       "path": "sa-east-1/rds.json",
-      "sha256": "27f8e5c56c4042b08cf15a9c16b3e27e85fe984672eb8d0806f1c6b89b4b813e"
+      "sha256": "73cbb18738ad10840b1955ad6b396110f3b6417fd623d5503d6c02c50d153eef"
     },
     {
       "path": "sa-east-1/route53.json",
@@ -105,7 +105,7 @@
     },
     {
       "path": "us-east-1/elasticache.json",
-      "sha256": "2de923cfe699f57fc0effbceeec622ee73604eed84a70b2642bc6f014a799994"
+      "sha256": "7cad162b06551c2f0a7401da7e7220e96069f680beaccacd237dcd35af3d7fba"
     },
     {
       "path": "us-east-1/lambda.json",
@@ -117,7 +117,7 @@
     },
     {
       "path": "us-east-1/rds.json",
-      "sha256": "4efb91bd11e3d7e280e942ff4a962a2a95b4bdb1f636eaa38bec8c64e7b43bb4"
+      "sha256": "0429d4a59312524e1fce366d3a0737f505e3f03859af733aa9c4bd4bb29c3b0b"
     },
     {
       "path": "us-east-1/route53.json",
