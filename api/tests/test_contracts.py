@@ -86,6 +86,9 @@ INVALID: dict[str, Mutation] = {
     "kind faltando": lambda b, e: e["kinds"].pop(),
     "kind repetido": lambda b, e: e["kinds"].append(e["kinds"][0]),
     "schemaVersion booleano": lambda b, e: b.update(schemaVersion=True),
+    "sem opções": lambda b, e: (_arch(b).pop("default"), _arch(b).update(options=[])),
+    "unidade de 41 caracteres": lambda b, e: _usage(b, "avgDurationMs").update(unit="a" * 41),
+    "kind sem pares": lambda b, e: e["kinds"][0].update(pairs=[]),
 }
 
 
