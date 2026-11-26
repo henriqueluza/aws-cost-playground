@@ -6,6 +6,7 @@
 **/pnpm-lock.yaml
 **/yarn.lock
 **/*.lock
+**/.terraform.lock.hcl
 **/go.sum
 **/packages.lock.json
 

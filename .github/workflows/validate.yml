@@ -63,9 +63,22 @@ jobs:
         with:
           version: "0.13.8"
           enable-cache: true
-          cache-dependency-glob: api/uv.lock
+          cache-dependency-glob: |
+            api/uv.lock
+            pricing/uv.lock
       - name: API — format, lint, tipos, arquitetura e testes
         working-directory: api
+        env:
+          UV_LOCKED: "1" # todo `uv run` também falha se o lock estiver desatualizado
+        run: |
+          uv sync --locked
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run mypy app
+          uv run lint-imports
+          uv run pytest -q --cov
+      - name: Pricing — format, lint, tipos, arquitetura e testes
+        working-directory: pricing
         env:
           UV_LOCKED: "1" # todo `uv run` também falha se o lock estiver desatualizado
         run: |

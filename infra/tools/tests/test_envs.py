@@ -1,7 +1,8 @@
 """Testes das raízes infra/envs/*. Rodam com `python3 -m unittest discover -s infra/tools/tests`.
 
-O diff entre os ambientes fica só no terraform.tfvars; o plano da raiz é testado à parte,
-em infra/envs/<env>/tests (terraform test).
+Os ambientes chamam os mesmos módulos com o mesmo código: o diff fica só no terraform.tfvars
+(e no nome do ambiente em backend.tf e versions.tf). O plano da raiz é testado à parte, em
+infra/envs/<env>/tests (terraform test).
 """
 
 from __future__ import annotations
@@ -17,7 +18,15 @@ ENVS = {
         "self_signup_enabled": "false",
         "point_in_time_recovery_enabled": "false",
     },
+    # Cadastro aberto em produção: critério da #21, com o risco aceito pelo autor na #139.
+    "production": {
+        "environment": "production",
+        "self_signup_enabled": "true",
+        "point_in_time_recovery_enabled": "true",
+    },
 }
+PREFIXES = {"staging": "acp-stg", "production": "acp-prod"}
+IDENTICAL = ("main.tf", "variables.tf", "outputs.tf", ".terraform.lock.hcl")
 SHARED = {
     "llm_enabled": "false",
     "default_throttle": "{ rate_limit = 10, burst_limit = 20 }",
@@ -31,6 +40,18 @@ RUNBOOK_OUTPUTS = {"api_id", "function_role_names", "llm_api_key_parameter_name"
 
 def read(env: str, name: str) -> str:
     return (ROOT / "infra" / "envs" / env / name).read_text(encoding="utf-8")
+
+
+def tfvars(env: str) -> dict[str, str]:
+    pairs = re.findall(r"^(\w+)\s*=\s*(.+?)\s*$", read(env, "terraform.tfvars"), re.M)
+    return {key: value.strip('"') for key, value in pairs}
+
+
+def files(env: str) -> set[str]:
+    """Arquivos do ambiente, sem o diretório de trabalho do Terraform (`.terraform/`)."""
+    base = ROOT / "infra" / "envs" / env
+    paths = (p.relative_to(base) for p in base.rglob("*") if p.is_file())
+    return {p.as_posix() for p in paths if ".terraform" not in p.parts}
 
 
 def block(text: str, kind: str, name: str) -> str:
@@ -50,9 +71,7 @@ def schema_keys() -> set[str]:
 class EnvsTest(unittest.TestCase):
     def test_tfvars_has_exact_keys_and_values(self) -> None:
         for env, expected in ENVS.items():
-            text = read(env, "terraform.tfvars")
-            pairs = dict(re.findall(r"^(\w+)\s*=\s*(.+?)\s*$", text, re.M))
-            self.assertEqual({k: v.strip('"') for k, v in pairs.items()}, expected | SHARED)
+            self.assertEqual(tfvars(env), expected | SHARED, env)
 
     def test_tfvars_has_no_secret_or_author_data(self) -> None:
         for env in ENVS:
@@ -98,11 +117,30 @@ class EnvsTest(unittest.TestCase):
             self.assertEqual(set(re.findall(r"^\s*(\w+)\s*=", config.group(1), re.M)), keys)
 
     def test_shared_files_are_identical_across_envs(self) -> None:
-        """Com um ambiente só passa trivialmente; vale quando a #168 acrescentar `production`."""
-        first = next(iter(ENVS))
-        for env in ENVS:
-            for name in ("main.tf", "variables.tf", "outputs.tf"):
-                self.assertEqual(read(env, name), read(first, name), f"{env}/{name}")
+        """Mesmos módulos, mesmas variáveis, mesmas saídas e mesmos providers, byte a byte."""
+        self.assertEqual(set(ENVS), {"staging", "production"})
+        for name in IDENTICAL:
+            self.assertEqual(read("production", name), read("staging", name), name)
+
+    def test_envs_have_the_same_files(self) -> None:
+        self.assertEqual(files("production"), files("staging"))
+        self.assertLessEqual({*IDENTICAL, "terraform.tfvars", "backend.tf", "versions.tf"}, files("staging"))
+
+    def test_backend_and_versions_differ_only_in_the_environment_name(self) -> None:
+        for name in ("backend.tf", "versions.tf"):
+            generic = {
+                env: read(env, name).replace(env, "<env>").replace(prefix, "<prefixo>")
+                for env, prefix in PREFIXES.items()
+            }
+            self.assertEqual(generic["production"], generic["staging"], name)
+            self.assertNotEqual(read("production", name), read("staging", name), name)
+
+    def test_tfvars_differ_only_in_environment_signup_and_pitr(self) -> None:
+        """Só variáveis mudam entre os ambientes: nome, cadastro aberto e PITR."""
+        staging, production = tfvars("staging"), tfvars("production")
+        self.assertEqual(set(production), set(staging))
+        changed = {key for key in staging if staging[key] != production[key]}
+        self.assertEqual(changed, {"environment", "self_signup_enabled", "point_in_time_recovery_enabled"})
 
 
 if __name__ == "__main__":

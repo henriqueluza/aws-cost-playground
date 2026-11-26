@@ -4,7 +4,7 @@
 
 - **Origem:** [ADR-0001](ADR-0001-stack.md) e o PRD (F2, F10 a F12). O design que referencia estes tipos está em [design-document.md](design-document.md); o catálogo de preços, em [price-catalog.md](price-catalog.md); o resultado do motor, em [cost-estimate.md](cost-estimate.md).
 - **Onde mora:** os dados em `contracts/blocks.json` e `contracts/edges.json`; os schemas zod (`blocksFileSchema`, `edgesFileSchema`), `PRD_BLOCK_LEVELS`, `BLOCK_TYPES`, `BLOCK_CATEGORIES`, `BLOCK_CONTRACT_LIMITS`, os tipos (`BlockDefinition`, `AttributeDefinition`, `UsageKeyDefinition`, `EdgeKindDefinition`) e a assinatura da função de preço (`BlockPricer`, `BlockPriceInput`, `BlockCharge`) em `web/src/features/pricing/model/blockContract.ts`; o registro (`BLOCKS`, `blockDefinition`, `blockPricer`, `edgeKindsFor`) em `blockRegistry.ts` e as funções de preço em `blocks/<bloco>.ts`. Se este texto e o código divergirem, vale o código.
-- **Estado:** a #175 (parte 1 de #9) traz `edges.json` e o contrato em código. A #176 (parte 2 de #9) traz o registro de blocos e os 11 blocos de nível A em `blocks.json`; os 9 de nível B e C chegam na #177 (fecha a #9).
+- **Estado:** a #175 (parte 1 de #9) traz `edges.json` e o contrato em código. A #176 (parte 2 de #9) traz o registro de blocos e os 11 blocos de nível A em `blocks.json`. A #177 (parte 3 de #9) traz os 9 de nível B e C: os 20 blocos do PRD estão em `blocks.json` e a #9 fecha.
 
 ## `contracts/blocks.json`
 
@@ -67,9 +67,9 @@ Raiz: `{ "schemaVersion": 1, "kinds": [...] }`. Cada tipo de aresta (`data`, `ru
 - `blockPricer(type)`: a função de preço do tipo, ou `undefined` se o tipo não está no contrato.
 - `edgeKindsFor(sourceType, targetType)`: os tipos de aresta aceitos entre dois tipos de bloco (`targetType` pode ser `client`), na ordem de `edges.json`.
 
-`edgeKindsFor` devolve lista vazia quando origem ou destino é um tipo fora do contrato ou ainda ausente de `blocks.json`. Por isso `aws.ecs -> aws.ec2` só passa a aceitar `runs-on` na #177, quando `aws.ecs` entra no JSON, mesmo que o par já conste em `edges.json`.
+`edgeKindsFor` devolve lista vazia quando origem ou destino é um tipo fora do contrato. Com `aws.ecs` em `blocks.json`, `edgeKindsFor('aws.ecs', 'aws.ec2')` devolve `['data', 'runs-on']`.
 
-As funções de preço dos blocos de nível A são provisórias e devolvem `[]`: as regras reais chegam nas Issues de preço (#30 a #37). `BLOCK_PRICERS` é `Partial<Record<BlockType, BlockPricer>>` até a #177, que o completa com os 9 blocos restantes.
+`BLOCK_PRICERS` é `Readonly<Record<BlockType, BlockPricer>>`, completo: o compilador recusa bloco do PRD sem função de preço. As funções dos 20 blocos são provisórias e devolvem `[]`; as regras reais chegam nas Issues de preço (#30 a #41).
 
 Para acrescentar um bloco:
 
@@ -132,6 +132,41 @@ Valores copiados de `contracts/blocks.json`. Atributo sem `default` é opcional.
 | `aws.cloudwatch` | `alarms` | alarms | `10` | `0` | `100000` | sim |
 | `aws.nat-gateway` | `processedGbPerMonth` | GB | `100` | `0` | `100000000` | não |
 
+## Blocos de nível B e C
+
+Valores copiados de `contracts/blocks.json`, no mesmo formato. Atributo sem `default` é opcional. Blocos de B e C sem atributo (`aws.waf`, `aws.secrets-manager`, `aws.cloudtrail`, `aws.route53`, `aws.iam`, `aws.cloudformation`) não aparecem na tabela de atributos.
+
+- Os três de nível C (`aws.iam`, `aws.cloudformation`, `aws.ecs`) custam zero e não têm chave de uso.
+- `aws.ecs` leva só o atributo opcional `az` (`a`, `b`, `c`, sem padrão). O custo dele vem do EC2 ligado pela aresta `runs-on`.
+- Em `aws.codepipeline`, as chaves `activePipelines` e `executionMinutesPerMonth` convivem no bloco. Qual delas cada tipo de pipeline usa é definido pela função de preço (#40), não por este contrato.
+- Em `aws.cloudtrail`, `trails` é o número de trilhas: a cobrança dos eventos de gerenciamento "além da primeira trilha" (#40) sai dele.
+
+### Atributos
+
+| Bloco | Atributo | Opções | Padrão |
+| ----- | -------- | ------ | ------ |
+| `aws.cognito` | `tier` | `lite`, `essentials`, `plus` | `essentials` |
+| `aws.codepipeline` | `pipelineType` | `V1`, `V2` | `V2` |
+| `aws.ecs` | `az` | `a`, `b`, `c` | sem padrão (opcional) |
+
+### Chaves de uso
+
+| Bloco | Chave | Unidade | Padrão | Mínimo | Máximo | Inteiro |
+| ----- | ----- | ------- | ------ | ------ | ------ | ------- |
+| `aws.waf` | `webAcls` | web ACLs | `1` | `1` | `100` | sim |
+| `aws.waf` | `rules` | rules | `5` | `0` | `10000` | sim |
+| `aws.waf` | `requestsPerMonth` | requests | `1000000` | `0` | `100000000000` | sim |
+| `aws.cognito` | `monthlyActiveUsers` | users | `1000` | `0` | `100000000` | sim |
+| `aws.secrets-manager` | `secrets` | secrets | `5` | `0` | `100000` | sim |
+| `aws.secrets-manager` | `apiCallsPerMonth` | requests | `100000` | `0` | `100000000000` | sim |
+| `aws.cloudtrail` | `trails` | trails | `1` | `1` | `5` | sim |
+| `aws.cloudtrail` | `managementEventsPerMonth` | events | `100000` | `0` | `100000000000` | sim |
+| `aws.cloudtrail` | `dataEventsPerMonth` | events | `0` | `0` | `100000000000` | sim |
+| `aws.route53` | `hostedZones` | hosted zones | `1` | `1` | `500` | sim |
+| `aws.route53` | `queriesPerMonth` | queries | `1000000` | `0` | `100000000000` | sim |
+| `aws.codepipeline` | `activePipelines` | pipelines | `1` | `0` | `1000` | sim |
+| `aws.codepipeline` | `executionMinutesPerMonth` | minutes | `500` | `0` | `10000000` | não |
+
 ## Tipos dos blocos e nível
 
 Nível de preço do PRD (F10 a F12); `C` é custo zero.
@@ -142,7 +177,7 @@ Nível de preço do PRD (F10 a F12); `C` é custo zero.
 | B     | `aws.waf`, `aws.cognito`, `aws.secrets-manager`, `aws.cloudtrail`, `aws.route53`, `aws.codepipeline`                       |
 | C     | `aws.iam`, `aws.cloudformation`, `aws.ecs`                                                                                |
 
-Os de nível A já estão em `blocks.json` (#176); os de B e C chegam na #177.
+Os de nível A entraram em `blocks.json` na #176; os de B e C, na #177. Os 20 estão no arquivo.
 
 ## Função de preço
 
@@ -150,13 +185,19 @@ Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInp
 
 | Tipo              | Campo                      | Significado                                                           |
 | ----------------- | -------------------------- | --------------------------------------------------------------------- |
-| `BlockPriceInput` | `attributes`               | Atributos do bloco (`Block['attributes']`), já validados              |
-| `BlockPriceInput` | `usage`                    | Uso efetivo (`UsageValues`), já validado                              |
+| `BlockPriceInput` | `attributes`               | Atributos do bloco, só os do contrato (abaixo)                        |
+| `BlockPriceInput` | `usage`                    | Uso efetivo, só as chaves do contrato (abaixo)                        |
 | `BlockCharge`     | `sku`                      | SKU do catálogo (`Price.sku`)                                         |
-| `BlockCharge`     | `quantity`                 | Quantidade mensal do SKU (`Decimal`)                                  |
+| `BlockCharge`     | `quantity`                 | Quantidade bruta do mês (`Decimal`), não negativa: sem franquia, mínimo nem faixas |
 | `BlockCharge`     | `charge`                   | `fixed` ou `variable` (`ChargeKind`, de [cost-estimate.md](cost-estimate.md)) |
+| `BlockCharge`     | `service` (opcional)       | Serviço do catálogo que tem o SKU. Sem ele vale o tipo do bloco sem `aws.` (`aws.nat-gateway` vira `nat-gateway`) |
 
-**Provisório:** o motor (#26) aplica faixas, franquia gratuita e mínimo do catálogo às `BlockCharge` e monta as `CostLine`. Ele pode estender `BlockPriceInput` (por exemplo, com o catálogo ou o contexto da aresta); a função de cada bloco não muda por isso.
+`BlockPriceInput` chega conforme o contrato do tipo (`blockPriceInput`, em `blockInput.ts`):
+
+- **Uso:** o efetivo (override vence). Só as chaves do contrato; chave ausente recebe o padrão; valor fora da faixa é limitado a `min`/`max`; chave `integer` com fração é arredondada para cima.
+- **Atributos:** só os do contrato; ausente recebe o padrão, se houver (`az` ausente fica ausente). Valor fora das opções não chega à função: o bloco sai `unavailable`.
+
+O motor (#26) aplica mínimo, franquia e faixas às `BlockCharge` e monta as `CostLine`, como descrito em [cost-estimate.md](cost-estimate.md#algoritmo). As funções dos 20 blocos continuam provisórias (devolvem `[]`) até as #30 a #41.
 
 ## Convenções
 
@@ -164,3 +205,4 @@ Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInp
 - **Uma linha por atributo e por chave de uso.** Os JSON são formatados à mão: o Prettier do `web/` não alcança `contracts/`.
 - **Unidade e `name` em inglês.** O contrato não tem rótulo de UI: os rótulos em pt-BR dos blocos, atributos e chaves de uso são da UI (#48).
 - **Sem valor em dólar.** O preço vem só do catálogo; o contrato só diz o que o bloco aceita.
+- **Cenários de referência:** os designs de `contracts/scenarios/` são conferidos contra este contrato por teste. Mudar `blocks.json` ou `edges.json` pode exigir atualizar os cenários; veja [scenarios.md](../../scenarios.md).
