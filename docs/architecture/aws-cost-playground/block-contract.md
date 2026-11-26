@@ -69,7 +69,7 @@ Raiz: `{ "schemaVersion": 1, "kinds": [...] }`. Cada tipo de aresta (`data`, `ru
 
 `edgeKindsFor` devolve lista vazia quando origem ou destino é um tipo fora do contrato. Com `aws.ecs` em `blocks.json`, `edgeKindsFor('aws.ecs', 'aws.ec2')` devolve `['data', 'runs-on']`.
 
-`BLOCK_PRICERS` é `Readonly<Record<BlockType, BlockPricer>>`, completo: o compilador recusa bloco do PRD sem função de preço. `aws.lambda` e `aws.sqs` já têm as regras reais (#30, em [Lambda e SQS](#lambda-e-sqs)); as outras 18 funções são provisórias e devolvem `[]` até as Issues de preço (#31 a #41).
+`BLOCK_PRICERS` é `Readonly<Record<BlockType, BlockPricer>>`, completo: o compilador recusa bloco do PRD sem função de preço. A função começa provisória (devolve `[]`) e a Issue de preço do bloco (#30 a #41) a troca pela regra real, descrita no TSDoc de `blocks/<bloco>.ts`.
 
 Para acrescentar um bloco:
 
@@ -197,22 +197,9 @@ Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInp
 - **Uso:** o efetivo (override vence). Só as chaves do contrato; chave ausente recebe o padrão; valor fora da faixa é limitado a `min`/`max`; chave `integer` com fração é arredondada para cima.
 - **Atributos:** só os do contrato; ausente recebe o padrão, se houver (`az` ausente fica ausente). Valor fora das opções não chega à função: o bloco sai `unavailable`.
 
-O motor (#26) aplica mínimo, franquia e faixas às `BlockCharge` e monta as `CostLine`, como descrito em [cost-estimate.md](cost-estimate.md#algoritmo). Fora Lambda e SQS (abaixo), as funções continuam provisórias (devolvem `[]`) até as #31 a #41.
+O motor (#26) aplica mínimo, franquia e faixas às `BlockCharge` e monta as `CostLine`, como descrito em [cost-estimate.md](cost-estimate.md#algoritmo). Função provisória devolve `[]`; as regras de cada bloco (SKUs, quantidade, o que fica de fora) ficam no TSDoc do arquivo do bloco.
 
 `web/src/features/pricing/model/blockSeedCatalog.test.ts` confere, para todo bloco, região e combinação de atributos, que todo SKU emitido existe na semente da região (`web/public/prices/<region>/`). A Issue de um bloco não precisa editá-lo: basta a função e a semente.
-
-### Lambda e SQS
-
-| Bloco        | SKU                        | `quantity`                                                             | `charge`   |
-| ------------ | -------------------------- | ---------------------------------------------------------------------- | ---------- |
-| `aws.lambda` | `lambda-requests-<arq>`    | `requestsPerMonth`                                                     | `variable` |
-| `aws.lambda` | `lambda-duration-<arq>`    | GB-s = `requestsPerMonth` × `avgDurationMs` / 1000 × `memoryMb` / 1024 | `variable` |
-| `aws.sqs`    | `sqs-requests-<queueType>` | `requestsPerMonth`                                                     | `variable` |
-
-- `<arq>`: `x86_64` vira `x86`; `arm64` fica `arm64`. `<queueType>`: `standard` ou `fifo`.
-- O GB-s é calculado em `Decimal`, sem arredondamento (as divisões por 1000 e 1024 são exatas).
-- As cobranças saem mesmo com uso 0; franquia e faixas ficam com o motor e o catálogo.
-- Atributo fora do mapa lança `RangeError`. Não acontece na prática: `blockPriceInput` já recusa e o bloco sai `unavailable`.
 
 ## Convenções
 

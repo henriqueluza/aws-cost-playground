@@ -5,10 +5,13 @@ import { catalogOf, type RawPrice } from '../../../test/catalogFixtures';
 import { adrExampleDesign, designWithBlocks } from '../../../test/designFixtures';
 import { estimate } from '..';
 import type { BlockPricer } from './blockContract';
-import { blockDefinition, blockPricer } from './blockRegistry';
+import { blockDefinition } from './blockRegistry';
 import { createEstimator, type BlockCost, type CostEstimate } from './engine';
 
-/** Preços públicos de us-east-1 (x86), só para a conta conferida à mão; os reais chegam na #30. */
+/**
+ * Preços públicos de us-east-1 (x86), só para a conta conferida à mão com os pricers falsos abaixo.
+ * Lambda e SQS já têm função de preço real; as demais chegam nas #31–#41.
+ */
 const catalog = catalogOf({
   lambda: [
     { sku: 'requests', tiers: [[null, '0.0000002']], freeTier: { quantity: '1000000' } },
@@ -197,6 +200,5 @@ describe('estimate', () => {
       'lambda-duration-arm64 0.000000 0.000000 variable',
     ]);
     expect(totals(result)).toEqual(['0.400000', '0.000000', '0.400000']);
-    expect(blockPricer('aws.lambda')).toBeDefined();
   });
 });

@@ -27,7 +27,9 @@ function seedSkus(region: Region, service: string): ReadonlySet<string> | undefi
       : undefined;
     expect(parsed?.error?.issues, `${key}.json fora do schema do catálogo`).toBeUndefined();
     const file = parsed?.data;
-    expect(file && [file.region, file.service], key).toEqual(file && [region, service]);
+    if (file) {
+      expect([file.region, file.service], key).toEqual([region, service]);
+    }
     seeds.set(key, file && new Set(file.prices.map((price) => price.sku)));
   }
   return seeds.get(key);
@@ -80,8 +82,12 @@ describe.each(REGIONS)('catálogo semente de %s', (region) => {
         const where = `${type} em ${region}, atributos ${JSON.stringify(attributes)}, uso ${JSON.stringify(values)}`;
         const input = blockPriceInput(definition, designBlock(type, attributes, values));
         expect(input, where).toBeDefined();
-        let charges: readonly BlockCharge[] = [];
-        expect(() => (charges = pricer!(input!)), where).not.toThrow();
+        let charges: readonly BlockCharge[];
+        try {
+          charges = pricer!(input!);
+        } catch (error) {
+          throw new Error(`${where}: a função de preço lançou exceção`, { cause: error });
+        }
         for (const { sku, quantity, service = blockService(type) } of charges) {
           const at = `${where}: SKU ${sku} (${region}/${service}.json)`;
           expect(seedSkus(region, service)?.has(sku), `${at} não está na semente`).toBe(true);

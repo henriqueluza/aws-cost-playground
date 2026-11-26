@@ -1,4 +1,7 @@
-"""Bloco Lambda: consultas, preços a partir da Price List real (fixtures) e a semente versionada."""
+"""Bloco Lambda: consultas, preços a partir da Price List real (fixtures) e a semente versionada.
+
+Fixtures: bulk offer file público da AWS publicado em 25/11/2026 e baixado em 26/11/2026.
+"""
 
 import json
 from collections.abc import Callable
@@ -85,6 +88,8 @@ def test_build_takes_only_the_closed_set(region: str) -> None:
     assert build(region, answer(region)) == EXPECTED
     # Ruído (provisioned, Edge, armazenamento) e produtos da outra região são ignorados.
     assert build(region, ALL) == EXPECTED
+    # Sem produto regional não sai preço, mas a franquia segue exigida (caso "empty").
+    assert build(region, [p for p in ALL if p.attributes["regionCode"] == ""]) == ()
 
 
 def test_free_tier_product_may_omit_region_code() -> None:
@@ -103,7 +108,7 @@ def test_missing_product_is_left_to_expected_skus() -> None:
 Change = Callable[[list[Product]], list[Product]]
 REQ_DIM = Dimension("Requests", "0", None, "0.0000002")
 FREE_DIM = Dimension("Request", "0", "1000000", "0")
-FREE = "franquia ausente ou fora do formato"
+SKU, FREE = "lambda-requests-x86", "franquia ausente ou fora do formato: lambda-requests"
 
 
 def _dims(sku: str, *dimensions: Dimension) -> Change:
@@ -115,9 +120,10 @@ def _duplicate(ps: list[Product]) -> list[Product]:
 
 
 CASES: dict[str, tuple[Change, str]] = {
-    "duplicate": (_duplicate, "mais de um produto da AWS"),
-    "unit": (_dims(REQ_X86, replace(REQ_DIM, unit="GB-Seconds")), "unidade da AWS inesperada"),
-    "zero-price": (_dims(REQ_X86, replace(REQ_DIM, usd="0")), "primeira faixa sem preço"),
+    "duplicate": (_duplicate, f"mais de um produto da AWS: {SKU}"),
+    "unit": (_dims(REQ_X86, replace(REQ_DIM, unit="GB")), f"unidade da AWS inesperada: {SKU}"),
+    "zero-price": (_dims(REQ_X86, replace(REQ_DIM, usd="0")), f"primeira faixa sem preço: {SKU}"),
+    "empty": (lambda ps: [], FREE),
     "no-free": (lambda ps: [p for p in ps if p.sku != FREE_REQ], FREE),
     "free-2-dims": (_dims(FREE_REQ, FREE_DIM, replace(FREE_DIM, begin="1000000", end=None)), FREE),
     "free-paid": (_dims(FREE_REQ, replace(FREE_DIM, usd="0.1")), FREE),
@@ -132,20 +138,17 @@ def test_build_rejects_unexpected_shapes(change: Change, message: str) -> None:
     with pytest.raises(PricingError) as info:
         build("us-east-1", change(answer("us-east-1")))
     # Mensagem fixa e só com o SKU do catálogo: nenhum texto da AWS.
-    assert str(info.value) == f"{message}: lambda-requests-x86"
+    assert str(info.value) == message
 
 
 @pytest.mark.parametrize("region", REGIONS)
 def test_generated_file_matches_the_versioned_seed(region: str, tmp_path: Path) -> None:
-    # As faixas não são comparadas com a semente: o workflow semanal (#29) atualiza os preços.
-    def shape(doc: dict[str, list[dict[str, object]]]) -> list[dict[str, object]]:
-        return [
-            {k: p.get(k) for k in ("sku", "description", "unit", "freeTier")} for p in doc["prices"]
-        ]
-
     now = datetime(2026, 11, 26, tzinfo=UTC)
     generated = json.loads(generate([SERVICE], fetch, tmp_path, now).files[f"{region}/lambda.json"])
     seed = json.loads((SEED / region / "lambda.json").read_bytes())
     assert validate_price_file(seed) == []
-    assert shape(generated) == shape(seed)
     assert {p["sku"] for p in seed["prices"]} == SERVICE.expected_skus
+    # Sem faixas nem `freeTier.quantity`: números da AWS que o workflow semanal (#29) atualiza.
+    for price in (*generated["prices"], *seed["prices"]):
+        del price["tiers"], price["freeTier"]["quantity"]
+    assert generated["prices"] == seed["prices"]
