@@ -11,6 +11,8 @@ from starlette.exceptions import HTTPException
 from app.logs import get_request_id
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
+TOO_LARGE_ERROR = "doc_too_large"
+"""`type` do erro de validação que vira 413 em vez de 422 (documento do design grande demais)."""
 
 
 def _build(
@@ -31,6 +33,8 @@ async def _handle(request: Request, exc: Exception) -> JSONResponse:
         detail = exc.detail if isinstance(exc.detail, str) else None
         return _build(exc.status_code, detail, exc.headers, {})
     if isinstance(exc, RequestValidationError):
+        if any(e["type"] == TOO_LARGE_ERROR for e in exc.errors()):
+            return _build(413, "Design document too large", None, {})
         # Só `loc` e `msg`: `input`, `ctx` e `url` ecoam o corpo enviado pelo usuário.
         errors = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
         return _build(422, "Request validation failed", None, {"errors": errors})
