@@ -26,9 +26,13 @@ export function createSessionAttemptStore(storage?: Storage): LoginAttemptStore 
   };
   return {
     save(attempt: LoginAttempt) {
+      const where = area();
+      const parsed = attemptSchema.safeParse(attempt);
+      if (!where || !parsed.success) return false;
       try {
-        area()?.setItem(KEY, JSON.stringify(attempt));
-        return area()?.getItem(KEY) !== null;
+        const raw = JSON.stringify(parsed.data);
+        where.setItem(KEY, raw);
+        return where.getItem(KEY) === raw;
       } catch {
         return false;
       }

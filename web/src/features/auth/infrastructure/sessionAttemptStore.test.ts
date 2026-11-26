@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LoginAttempt } from '../application/ports';
 import { createSessionAttemptStore } from './sessionAttemptStore';
 
@@ -26,6 +26,11 @@ function memoryStorage(): Storage {
 }
 
 describe('createSessionAttemptStore', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(globalThis, 'sessionStorage');
+  });
+
   it('devolve a tentativa uma vez e apaga; uma nova substitui a anterior', () => {
     const storage = memoryStorage();
     const store = createSessionAttemptStore(storage);
@@ -59,5 +64,23 @@ describe('createSessionAttemptStore', () => {
     } as unknown as Storage);
     expect(store.save(ATTEMPT)).toBe(false);
     expect(store.take()).toBeNull();
+  });
+
+  it('sessionStorage inacessível (o acesso lança) e destino grande demais: save devolve false', () => {
+    vi.stubGlobal('sessionStorage', undefined);
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      get() {
+        throw new Error('bloqueado');
+      },
+    });
+    expect(createSessionAttemptStore().save(ATTEMPT)).toBe(false);
+    expect(createSessionAttemptStore().take()).toBeNull();
+    expect(
+      createSessionAttemptStore(memoryStorage()).save({
+        ...ATTEMPT,
+        returnTo: `/${'a'.repeat(512)}`,
+      }),
+    ).toBe(false);
   });
 });

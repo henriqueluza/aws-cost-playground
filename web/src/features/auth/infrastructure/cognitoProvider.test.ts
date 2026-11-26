@@ -92,6 +92,7 @@ describe('beginSignIn', () => {
     expect(saved?.verifier).toHaveLength(86);
     expect(url.toString()).not.toContain(saved?.verifier ?? '?');
     expect(saved?.state).toBe(p.get('state'));
+    expect(saved?.createdAt).toBe(NOW);
     expect(Object.keys(saved ?? {}).sort()).toEqual(
       ['createdAt', 'nonce', 'returnTo', 'state', 'verifier'].sort(),
     );
@@ -131,6 +132,7 @@ describe('descoberta OIDC', () => {
     expect(s.calls.length).toBeGreaterThan(0);
     for (const init of s.calls) {
       expect([init.credentials, init.redirect]).toEqual(['omit', 'error']);
+      expect([init.cache, init.referrerPolicy]).toEqual(['no-store', 'no-referrer']);
       expect(init.signal).toBeInstanceOf(AbortSignal);
     }
   });
@@ -167,9 +169,16 @@ describe('descoberta OIDC', () => {
     expect(s.storage.length).toBe(0);
   });
 
-  it('aceita o emissor com barra no fim; falha de rede vira network', async () => {
+  it('aceita o emissor com barra no fim (na descoberta e no documento); falha de rede vira network', async () => {
     const s = setup({ discovery: { ...BASE, issuer: `${ISSUER}/` } });
     await expect(s.provider.beginSignIn('sign-in', '/')).resolves.toContain(AUTH_ORIGIN);
+    const slash = createCognitoProvider({
+      ...s.config,
+      authority: `${ISSUER}/`,
+      attempts: s.attempts,
+    });
+    await slash.beginSignIn('sign-in', '/');
+    expect(s.cognito.seen.discovery.at(-1)).toBe(DISCOVERY_URL);
     const down = setup();
     server.use(http.get(DISCOVERY_URL, () => HttpResponse.error()));
     await expectKind(down.provider.beginSignIn('sign-in', '/'), 'network');
