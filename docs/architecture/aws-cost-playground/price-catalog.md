@@ -4,7 +4,7 @@ O catálogo é o conjunto de arquivos JSON de preço que o frontend baixa de `pu
 
 - **Origem:** [ADR-0001](ADR-0001-stack.md). Este documento só detalha o formato e a validação.
 - **Onde mora:** `web/src/features/pricing/model/catalog.ts` (schemas zod `priceFileSchema` e `priceManifestSchema`, `CATALOG_LIMITS` e os tipos `Price`, `PriceTier`, `PriceFile`, `PriceManifest`, `PriceSource` e `PriceCatalog`). Importe pelo `index.ts` da feature. Se este texto e o código divergirem, vale o código.
-- **Fora deste contrato:** a carga por HTTP, a conferência do `sha256` e o motor de cálculo.
+- **Fora deste contrato:** o adaptador HTTP da carga, o hook do TanStack Query e o motor de cálculo.
 
 ## Arquivo de preço
 
@@ -86,8 +86,27 @@ Um arquivo por serviço e região, em `public/prices/<region>/<service>.json`.
 - **Leitura tolerante:** chave desconhecida, em qualquer nível, é descartada, não recusada (mesma regra do [documento do design](design-document.md)).
 - **`Decimal`:** só existe no tipo de saída do schema (`Decimal` de `shared/lib/money`, `bigint` escalado). Nunca vai para JSON, estado persistido nem query key do TanStack Query; use `toFixed`.
 
+## Carga
+
+`web/src/features/pricing/application/loadCatalog.ts` (TypeScript puro, sem `fetch`). `createCatalogLoader(read)` recebe a porta `ReadPriceFile = (path) => Promise<Uint8Array>` e devolve:
+
+- `manifest()`: lê e valida `manifest.json` uma só vez; falha não fica em cache, a próxima chamada tenta de novo.
+- `load(region, services)`: busca só os arquivos `<region>/<service>.json` pedidos que o manifest lista. Serviço fora do manifest não entra no mapa `services`. Para cada arquivo, confere o `sha256` (Web Crypto) contra o manifest **antes** do parse, valida com o schema zod e recusa o arquivo cujo `region`/`service` não bate com o caminho. Qualquer falha derruba a carga inteira; não há catálogo parcial.
+
+A porta lança `CatalogError` para `network`, `missing` e `too-large`; o carregador lança `invalid` e `integrity`. Toda falha é um `CatalogError`, com mensagem fixa (sem texto do arquivo ou da rede) e `kind`:
+
+| `kind`      | Quando                                                         |
+| ----------- | -------------------------------------------------------------- |
+| `network`   | Falha de rede na leitura (lançado pela porta)                  |
+| `missing`   | Arquivo listado no manifest que não existe (porta)             |
+| `too-large` | Arquivo acima do tamanho máximo aceito (porta)                 |
+| `invalid`   | JSON ou schema inválido, ou `region`/`service` fora do caminho |
+| `integrity` | O `sha256` calculado difere do manifest                        |
+
+Ficam para outras Issues: o adaptador HTTP que implementa `ReadPriceFile` (#173) e o hook com TanStack Query (#174).
+
 ## Fora do escopo
 
-- Baixar os arquivos, conferir o `sha256` contra o manifest e tratar falhas de rede: Issue própria, fora da #99.
+- Adaptador HTTP da porta `ReadPriceFile` (#173) e hook com TanStack Query (#174).
 - Calcular custo com o catálogo (`PriceCatalog` é só o que o motor recebe).
 - Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest.

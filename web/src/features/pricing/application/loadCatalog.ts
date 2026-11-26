@@ -9,7 +9,6 @@ export type CatalogErrorKind = 'network' | 'missing' | 'too-large' | 'invalid' |
 /** Erro tipado da carga do catálogo. A mensagem é fixa e não ecoa o conteúdo do arquivo. */
 export class CatalogError extends Error {
   readonly kind: CatalogErrorKind;
-
   constructor(kind: CatalogErrorKind, options?: ErrorOptions) {
     super(`Erro do catálogo de preços: ${kind}.`, options);
     this.name = 'CatalogError';
@@ -30,8 +29,9 @@ export interface CatalogLoader {
 function parse<S extends z.ZodType>(schema: S, bytes: Uint8Array): z.output<S> {
   try {
     return schema.parse(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
-  } catch (cause) {
-    throw new CatalogError('invalid', { cause });
+  } catch {
+    // Sem `cause`: a mensagem do `SyntaxError` do JSON traz um trecho do arquivo.
+    throw new CatalogError('invalid');
   }
 }
 
@@ -42,7 +42,7 @@ async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
 
 export function createCatalogLoader(read: ReadPriceFile): CatalogLoader {
   let cached: Promise<PriceManifest> | undefined;
-  const manifest = (): Promise<PriceManifest> => {
+  const manifest = async (): Promise<PriceManifest> => {
     cached ??= read('manifest.json').then((bytes) => parse(priceManifestSchema, bytes));
     // Falha não fica guardada: a próxima chamada tenta de novo.
     cached.catch(() => (cached = undefined));

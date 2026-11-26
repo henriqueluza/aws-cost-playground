@@ -57,6 +57,8 @@ describe('createCatalogLoader', () => {
     ['hash diferente do manifest', 'integrity', {}, { [s3]: usFile('s3', { x: 1 }) }],
     ['arquivo fora do schema', 'invalid', { [s3]: usFile('s3', { currency: '<b>' }) }, {}],
     ['arquivo de outro serviço', 'invalid', { [s3]: usFile('lambda') }, {}],
+    ['arquivo de outra região', 'invalid', { [s3]: priceFile('sa-east-1', 's3') }, {}],
+    ['hash errado de conteúdo inválido', 'integrity', {}, { [s3]: encode({ nope: 1 }) }],
     ['arquivo listado que não existe', 'missing', {}, { [s3]: undefined }],
     ['manifest fora do schema', 'invalid', {}, { 'manifest.json': encode({ schemaVersion: 2 }) }],
     ['manifest que não é JSON', 'invalid', {}, { 'manifest.json': new Uint8Array([0xff, 0x7b]) }],
