@@ -25,6 +25,23 @@ uv run python -m app seed
 - `generate` (padrão): consulta a Price List com as credenciais do ambiente, confere tudo em memória e só então grava em `web/public/prices/`. Se qualquer checagem falhar, sai com exit 1 e nada é gravado. O relatório (variações, serviços provisórios) vai para o stdout e os erros para o stderr. `--root PATH` troca a raiz do repositório.
 - `seed`: não usa AWS nem o relógio. Valida os arquivos versionados `web/public/prices/<region>/<service>.json` dos serviços registrados e regrava só o `web/public/prices/manifest.json` (`source: seed`, `generatedAt` fixo em `SEED_GENERATED_AT`). Mesmos arquivos, mesmos bytes.
 
+## Resumo do PR e publicação do catálogo (#29)
+
+O workflow semanal (parte 2, #222) encadeia dois passos. Esta parte entrega os dois, sem o workflow.
+
+```bash
+# em pricing/
+uv run python -m app generate > report.txt
+uv run python -m app.summary < report.txt > body.md
+# na raiz do repositório (HEAD = main, catálogo já regravado)
+bash scripts/prices-pr.sh body.md
+```
+
+- `app.summary` lê o relatório do `generate` no stdin e escreve o corpo do PR em Markdown: `## SKUs adicionados`, `## SKUs removidos`, `## Variações acima de 30%` e `## Outros`, mais o rodapé (merge humano; o PR do `GITHUB_TOKEN` não dispara o CI, então feche e reabra). Seção vazia mostra `Nenhum.`; mais de 100 itens viram `e mais N`. Nenhuma linha do relatório entra crua: só entram linhas no formato conhecido, com SKU validado por `is_sku` e arquivo por `file_key`; o resto vira contagem em `Outros`. Sempre sai com exit 0.
+- `scripts/prices-pr.sh <body-file>` mantém um único PR, da branch `prices/catalogo` para `main`, e precisa de `git` e `gh` autenticado (`GH_TOKEN`). O commit tem a árvore de `main` mais o catálogo novo e, como segundo pai, a ponta anterior da branch: o push é fast-forward, nunca `--force`. O `manifest.json` não entra na comparação (a data muda a cada execução), mas vai no commit quando há mudança nos preços. PR vindo de fork com o mesmo nome de branch é ignorado.
+- Saída (uma linha no stdout): `sem mudança`, `pr criado`, `pr atualizado` ou `pr fechado`. Quando o catálogo volta a ser igual ao de `main`, o PR aberto é fechado com um comentário.
+- Os testes do script ficam em `infra/tools/tests/test_prices_pr_script.py` e usam um `origin` descartável, sem rede.
+
 ## Qualidade
 
 ```bash
@@ -45,6 +62,7 @@ Os testes não fazem rede nem precisam de credenciais AWS: simulam o `GetProduct
 - `checks.py` — `blocking` (impede a gravação: nenhum preço, SKU esperado ausente, preço negativo, arquivo de 500 KB ou mais), `regression` (também impede: mais da metade dos SKUs do arquivo anterior sumiu, ou um preço positivo virou zero) e `variation` (só relata: SKU novo, SKU removido, faixa com variação maior que 30%).
 - `generate.py` — `generate(specs, fetch, prices_dir, now)` (monta e confere em memória, não grava), `seed(specs, prices_dir)`, `write(prices_dir, files)`, `Result` (`files` e `report`) e `Fetch` (função que atende uma `Query`).
 - `__main__.py` — a CLI (`generate` e `seed`, `--root`).
+- `summary.py` — `pr_body(report)` e `python -m app.summary`: corpo do PR semanal a partir do relatório (seção abaixo).
 - `services/` — registro: um módulo por serviço, cada um exporta `SERVICE = ServiceSpec(...)`; `SERVICES` junta os 17, em ordem de slug.
 
 ## Registro de serviços
