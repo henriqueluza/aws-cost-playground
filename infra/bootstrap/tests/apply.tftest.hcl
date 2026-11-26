@@ -177,7 +177,7 @@ run "saidas_e_limites_da_aws" {
   assert {
     condition = alltrue([
       for env in ["staging", "production"] :
-      length(aws_iam_role_policy.apply_state[env].policy) + length(aws_iam_role_policy.apply_deny[env].policy) <= 10240
+      length(aws_iam_role_policy.apply_state[env].policy) + length(aws_iam_role_policy.apply_deny[env].policy) + length(aws_iam_role_policy.apply_deny_data[env].policy) <= 10240
     ])
     error_message = "A soma das políticas inline de um papel não pode passar de 10240 caracteres, o limite da AWS."
   }

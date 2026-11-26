@@ -93,4 +93,4 @@ terraform -chdir=infra/modules/site init -backend=false \
   && terraform -chdir=infra/modules/site test
 ```
 
-`tflint` e `trivy` rodam como descrito em `infra/README.md`. O `terraform test` usa `mock_provider` e não toca a AWS. O workflow `terraform.yml` ainda não roda `terraform test` nem valida módulos isolados (só os ambientes).
+`tflint` e `trivy` rodam como descrito em `infra/README.md`. O `terraform test` usa `mock_provider` e não toca a AWS. O workflow `terraform.yml` roda `validate` e `terraform test` em cada módulo (`infra/tools/tf_checks.sh`).

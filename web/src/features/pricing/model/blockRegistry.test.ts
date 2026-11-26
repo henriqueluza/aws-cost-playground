@@ -114,9 +114,9 @@ describe('contracts/blocks.json', () => {
     }
   });
 
-  it('todo bloco tem função de preço provisória, sem cobranças', () => {
+  it('todo bloco do contrato tem função de preço', () => {
     for (const block of BLOCKS) {
-      expect(blockPricer(block.type)?.({ attributes: {}, usage: {} }), block.type).toEqual([]);
+      expect(blockPricer(block.type), block.type).toBeTypeOf('function');
     }
   });
 

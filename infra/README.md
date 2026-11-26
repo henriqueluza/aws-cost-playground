@@ -21,9 +21,9 @@ Terraform da AWS (us-east-1, 100% serverless). Decisões em `docs/architecture/a
 terraform -chdir=infra/envs/<env> init -backend=false && terraform -chdir=infra/envs/<env> validate
 ```
 
-Módulo com testes (`tests/*.tftest.hcl`, provider simulado, sem credenciais): `terraform -chdir=infra/modules/<m> init -backend=false && terraform -chdir=infra/modules/<m> validate && terraform -chdir=infra/modules/<m> test`. O lockfile do módulo não é versionado, e o CI só roda `validate` nos ambientes.
+Módulo com testes (`tests/*.tftest.hcl`, provider simulado, sem credenciais): `terraform -chdir=infra/modules/<m> init -backend=false && terraform -chdir=infra/modules/<m> validate && terraform -chdir=infra/modules/<m> test`. O lockfile do módulo não é versionado.
 
-Cada ambiente também tem teste de composição com provider simulado (o CI ainda não roda `terraform test`, #117):
+Cada ambiente também tem teste de composição com provider simulado:
 
 ```bash
 terraform -chdir=infra/envs/<env> init -backend=false && terraform -chdir=infra/envs/<env> test
@@ -150,6 +150,15 @@ python3 -m unittest discover -s infra/tools/tests
 
 ```bash
 terraform fmt -check -recursive infra
+infra/tools/tf_checks.sh   # init -backend=false, validate e terraform test em tudo
 tflint --chdir=infra --recursive --config="$PWD/infra/.tflint.hcl"
 trivy config infra
 ```
+
+`tf_checks.sh` é o que o job `fmt, validate, tflint, trivy` do `terraform.yml` roda, sem credenciais da AWS:
+
+- Percorre `envs/*`, `bootstrap` e cada pasta de `modules/*` que tenha `.tf`, descobertas por laço. Módulo novo entra sozinho.
+- Roda todos os diretórios, lista os que falharam e sai com 1 se houver algum: um teste quebrado reprova o PR.
+- Nas raízes o `init` usa `-lockfile=readonly`. Cada módulo recebe uma cópia do lockfile de um ambiente (fora do git), para ser testado com o provider que os ambientes travam e não com o mais novo que a restrição aceitar.
+- No CI, `TF_PLUGIN_CACHE_DIR` faz o provider ser baixado uma vez para todos os diretórios. Na sua máquina, use `plugin_cache_dir` no `~/.terraformrc`.
+- Os testes do script ficam em `tools/tests/test_tf_checks.py` e precisam de `terraform` no PATH.

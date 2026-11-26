@@ -73,11 +73,11 @@ infra/{modules,envs/{staging,production},bootstrap}/
 docs/
 ```
 
-Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `model/`, com `api/` como adapter. `features/pricing/{application,model}` é TypeScript puro: não importa React, React Flow nem `fetch`.
+Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `model/`, com `api/` como adapter. `features/pricing/{application,model}` é TypeScript puro: não importa React, React Flow nem `fetch`. Store Zustand (inclusive `zustand/vanilla`) fica em `hooks/`: guarda o estado de tela (layout, seleção) e delega toda mudança de documento às ações puras de `model/`/`application/`.
 
 ### Teste de arquitetura
 
-- `web/`: `eslint-plugin-boundaries` (feature só importa outra pelo `index.ts`) mais `no-restricted-imports` proibindo `react`, `@xyflow/*` e `shared/lib/http` dentro de `**/application/**` e `**/model/**`.
+- `web/`: `eslint-plugin-boundaries` (feature só importa outra pelo `index.ts`) mais `no-restricted-imports` proibindo `react`, `react-dom`, `@xyflow/*`, `@tanstack/*`, `zustand` e módulos `http` (`shared/lib/http`) nas camadas TypeScript puro: `**/application/**`, `**/model/**`, `shared/lib/design/**`, `shared/lib/api/**` e `shared/lib/money.ts`.
 - `api/`: `import-linter` com um contrato `forbidden`: módulos `router` não importam `boto3` nem `anthropic`. É a garantia mínima do nível `simple` (regra fora do controller, acesso a dados atrás de função nomeada).
 
 ### Comandos de qualidade

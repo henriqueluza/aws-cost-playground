@@ -69,6 +69,11 @@ const zeroCost = { status: 'priced', total: ZERO, fixed: ZERO, variable: ZERO, l
 const unavailable = { ...zeroCost, status: 'unavailable' } as const;
 const BLOCK_TYPE_PREFIX = 'aws.';
 
+/** Serviço do catálogo de um tipo de bloco quando a cobrança não diz outro: o tipo sem `aws.`. */
+export function blockService(blockType: string): string {
+  return blockType.slice(BLOCK_TYPE_PREFIX.length);
+}
+
 function itemCost(lines: readonly CostLine[] | undefined): ItemCost {
   if (lines === undefined) return unavailable;
   const amountOf = (charge: ChargeKind) =>
@@ -94,7 +99,7 @@ export function createEstimator(blocks: BlockPricing) {
       const input = definition && blockPriceInput(definition, block);
       const pricer = blocks.pricer(block.type);
       if (!sameRegion || input === undefined || pricer === undefined) return undefined;
-      const service = block.type.slice(BLOCK_TYPE_PREFIX.length);
+      const service = blockService(block.type);
       return rater.rate(
         pricer(input).map((charge) => ({ ...charge, service: charge.service ?? service })),
       );

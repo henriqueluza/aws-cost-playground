@@ -5,10 +5,13 @@ import { catalogOf, type RawPrice } from '../../../test/catalogFixtures';
 import { adrExampleDesign, designWithBlocks } from '../../../test/designFixtures';
 import { estimate } from '..';
 import type { BlockPricer } from './blockContract';
-import { blockDefinition, blockPricer } from './blockRegistry';
+import { blockDefinition } from './blockRegistry';
 import { createEstimator, type BlockCost, type CostEstimate } from './engine';
 
-/** Preços públicos de us-east-1 (x86), só para a conta conferida à mão; os reais chegam na #30. */
+/**
+ * Preços públicos de us-east-1 (x86), só para a conta conferida à mão com os pricers falsos abaixo.
+ * Lambda e SQS já têm função de preço real; as demais chegam nas #31–#41.
+ */
 const catalog = catalogOf({
   lambda: [
     { sku: 'requests', tiers: [[null, '0.0000002']], freeTier: { quantity: '1000000' } },
@@ -170,14 +173,33 @@ describe('estimate', () => {
     expect(catalog).toEqual(before);
   });
 
-  it('com o registro real e o exemplo do ADR, os blocos saem com preço e sem cobranças até a #30', () => {
-    const adr = designDocumentSchema.parse(adrExampleDesign);
-    const result = estimate(adr, catalog);
+  it('com o registro real e o exemplo do ADR, a Lambda sai com as cobranças dela e o S3 sem preço', () => {
+    // Lambda arm64: (3.000.000 − 1.000.000) × US$ 0,0000002 = US$ 0,40; 3.000.000 × 0,080 s ×
+    // 0,5 GB = 120.000 GB-s, dentro da franquia de 400.000. O S3 cobra SKUs que este catálogo
+    // não tem e sai `unavailable`, fora dos totais.
+    const arm64 = catalogOf({
+      lambda: [
+        {
+          sku: 'lambda-requests-arm64',
+          tiers: [[null, '0.0000002']],
+          freeTier: { quantity: '1000000' },
+        },
+        {
+          sku: 'lambda-duration-arm64',
+          tiers: [[null, '0.0000133334']],
+          freeTier: { quantity: '400000' },
+        },
+      ],
+    });
+    const result = estimate(designDocumentSchema.parse(adrExampleDesign), arm64);
     expect(result.blocks.map((b) => [b.blockId, b.blockType, b.status, b.lines.length])).toEqual([
-      ['blk_fn_api', 'aws.lambda', 'priced', 0],
-      ['blk_assets', 'aws.s3', 'priced', 0],
+      ['blk_fn_api', 'aws.lambda', 'priced', 2],
+      ['blk_assets', 'aws.s3', 'unavailable', 0],
     ]);
-    expect(totals(result)).toEqual(ZEROS);
-    expect(blockPricer('aws.lambda')).toBeDefined();
+    expect(lines(result.blocks[0]!)).toEqual([
+      'lambda-requests-arm64 2000000.000000 0.400000 variable',
+      'lambda-duration-arm64 0.000000 0.000000 variable',
+    ]);
+    expect(totals(result)).toEqual(['0.400000', '0.000000', '0.400000']);
   });
 });
