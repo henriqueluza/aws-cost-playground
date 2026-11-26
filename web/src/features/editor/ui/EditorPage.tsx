@@ -7,6 +7,7 @@ import { catalogStamp } from '../model/estimateNotice';
 import { ActionBar } from './ActionBar';
 import { CanvasPanel } from './CanvasPanel';
 import styles from './EditorPage.module.css';
+import { DownloadDesignButton } from './DesignFileActions';
 import { EstimateNotice } from './EstimateNotice';
 import { InspectorPanel } from './InspectorPanel';
 import { PalettePanel } from './PalettePanel';
@@ -42,6 +43,7 @@ export function EditorPage() {
         <h1>Editor</h1>
         <p>A edição precisa de uma tela com pelo menos 1024 px de largura.</p>
         <Link to="/designs">Meus designs</Link>
+        <DownloadDesignButton variant="tertiary" />
         <EstimateNotice stamp={stamp} />
       </main>
     );

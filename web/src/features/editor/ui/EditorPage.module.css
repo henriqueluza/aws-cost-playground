@@ -40,8 +40,7 @@
   min-width: 0;
   min-height: 0;
   margin-bottom: var(--sheet-inset);
-  padding: var(--card-pad);
-  overflow: auto;
+  overflow: hidden;
   background-color: var(--surface);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-sheet);
@@ -115,4 +114,12 @@
   margin: 0 0 var(--space-4);
   font-size: var(--fs-read);
   line-height: var(--lh-read);
+}
+
+/* Ações da barra superior, à direita; cada feature põe os seus botões dentro dela. */
+.actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
