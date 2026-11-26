@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "service": "elasticache",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "prices": []
+}

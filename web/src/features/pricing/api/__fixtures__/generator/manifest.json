@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "source": "price-list",
+  "generatedAt": "2026-11-23T12:00:00Z",
+  "files": [
+    {
+      "path": "us-east-1/lambda.json",
+      "sha256": "02783454de6e42319c09cb49c4c764679902b342d3272da0fb3e9afd3df0f705"
+    }
+  ]
+}

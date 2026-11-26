@@ -46,6 +46,29 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     expect(rules).toContain('no-restricted-imports');
   });
 
+  const pureLayers = [
+    './features/pricing/application/x.ts',
+    './features/pricing/model/x.ts',
+    './features/editor/application/x.ts',
+    './features/editor/model/x.ts',
+    designLib,
+    apiLib,
+    moneyLib,
+  ];
+  const stateLibImports = [
+    "import { useQuery } from '@tanstack/react-query';",
+    "import { QueryClient } from '@tanstack/query-core';",
+    "import { create } from 'zustand';",
+    "import { createStore } from 'zustand/vanilla';",
+  ];
+  it.each(pureLayers.flatMap((file) => stateLibImports.map((line) => [line, file])))(
+    'proíbe %s em %s',
+    async (line, file) => {
+      const rules = await errorRules(`${line}\nexport const dep = 1;\n`, file);
+      expect(rules).toContain('no-restricted-imports');
+    },
+  );
+
   it('permite react em ui/', async () => {
     const rules = await errorRules(reactImport, './features/pricing/ui/x.tsx');
     expect(rules).not.toContain('no-restricted-imports');
@@ -67,6 +90,12 @@ describe('arquitetura do web (ADR-0001)', { timeout: 30_000 }, () => {
     const code =
       "import { useQuery } from '@tanstack/react-query';\nimport { useMemo } from 'react';\nimport { httpPriceFiles } from '../api/httpPriceFiles';\nimport { catalogServices } from '../application/catalogServices';\nexport const deps = [useQuery, useMemo, httpPriceFiles, catalogServices];\n";
     expect(await errorRules(code, './features/pricing/hooks/x.ts')).toEqual([]);
+  });
+
+  it('permite a editor/hooks montar a store Zustand sobre as ações puras de model/', async () => {
+    const code =
+      "import { createStore } from 'zustand/vanilla';\nimport { useStore } from 'zustand';\nimport * as act from '../model/designActions';\nexport const deps = [createStore, useStore, act];\n";
+    expect(await errorRules(code, './features/editor/hooks/x.ts')).toEqual([]);
   });
 
   it('proíbe outra feature de importar o adaptador de pricing/api direto', async () => {

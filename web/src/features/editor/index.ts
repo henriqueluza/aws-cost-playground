@@ -1,6 +1,6 @@
 export { EditorPage } from './ui/EditorPage';
 export { useDesignStore } from './hooks/useDesignStore';
-export type { DesignActions, DesignStoreState } from './application/designStore';
+export type { DesignActions, DesignStoreState } from './hooks/designStore';
 export type {
   ActionErrorCode,
   BlockPatch,
