@@ -132,9 +132,9 @@ resource "aws_iam_role_policy" "apply_deny" {
         Resource = "*"
       },
       {
-        # Tudo que não é ler, gravar e listar objetos fica negado no bucket do estado, inclusive
-        # o que a AWS criar depois. O nome casa com `acp-<prefixo>-*`, então um `Allow` futuro
-        # por prefixo não o alcança.
+        # No bucket do estado só passam as quatro ações do backend; o resto fica negado, inclusive
+        # excluir versões e o que a AWS criar depois. O nome casa com `acp-<prefixo>-*`, então
+        # um `Allow` futuro por prefixo não alcança a configuração do bucket.
         Sid       = "DenyStateBucketConfig"
         Effect    = "Deny"
         NotAction = ["s3:DeleteObject", "s3:GetObject", "s3:ListBucket", "s3:PutObject"]
