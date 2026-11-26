@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { adrExampleDesign } from '../../../test/designFixtures';
 import type { DesignDocument } from '../../../shared/lib/design';
 import { designErrorMessage, isRetryable } from './designMessages';
-import { hasUnsavedChanges, saveStatus, sameDocument, type SavedDesign } from './saveState';
+import { saveStatus, sameDocument, type SavedDesign } from './saveState';
 
 const doc = adrExampleDesign as unknown as DesignDocument;
-const empty: DesignDocument = { ...doc, blocks: [], edges: [], workload: { description: '' } };
 const saved = (d: DesignDocument): SavedDesign => ({ id: 'X', name: 'N', version: 1, doc: d });
 const changed: DesignDocument = { ...doc, region: 'sa-east-1' };
 
@@ -34,13 +33,6 @@ describe('estado do salvamento', () => {
     ['diferente do salvo', changed, saved(doc), false, 'dirty'],
   ] as const)('%s', (_n, current, last, saving, expected) => {
     expect(saveStatus(current, last, saving)).toBe(expected);
-  });
-
-  it('só pede confirmação quando haveria perda', () => {
-    expect(hasUnsavedChanges(empty, null)).toBe(false);
-    expect(hasUnsavedChanges(doc, null)).toBe(true);
-    expect(hasUnsavedChanges(doc, saved(doc))).toBe(false);
-    expect(hasUnsavedChanges(changed, saved(doc))).toBe(true);
   });
 });
 

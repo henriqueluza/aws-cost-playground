@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useDesignStore } from '../../editor';
+import { designStore, useDesignStore } from '../../editor';
 import { ApiError, isApiError } from '../../../shared/lib/api';
 import { useApi } from '../../../shared/lib/api/ApiProvider';
 import { designDocumentSchema, type DesignDocument } from '../../../shared/lib/design';
@@ -24,7 +24,10 @@ export function useSaveDesign() {
       if (!store.begin()) return;
       try {
         const saved = await saveDesign(api, { saved: store.saved, ...input });
-        savedDesignStore.getState().finish(saved);
+        // O documento ENVIADO é o salvo: o que a pessoa editou durante a chamada continua pendente.
+        if (savedDesignStore.getState().finish(saved, store.epoch)) {
+          designStore.getState().markSaved(input.doc);
+        }
         void client.invalidateQueries({ queryKey: designsKeys.list });
       } catch (error) {
         savedDesignStore.getState().fail(errorKind(error));
