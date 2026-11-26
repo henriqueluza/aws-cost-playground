@@ -50,8 +50,8 @@ run "compoe_sem_ciclo_com_nomes_de_staging" {
   }
 
   assert {
-    condition     = length(module.alarms.alarm_names) == 5
-    error_message = "Cinco alarmes por ambiente: os dois somam a franquia de 10 do CloudWatch."
+    condition     = length(module.alarms.alarm_names) == 5 && alltrue([for n in values(module.alarms.alarm_names) : startswith(n, "acp-stg-")])
+    error_message = "Cinco alarmes acp-stg-* por ambiente: os dois somam a franquia de 10 do CloudWatch."
   }
 
   assert {

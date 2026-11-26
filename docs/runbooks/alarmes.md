@@ -2,7 +2,7 @@
 
 O que fazer quando um alarme do CloudWatch chega por e-mail. O módulo [`infra/modules/alarms`](../../infra/modules/alarms/README.md) (Issue #20) cria, por ambiente (`acp-stg` e `acp-prod`), o tópico SNS `<prefixo>-alarms` com assinatura por e-mail e 5 alarmes. Todos disparam com soma maior que 0 em 1 período de 5 minutos; dado ausente conta como OK; só há aviso ao entrar em alarme, não ao voltar a OK. Não há dashboards.
 
-**Pendências de outros PRs:** as funções (nomes `<prefixo>-api` e `<prefixo>-llm-proxy`, log group `/aws/lambda/<função>`, variável `LLM_ENABLED` e reserva de concorrência) vêm do módulo `functions` (PR #122, ainda não em `main`); confirme esses nomes no `terraform output` quando ele entrar. O workflow de produção com SHA e `docs/runbooks/rollback.md`, previstos no ADR-0001, também ainda não existem no repositório; até lá, o rollback é decisão do autor.
+**Pendências de outros PRs:** as funções (nomes `<prefixo>-api` e `<prefixo>-llm-proxy`, log group `/aws/lambda/<função>`, variável `LLM_ENABLED` e reserva de concorrência) vêm do módulo `functions`; confirme esses nomes no `terraform output` do ambiente (`function_names`). O workflow de produção com SHA e `docs/runbooks/rollback.md`, previstos no ADR-0001, também ainda não existem no repositório; até lá, o rollback é decisão do autor.
 
 **Placeholders:** tudo entre `< >` é substituído na hora de rodar e nunca é escrito de volta aqui. `<prefixo>` é `acp-stg` ou `acp-prod`; `<topic_arn>`, `<API_ID>` e os nomes das funções saem do `terraform output` do ambiente. O endereço de e-mail vem de `TF_VAR_alarm_email` e não fica no repositório.
 
