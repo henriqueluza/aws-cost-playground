@@ -19,6 +19,13 @@ class DesignLimitReached(DesignError):
     detail = "Design limit reached"
 
 
+class VersionConflict(DesignError):
+    """A `version` gravada não é a esperada: outra aba ou outro dispositivo gravou antes."""
+
+    status = 409
+    detail = "Version conflict"
+
+
 class StoreUnavailable(DesignError):
     """DynamoDB indisponível, limitando taxa ou inalcançável: vale tentar de novo."""
 

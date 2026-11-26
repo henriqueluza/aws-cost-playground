@@ -73,7 +73,7 @@ Nenhum segredo vai em variável de ambiente.
 
 | Papel | Permissões |
 |---|---|
-| `api` | `dynamodb:GetItem`, `PutItem`, `DeleteItem`, `Query` e `BatchWriteItem` na tabela, restritas por `dynamodb:LeadingKeys` às partições `USER#*`; `cognito-idp:AdminDeleteUser` no pool. Não lê o parâmetro |
+| `api` | `dynamodb:GetItem`, `PutItem`, `UpdateItem` (trava otimista dos designs, #54), `DeleteItem`, `Query` e `BatchWriteItem` na tabela, restritas por `dynamodb:LeadingKeys` às partições `USER#*`; `cognito-idp:AdminDeleteUser` no pool. Não lê o parâmetro |
 | `llm-proxy` | `dynamodb:GetItem` e `UpdateItem` na tabela (o `TransactWriteItems` da quota é autorizado pela ação `UpdateItem`); `ssm:GetParameter` só no parâmetro da chave |
 | Ambos | `logs:CreateLogStream` e `logs:PutLogEvents` só no próprio log group. Sem `logs:CreateLogGroup`: o Terraform já criou o grupo |
 
