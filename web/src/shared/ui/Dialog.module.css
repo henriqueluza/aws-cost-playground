@@ -1,0 +1,62 @@
+/* DESIGN.md, "Elevation & Depth", "Shapes" e "Movimento"; só tokens. O scrim cobre a tela
+   (portal em body) e centra o diálogo. box-sizing, fonte, cor e foco vêm do base.css. */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1; /* sem token de camada; o mesmo do toast e, por vir depois no DOM, fica acima dele */
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background-color: var(--scrim);
+  animation: scrimIn var(--t-ui) var(--ease-out);
+}
+
+/* Flutua: raio de cartão e --shadow-float; rola por dentro sem vazar para a página. */
+.dialog {
+  inline-size: min(100%, var(--rail-width));
+  max-block-size: calc(100dvh - 2 * var(--space-4));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--card-pad);
+  background-color: var(--surface);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
+  animation: dialogIn var(--t-ui) var(--ease-out);
+}
+
+/* No escuro a sombra quase não aparece: o que flutua sobe de tom e ganha borda. */
+:global(:root[data-theme='dark']) .dialog {
+  background-color: var(--raised);
+  border-color: var(--border);
+}
+
+.title {
+  margin: 0 0 var(--space-3); /* o título Section do Panel */
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-semibold);
+  text-wrap: balance;
+}
+
+@keyframes scrimIn {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Sobe como o toast e cresce do centro (origem padrão): o modal não sai de um gatilho. */
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2)) scale(0.98);
+  }
+}
+
+/* O --t-ui já zera aqui; o none deixa explícito. */
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .dialog {
+    animation: none;
+  }
+}
