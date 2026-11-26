@@ -187,6 +187,7 @@ Cada bloco tem uma função pura (`BlockPricer`), sem I/O: recebe `BlockPriceInp
 | ----------------- | -------------------------- | --------------------------------------------------------------------- |
 | `BlockPriceInput` | `attributes`               | Atributos do bloco, só os do contrato (abaixo)                        |
 | `BlockPriceInput` | `usage`                    | Uso efetivo, só as chaves do contrato (abaixo)                        |
+| `BlockPriceInput` | `incomingLogsGbPerMonth` (opcional) | GB por mês que chegam ao bloco pelas arestas `logs` (soma de `gbPerMonth`), não negativo (`Decimal`). Ausente vale zero; o motor preenche a partir das arestas na #42. Só `aws.cloudwatch` lê |
 | `BlockCharge`     | `sku`                      | SKU do catálogo (`Price.sku`)                                         |
 | `BlockCharge`     | `quantity`                 | Quantidade bruta do mês (`Decimal`), não negativa: sem franquia, mínimo nem faixas |
 | `BlockCharge`     | `charge`                   | `fixed` ou `variable` (`ChargeKind`, de [cost-estimate.md](cost-estimate.md)) |
