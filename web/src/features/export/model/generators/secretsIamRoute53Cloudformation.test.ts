@@ -44,7 +44,9 @@ describe('gerador de Secrets Manager', () => {
   it('não escreve valor, versão de segredo nem política de acesso', () => {
     const text = renderHcl(nodes);
     expect(resourceTypes(nodes, 'cofre')).toEqual(['aws_secretsmanager_secret']);
-    expect(text).not.toMatch(/secret_string|secret_binary|aws_secretsmanager_secret_version/);
+    expect(text).not.toMatch(
+      /secret_string|secret_binary|aws_secretsmanager_secret_(version|policy)/,
+    );
     expect(text).not.toMatch(SENSITIVE_LITERAL);
   });
 });
@@ -83,6 +85,7 @@ describe('gerador de IAM', () => {
       identifiers: '[data.aws_caller_identity.papel.account_id]',
     });
     expect(body(nodes, 'data', 'aws_caller_identity', 'papel')).toEqual([]);
+    expect(renderHcl(nodes)).toContain('# A confiança é a conta inteira: restrinja');
   });
 
   it('não tem `*` em ação nem em recurso, e nenhuma política de permissão', () => {

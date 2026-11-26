@@ -29,6 +29,9 @@ export const iam: BlockGenerator = ({ block, blocks }) => {
       ...(services.length === 0
         ? [
             hcl.comment('Sem bloco de computação no design: só a própria conta assume o papel.'),
+            hcl.comment(
+              'A confiança é a conta inteira: restrinja o principal antes de dar permissões.',
+            ),
             hcl.block('data', ['aws_caller_identity', block.name], []),
           ]
         : []),
