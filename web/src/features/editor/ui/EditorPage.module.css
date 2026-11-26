@@ -80,7 +80,8 @@
 
 .narrow {
   max-width: var(--measure-read);
-  margin: var(--space-6) auto;
+  /* Calha de 16px nas laterais: abaixo de --measure-read a folha encostava na borda da janela. */
+  margin: var(--space-6) max(var(--space-4), calc((100% - var(--measure-read)) / 2));
   padding: var(--card-pad);
   background-color: var(--surface);
   border: var(--border-width) solid var(--border);
