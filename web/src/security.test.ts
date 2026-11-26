@@ -50,6 +50,7 @@ const offenders = (pattern: RegExp) =>
 
 describe('invariantes de segurança do código do site', () => {
   it('lê o código de produção inteiro, sem os testes', () => {
+    // Piso folgado (hoje são mais de 250): só garante que o glob não voltou vazio.
     expect(production.length).toBeGreaterThan(200);
     expect(production.map(([path]) => path)).toContain(
       './features/auth/infrastructure/memorySessionStore.ts',

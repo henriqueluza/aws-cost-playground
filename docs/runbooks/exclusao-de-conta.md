@@ -2,7 +2,7 @@
 
 Procedimentos para `DELETE /me` (Issue #55). Comportamento da rota: `api/README.md`, seção "Exclusão de conta".
 
-O log da aplicação não tem `sub`, `username`, e-mail nem hash: o evento se localiza só pelo `request_id`. `<função>` é o nome da função `api` (`terraform output function_names`).
+O evento de exclusão do log da aplicação (`app.account`) não tem `sub`, `username`, e-mail nem hash: ele se localiza só pelo `request_id`. Os eventos de quota e de estimativa do `llm-proxy` levam o `sub` (ver "O que sobra", abaixo). `<função>` é o nome da função `api` (`terraform output function_names`).
 
 ## Conferir uma exclusão pelo `request_id`
 

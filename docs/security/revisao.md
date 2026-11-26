@@ -2,7 +2,7 @@
 
 Primeira rodada da Issue #73. Auditoria do repositório inteiro contra o threat model do ADR (`docs/architecture/aws-cost-playground/ADR-0001-stack.md`, seção "Segurança", ameaças T1 a T6).
 
-- **Data:** 26/11/2026. **Commit auditado:** `4f2a233` (`main` no início da revisão). Durante a revisão `main` avançou até `0c8715f`; esse delta não foi auditado (ver "Fora desta rodada"), mas os testes novos rodam verdes sobre ele.
+- **Data:** 26/11/2026. **Commit auditado:** `4f2a233` (`main` no início da revisão). Durante a revisão `main` avançou até `86442c2`; esse delta não foi auditado (ver "Fora desta rodada"), mas os testes novos rodam verdes sobre ele.
 - **Resultado:** nenhum achado crítico. Um achado **alto**, no CI (agente revisor de PR, #364). Um médio, doze baixos e três informativos, cada um com Issue ou corrigido neste PR. Nenhum segredo no repositório nem no histórico. Nenhuma dependência com vulnerabilidade conhecida.
 - **Não é a revisão final:** o código que ainda não está em `main` fica para a segunda rodada (#375). Ver "Fora desta rodada".
 
@@ -15,7 +15,7 @@ O repositório é público. O achado alto está descrito aqui em termos gerais; 
 | Revisão manual por área (api, web, infra, CI) | Skills `security-review` e `owasp-security` (Top 10:2025 e Top 10 de LLM), um revisor por área, leitura dos arquivos inteiros |
 | Agente em workflow | Skill `agentic-actions-auditor` em `review-pr.yml` |
 | Análise estática | Semgrep 1.182.0 com `p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/python`, `p/typescript`, `p/react`, `p/javascript`, `p/terraform`, `p/github-actions`, `p/secrets`: 784 arquivos, 24 achados (0 ERROR) |
-| Segredos | gitleaks 8.30.1 no histórico de todas as refs e no estado atual, mais busca dirigida por padrões |
+| Segredos | gitleaks 8.30.1 no histórico de todas as refs e no estado atual, mais busca dirigida por padrões. O CI usa a 8.21.2, só sobre o checkout do PR |
 | Dependências | Skill `supply-chain-risk-auditor`, `npm audit` (com e sem dev), `pip-audit` 2.10.1 e consulta à OSV com todos os pacotes dos dois `uv.lock` |
 | Padrões inseguros | Categorias da skill `insecure-defaults`, por leitura dirigida dos pontos de configuração (ver "O que não rodou") |
 | Falsos positivos | Cada achado candidato passou pela skill `fp-check`, com um verificador que não participou da descoberta e tinha a tarefa de refutar |
@@ -94,7 +94,7 @@ Nenhum uso de id de usuário vindo de corpo, query, caminho ou cabeçalho em `ap
 | Limites do documento e ids por regex | `web/src/shared/lib/design/designDocument.ts:16-65,86-87` | `designDocument.test.ts` "aceita até maxBlocks blocos e recusa um a mais" |
 | `__proto__` e `constructor` | `designDocument.ts:31-34` | `designFile.test.ts` "__proto__ em qualquer nível não polui o protótipo e é descartado" |
 | Rótulo, nome e e-mail só como texto React | `web/src/features/editor/ui/BlockNode.tsx:20-22`, `web/src/features/designs/ui/DesignsPage.tsx:50-51` | `CanvasPanel.test.tsx` "mostra o rótulo com marcação como texto, nunca como HTML"; `web/src/features/compare/ui/CompareTable.test.tsx` "tipo desconhecido e rótulo com HTML saem só como texto" |
-| Nenhum sorvedouro de HTML ou de código (`dangerouslySetInnerHTML`, `innerHTML`, `eval` e afins) | todo `web/src` | `web/src/security.test.ts` "nenhum arquivo usa %s" (novo) |
+| Nenhum sorvedouro de HTML ou de código pelos padrões conhecidos (`dangerouslySetInnerHTML`, `innerHTML`, `eval` e afins; busca textual, não pega forma ofuscada como `window['eval']`) | todo `web/src` | `web/src/security.test.ts` "nenhum arquivo usa %s" (novo) |
 | Bundle sem `data:` e sem script ou estilo inline | `web/vite.config.ts:16`, `web/tooling/noDataUri.ts` | `tooling/noDataUri.test.ts` "falha o build com URI data: em chunk" |
 | CSP no CloudFront, nos dois comportamentos de cache | `infra/modules/site/headers.tf:2-15,27-30`, `infra/modules/site/cloudfront.tf:56,66` | `test_security_review.py::ContentSecurityPolicy::test_csp_inteira_e_fixada_diretiva_a_diretiva` (novo; o teste do módulo só conferia trechos) |
 | Export de Terraform: rótulo só vira comentário e, saneado, nome de recurso | `web/src/features/export/model/hcl.ts:67-122`, `web/src/features/export/model/names.ts:11-23` | `web/src/features/export/model/hcl.test.ts` (carga `%s` fica presa dentro de um literal de uma linha); `web/src/features/export/application/exportDesign.test.ts` (a carga `%s` no rótulo não cria nem altera linha de código). As 16 cargas estão em `web/src/features/export/test/injectionPayloads.ts`; nos nomes reais dos testes o `%s` vem entre aspas |
@@ -116,7 +116,7 @@ Nenhum uso de id de usuário vindo de corpo, query, caminho ou cabeçalho em `ap
 | `Authorization` só para a origem da API; sem cookie; não segue redirecionamento | `web/src/shared/lib/http/transport.ts:113-126,147-158` | `transport.test.ts` "não segue redirecionamento: o token não chega a outra origem" |
 | OIDC sem chave estática; trust por igualdade em `aud` e `sub` | `infra/bootstrap/oidc.tf:8-15`, `plan.tf:18-23`, `apply.tf:37-43`, `prices.tf:18-23` | `bootstrap.tftest.hcl` (`trust_do_papel_plan`), `apply.tftest.hcl` (`trust_dos_papeis_apply`); `infra/tools/tests/test_workflow_deploy_staging.py::test_no_static_aws_credentials` |
 | Regras da casa em todos os workflows: sem `pull_request_target`, sem expressão em `run:`, OIDC e environment só nos jobs conhecidos, actions por SHA | `.github/workflows/*.yml` | `infra/tools/tests/test_workflows_all.py` (novo; antes só os deploys e o `prices` tinham teste) |
-| gitleaks (histórico inteiro do PR) e Semgrep em todo PR, falhando fechado | `.github/workflows/security.yml:2-5,16,22-26` | `test_workflows_all.py::EveryWorkflow::test_semgrep_e_gitleaks_rodam_em_todo_pr_e_falham_fechado` (novo). São checks obrigatórios do ruleset de `main` (`validate`, `semgrep`, `gitleaks`, `pr-size`) |
+| gitleaks (checkout com o histórico inteiro, `fetch-depth: 0`) e Semgrep em todo PR, falhando fechado | `.github/workflows/security.yml:2-5,16,22-26` | `test_workflows_all.py::EveryWorkflow::test_semgrep_e_gitleaks_rodam_em_todo_pr_e_falham_fechado` (novo). São checks obrigatórios do ruleset de `main` (`validate`, `semgrep`, `gitleaks`, `pr-size`) |
 
 ### T6. Adulteração dos preços
 
@@ -199,7 +199,7 @@ Cada um passou por `fp-check`. Severidade é a final, depois da verificação.
 | WEB-1 | Baixa | Sem allowlist da origem do login gerenciado (risco residual de `docs/handoff/52.md`). Ver avaliação abaixo | `web/src/features/auth/model/endpoints.ts:48-69` | Verdadeiro; baixa é o teto | #370 |
 | WEB-2 | Info | O build de produção aceita `http://localhost` na configuração de runtime | `web/src/shared/config/runtimeConfig.ts:14-19` | Verdadeiro; o deploy exige `https://` e a CSP bloqueia | #370 |
 | WEB-3 | Info | `oidc-client-ts` instalado e sem uso | `web/package.json:17` | Verdadeiro | #371 |
-| DOC-1 | Baixa | A documentação dizia que o log da aplicação não tem `sub`; os eventos de quota e de estimativa têm | `api/README.md:222`, ADR linha 162, `docs/runbooks/exclusao-de-conta.md:39` | Verdadeiro | Corrigido neste PR |
+| DOC-1 | Baixa | A documentação dizia que o log da aplicação não tem `sub`; os eventos de quota e de estimativa têm | `api/README.md` (seção "Exclusão de conta"), ADR linha 162, `docs/runbooks/exclusao-de-conta.md:5,39` | Verdadeiro | Corrigido neste PR |
 | DOC-2 | Baixa | O runbook de rotação dizia que os papéis de CI leem o parâmetro da chave; o código nega. Num incidente, uma leitura anômala passaria por normal | `docs/runbooks/rotacao-de-segredos.md:76` | Verdadeiro | Corrigido neste PR |
 | OPS-1 | Info (bloqueio de deploy) | Os trusts OIDC esperam o formato antigo do `sub`; o repositório emite o formato imutável, com IDs. Falha fechada: ninguém ganha acesso, mas nenhum papel de CI seria assumido | `infra/bootstrap/oidc.tf:5`, `plan.tf:21`, `apply.tf:41`, `prices.tf:21` | Confirmado pela API e pela documentação do GitHub; não por token real | #366 (`needs-human`) |
 | TST-1 | — | T6 sem o teste de cenários de ±15% | — | — | #81 (já existia) |
@@ -237,7 +237,7 @@ Cada um passou por `fp-check`. Severidade é a final, depois da verificação.
 | `web/src/security.test.ts` | Nenhum sorvedouro de HTML ou de código, nenhum `console`, nenhum `localStorage`, IndexedDB ou cookie; `sessionStorage` só nos dois arquivos conhecidos |
 | `api/tests/test_main.py` | A aplicação nunca emite cabeçalho de CORS e não tem o middleware |
 
-Limite conhecido: `infra/tools/tests` só roda no CI quando o PR toca `infra/**` ou um dos workflows listados em `paths` de `.github/workflows/terraform.yml`. Um PR que só mexa em outro workflow não dispara `test_workflows_all.py`. A #365 pede que o job rode para qualquer arquivo de `.github/workflows/`.
+Limite conhecido: `infra/tools/tests` só roda no CI quando o PR toca `infra/**` ou um dos workflows listados em `paths` de `.github/workflows/terraform.yml`. Um PR que só mexa em outro workflow não dispara `test_workflows_all.py`. A #365 pede que o job rode para qualquer arquivo de `.github/workflows/`. Pela mesma razão, as conferências de segredos no histórico inteiro e de dependências são evidência pontual desta revisão: o CI não roda `npm audit` nem `pip-audit` (a #365 recebeu esse pedido em comentário).
 
 ## Fora desta rodada
 
@@ -246,8 +246,8 @@ Código que não está em `main` no commit auditado. Fica para a #375, que fecha
 | Item | Issue | Estado |
 |---|---|---|
 | API de atualizar, renomear, duplicar e apagar designs (501 no commit auditado) | #54 | Entrou em `main` durante a revisão (PR #376, `0c8715f`). Não auditada aqui |
-| Tela dessas operações | #57 | Em andamento |
-| Rotas de designs no API Gateway | #252 | Pronta para começar |
+| Tela dessas operações | #57 | Entrou em `main` durante a revisão (PR #377). Não auditada aqui |
+| Rotas de designs no API Gateway | #252 | Entrou em `main` durante a revisão (`86442c2`). Não auditada aqui; os invariantes de `test_security_review.py` passam sobre ela |
 | Custo de leitura da partição de designs no pior caso (achado médio já registrado; decisão do autor) | #277 | `needs-human` |
 | Designs salvos na comparação | #351 | Entrou em `main` durante a revisão (PR #362). Não auditada aqui |
 | Workflow `export-validate.yml` | #359 | Entrou em `main` durante a revisão. Passa nos invariantes de `test_workflows_all.py`; não auditado além disso |
