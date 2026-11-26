@@ -60,9 +60,9 @@ Regras para o deploy:
 
 1. Subir `assets/` antes do `index.html`.
 2. Não apagar assets antigos no mesmo deploy (quem ainda tem o `index.html` antigo em cache precisa deles).
-3. Após publicar, invalidar só `/index.html` e `/config.json` (os arquivos sem hash).
+3. Após publicar, invalidar `/*`.
 
-Por quê: um asset inexistente em `/assets/*` cai no fallback e devolve o HTML do `index.html` com status 200. Na borda o erro não fica em cache (`error_caching_min_ttl = 0`), mas, se a resposta levar a política de cabeçalhos de `/assets/*`, o navegador guarda esse HTML por 1 ano. Conferir em staging (#21).
+Por quê: `/*` é um caminho só na cota grátis e cobre `/prices/**`; invalidar só `/index.html` não invalida `/`, que o CloudFront guarda com chave própria por causa do `default_root_object`. Quanto aos assets: um asset inexistente em `/assets/*` cai no fallback e devolve o HTML do `index.html` com status 200. Na borda o erro não fica em cache (`error_caching_min_ttl = 0`), mas, se a resposta levar a política de cabeçalhos de `/assets/*`, o navegador guarda esse HTML por 1 ano. Conferir em staging (#21).
 
 ## CSP aplicada
 
