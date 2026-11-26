@@ -29,7 +29,7 @@
     },
     {
       "path": "sa-east-1/dynamodb.json",
-      "sha256": "737e928d4ba71c72064b67593bbd4d287de2afe1b1c2fd54c2557cf848be3a49"
+      "sha256": "142a82baa54724200b779a6c3f4cee3f8b2e3fd17d5c0f8b9cc4c1f6760335e5"
     },
     {
       "path": "sa-east-1/ec2.json",
@@ -97,7 +97,7 @@
     },
     {
       "path": "us-east-1/dynamodb.json",
-      "sha256": "ae4e9b537baf691fc3bfef3e4ed95a455cefe3dbe3d2f8ccf4bdee1ec9baea1e"
+      "sha256": "531e223f5cb1486e2736b750466b894de3428ea1673c78736aad7b4826529bad"
     },
     {
       "path": "us-east-1/ec2.json",
