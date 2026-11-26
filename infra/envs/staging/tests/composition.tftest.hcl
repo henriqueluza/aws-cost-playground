@@ -64,3 +64,21 @@ run "compoe_sem_ciclo_com_nomes_de_staging" {
     error_message = "O /config.json de staging deve apontar para api.staging.<domínio>."
   }
 }
+
+run "rotas_de_designs_atras_do_jwt_e_patch_no_cors" {
+  command = plan
+
+  assert {
+    condition = toset(module.http_api.route_keys) == toset([
+      "POST /estimates", "GET /quota", "DELETE /me",
+      "GET /designs", "POST /designs", "GET /designs/{design_id}",
+      "PATCH /designs/{design_id}", "DELETE /designs/{design_id}", "POST /designs/{design_id}/duplicate",
+    ])
+    error_message = "O gateway deve declarar as três rotas atuais e as seis de designs, com design_id."
+  }
+
+  assert {
+    condition     = module.http_api.cors_allow_methods == toset(["GET", "POST", "PATCH", "DELETE"])
+    error_message = "O CORS deve liberar GET, POST, PATCH e DELETE."
+  }
+}

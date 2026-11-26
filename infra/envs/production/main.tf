@@ -82,11 +82,18 @@ module "http_api" {
   domain_name          = module.dns.domain_names.api
   acm_certificate_arn  = module.dns.certificate_arns["api"]
   default_throttle     = var.default_throttle
-  # As rotas de designs entram com a #10; rota ausente responde 404.
+  # Rotas de designs: vão para a função api, atrás do JWT. PATCH entra no CORS por aqui.
   routes = {
     "POST /estimates" = { throttle = var.estimates_throttle }
     "GET /quota"      = {}
     "DELETE /me"      = {}
+
+    "GET /designs"                        = {}
+    "POST /designs"                       = {}
+    "GET /designs/{design_id}"            = {}
+    "PATCH /designs/{design_id}"          = {}
+    "DELETE /designs/{design_id}"         = {}
+    "POST /designs/{design_id}/duplicate" = {}
   }
 }
 

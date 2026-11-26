@@ -72,6 +72,16 @@ run "cors_com_origens_explicitas" {
     error_message = "CORS: só as origens da variável, os métodos das rotas e os cabeçalhos authorization e content-type, sem credenciais."
   }
 }
+run "patch_entra_no_cors_quando_ha_rota_patch" {
+  command = plan
+  variables {
+    routes = { "GET /designs" = {}, "POST /designs" = {}, "PATCH /designs/{design_id}" = {}, "DELETE /designs/{design_id}" = {} }
+  }
+  assert {
+    condition     = aws_apigatewayv2_api.this.cors_configuration[0].allow_methods == toset(["GET", "POST", "PATCH", "DELETE"])
+    error_message = "Os métodos do CORS saem das chaves de routes: PATCH só passa com uma rota PATCH."
+  }
+}
 run "limite_de_taxa_por_rota" {
   command = plan
   assert {
