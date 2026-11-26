@@ -1,0 +1,47 @@
+name: Deploy staging
+
+# Contrato (#22). Esqueleto: os passos são preenchidos no mesmo PR.
+#
+# Depois do merge em `main`, o job `build` constrói UMA vez o bundle do site e o zip das
+# Lambdas e os guarda como o artefato `release-<sha>`. O job `deploy` usa só esse artefato
+# (nunca reconstrói) e publica em staging nesta ordem: pacote no bucket de artefatos,
+# Terraform, funções, site, /config.json, invalidação do CloudFront e smoke test.
+#
+# Artefato `release-${{ github.sha }}` (retenção de 90 dias), na raiz:
+#   functions.zip  zip das Lambdas (scripts/build-functions.sh)
+#   site/          conteúdo de web/dist
+#   SHA256SUMS     sha256 em hex, caminhos relativos à raiz (`sha256sum -c SHA256SUMS`)
+#
+# Chave do pacote no S3: functions/<sha de 40 caracteres>.zip, igual a TF_VAR_package_key.
+# A primeira escrita vence: se a chave já existe, não é sobrescrita, e o hash esperado das
+# funções passa a ser o do objeto guardado (base64 do digest binário, como o CodeSha256).
+#
+# Variáveis do GitHub Environment `staging`: AWS_APPLY_ROLE_ARN (sem ela o deploy só avisa
+# e termina verde) e TF_VAR_PACKAGE_BUCKET. Do repositório, já usadas pelo job plan:
+# TF_STATE_BUCKET_STAGING, TF_VAR_ZONE_NAME e o secret TF_VAR_ALARM_EMAIL.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps: [] # P1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write # OIDC para assumir o papel acp-ci-apply-staging
+    # Ids dos passos, nesta ordem: gate (saída `configured` = true|false), download, verify,
+    # aws, package, terraform, functions, site, config, invalidate, smoke, summary.
+    steps: [] # P1
