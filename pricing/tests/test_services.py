@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from app.model import ServiceSpec
+from app.model import Query, ServiceSpec
 from app.services import SERVICES
 
 EXPECTED = {
@@ -45,7 +45,9 @@ def test_zero_cost_services_absent(slug: str) -> None:
 
 @pytest.mark.parametrize("region", ["us-east-1", "sa-east-1"])
 @pytest.mark.parametrize("spec", SERVICES, ids=lambda s: s.slug)
-def test_services_are_provisional(spec: ServiceSpec, region: str) -> None:
-    assert spec.queries(region) == ()
-    assert tuple(spec.build(region, [])) == ()
-    assert spec.expected_skus == frozenset()
+def test_service_contract(spec: ServiceSpec, region: str) -> None:
+    # Vale para o serviço provisório e para o implementado: o bloco não edita este arquivo.
+    queries = spec.queries(region)
+    assert isinstance(queries, tuple)
+    assert all(isinstance(query, Query) for query in queries)
+    assert all(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}", sku) for sku in spec.expected_skus)
