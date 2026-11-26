@@ -62,6 +62,8 @@ export function WorkloadPanel(): ReactElement {
       <div className={styles.group}>
         <TextAreaField
           label="Descrição da carga"
+          name="workload-description"
+          autoComplete="off"
           rows={7}
           maxLength={DESCRIPTION_LIMIT}
           value={description}
@@ -107,6 +109,7 @@ export function WorkloadPanel(): ReactElement {
             <Button
               variant="secondary"
               aria-disabled={disabled}
+              aria-busy={loading}
               aria-describedby={hint ? `${hintId}-why` : undefined}
               onClick={() => {
                 if (!disabled) void estimate();
