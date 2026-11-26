@@ -3,5 +3,28 @@
   "service": "alb",
   "region": "us-east-1",
   "currency": "USD",
-  "prices": []
+  "prices": [
+    {
+      "sku": "alb-hours",
+      "description": "Horas do balanceador",
+      "unit": "hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.0225"
+        }
+      ]
+    },
+    {
+      "sku": "alb-lcu-hours",
+      "description": "LCU-hora usadas",
+      "unit": "LCU-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.008"
+        }
+      ]
+    }
+  ]
 }

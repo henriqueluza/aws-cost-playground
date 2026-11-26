@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { routes } from './router';
@@ -13,7 +14,11 @@ describe('routes', () => {
     ['/termos', 'Termos de uso'],
     ['/auth/callback', 'Entrando'],
   ])('%s mostra o h1 "%s"', (path, name) => {
-    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />
+      </QueryClientProvider>,
+    );
     expect(screen.getByRole('heading', { level: 1, name })).toBeInTheDocument();
   });
 });

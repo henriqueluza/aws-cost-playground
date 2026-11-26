@@ -59,6 +59,11 @@ run "compoe_sem_ciclo_com_nomes_de_production" {
   }
 
   assert {
+    condition     = output.site_url == "https://exemplo.com"
+    error_message = "O smoke test do deploy usa site_url: https://<host>, sem barra final."
+  }
+
+  assert {
     condition     = output.site_config.apiBaseUrl == "https://api.exemplo.com"
     error_message = "O /config.json de production deve apontar para api.<domínio>, sem subdomínio de ambiente."
   }

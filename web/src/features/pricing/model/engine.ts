@@ -1,10 +1,14 @@
-import type { Block, DesignDocument, EdgeKind } from '../../../shared/lib/design';
+import type { Block, DesignDocument, Edge, EdgeKind } from '../../../shared/lib/design';
 import { add, decimal, sum, type Decimal, type Money } from '../../../shared/lib/money';
 import type { BlockDefinition, BlockPricer } from './blockContract';
 import { blockPriceInput } from './blockInput';
 import { blockDefinition, blockPricer } from './blockRegistry';
 import type { PriceCatalog } from './catalog';
+import { edgeCharges } from './edgeCharges';
 import { createRater } from './rating';
+import { zeroCostReport, type CostNote, type CostWarning } from './zeroCost';
+
+export type { CostNote, CostWarning, CostWarningCode } from './zeroCost';
 
 /** `unavailable`: falta preço para o item; os valores dele são zero, sem linhas, e ficam fora dos totais. */
 export type CostStatus = 'priced' | 'unavailable';
@@ -38,6 +42,8 @@ export interface BlockCost extends ItemCost {
   readonly blockId: string;
   /** `Block.type` do design (ex.: `aws.lambda`). */
   readonly blockType: string;
+  /** Por que o bloco sai com zero: só em bloco `priced` de custo zero (nível C); ausente nos demais. */
+  readonly note?: CostNote;
 }
 
 export interface EdgeCost extends ItemCost {
@@ -56,6 +62,8 @@ export interface CostEstimate {
   readonly blocks: readonly BlockCost[];
   /** Um item por aresta, na ordem de `design.edges`. */
   readonly edges: readonly EdgeCost[];
+  /** Problemas do design que não impedem o cálculo nem dependem do catálogo, na ordem de `design.blocks`. */
+  readonly warnings: readonly CostWarning[];
 }
 
 /** De onde o motor tira o contrato e a função de preço de um tipo de bloco. */
@@ -65,8 +73,13 @@ export interface BlockPricing {
 }
 
 const ZERO = decimal(0);
-const zeroCost = { status: 'priced', total: ZERO, fixed: ZERO, variable: ZERO, lines: [] } as const;
-const unavailable = { ...zeroCost, status: 'unavailable' } as const;
+const unavailable = {
+  status: 'unavailable',
+  total: ZERO,
+  fixed: ZERO,
+  variable: ZERO,
+  lines: [],
+} as const;
 const BLOCK_TYPE_PREFIX = 'aws.';
 
 /** Serviço do catálogo de um tipo de bloco quando a cobrança não diz outro: o tipo sem `aws.`. */
@@ -87,7 +100,11 @@ function itemCost(lines: readonly CostLine[] | undefined): ItemCost {
  * entrada ao contrato (`blockPriceInput`), chama a função de preço e aplica as regras do
  * catálogo (`createRater`). Sai `unavailable` o bloco de tipo sem contrato, com atributo fora
  * das opções ou com cobrança sem preço no catálogo, e todo bloco se o catálogo é de outra região.
- * As arestas saem `priced` com zero até a #42.
+ * Depois dos blocos, cada aresta, na ordem do design, passa pelo mesmo `rater` (`edgeCharges`):
+ * blocos e arestas dividem franquia e faixas. Aresta sem custo sai `priced` com zero; fora do
+ * contrato, com cobrança sem preço no catálogo ou com catálogo de outra região, `unavailable`.
+ * Bloco de custo zero (função de preço criada por `zeroCostPricer`) sai `priced` com zero, sem
+ * linhas e com a `note` do motivo; ECS sem `runs-on` gera aviso, não erro (`zeroCostReport`).
  */
 export function createEstimator(blocks: BlockPricing) {
   return (design: DesignDocument, catalog: PriceCatalog): CostEstimate => {
@@ -105,15 +122,30 @@ export function createEstimator(blocks: BlockPricing) {
       );
     };
 
-    const blockCosts = design.blocks.map((block) => ({
-      ...itemCost(linesOf(block)),
-      blockId: block.id,
-      blockType: block.type,
+    const { notes, warnings } = zeroCostReport(design, blocks.pricer);
+    const blockCosts = design.blocks.map((block): BlockCost => {
+      const cost = itemCost(linesOf(block));
+      const note = cost.status === 'priced' ? notes.get(block.id) : undefined;
+      return { ...cost, blockId: block.id, blockType: block.type, ...(note && { note }) };
+    });
+    const blockById = new Map(design.blocks.map((block) => [block.id, block]));
+    const edgeLinesOf = (edge: Edge): readonly CostLine[] | undefined => {
+      const charges = edgeCharges(
+        edge,
+        (id) => blockById.get(id),
+        (type) => blocks.definition(type),
+      );
+      return sameRegion && charges !== undefined ? rater.rate(charges) : undefined;
+    };
+    const edges = design.edges.map((edge) => ({
+      ...itemCost(edgeLinesOf(edge)),
+      edgeId: edge.id,
+      kind: edge.kind,
     }));
-    const edges = design.edges.map((e) => ({ ...zeroCost, edgeId: e.id, kind: e.kind }));
-    const fixed = sum(blockCosts.map((block) => block.fixed));
-    const variable = sum(blockCosts.map((block) => block.variable));
-    return { total: add(fixed, variable), fixed, variable, blocks: blockCosts, edges };
+    const items = [...blockCosts, ...edges];
+    const fixed = sum(items.map((item) => item.fixed));
+    const variable = sum(items.map((item) => item.variable));
+    return { total: add(fixed, variable), fixed, variable, blocks: blockCosts, edges, warnings };
   };
 }
 

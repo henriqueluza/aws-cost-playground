@@ -12,6 +12,7 @@ EXPECTED = {
     "cloudwatch": "AmazonCloudWatch",
     "codepipeline": "AWSCodePipeline",
     "cognito": "AmazonCognito",
+    "data-transfer": "AWSDataTransfer",
     "dynamodb": "AmazonDynamoDB",
     "ec2": "AmazonEC2",
     "elasticache": "AmazonElastiCache",
@@ -28,7 +29,7 @@ EXPECTED = {
 
 def test_services_slugs_unique_sorted_and_valid() -> None:
     slugs = [s.slug for s in SERVICES]
-    assert len(slugs) == 17
+    assert len(slugs) == 18
     assert len(set(slugs)) == len(slugs)
     assert slugs == sorted(slugs)
     assert all(re.fullmatch(r"[a-z][a-z0-9-]{0,39}", slug) for slug in slugs)
