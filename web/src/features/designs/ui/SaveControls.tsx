@@ -26,11 +26,16 @@ function useBeforeUnload(active: boolean) {
   }, [active]);
 }
 
+/** Rotas só de leitura: o design fica na store e volta ao editor intacto, então não há o que perder. */
+const READ_ONLY_ROUTES: ReadonlySet<string> = new Set(['/comparar']);
+
 /** Pede confirmação ao trocar de rota (ex.: "Meus designs") com alterações não salvas. */
 function LeaveGuard({ active }: { active: boolean }) {
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      active && currentLocation.pathname !== nextLocation.pathname,
+      active &&
+      currentLocation.pathname !== nextLocation.pathname &&
+      !READ_ONLY_ROUTES.has(nextLocation.pathname),
   );
   useBeforeUnload(active);
   return (

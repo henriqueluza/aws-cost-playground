@@ -164,6 +164,15 @@ describe('SaveControls', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/designs'));
   });
 
+  it('vai para a comparação (só leitura) sem perguntar, mesmo com alterações', async () => {
+    load(doc);
+    const { router } = renderWithApp(newApi(), <SaveControls />);
+    await act(() => router.navigate('/comparar'));
+    expect(router.state.location.pathname).toBe('/comparar');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(designStore.getState().document).toEqual(doc);
+  });
+
   it('sai sem perguntar quando não há nada a perder', async () => {
     const user = userEvent.setup();
     const { router } = renderWithApp(newApi(), <SaveControls />);
