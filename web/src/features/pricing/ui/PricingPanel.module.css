@@ -89,6 +89,7 @@
 
 .table tbody {
   border-top: var(--border-width) solid var(--rule);
+  scroll-margin-top: calc(var(--space-7) * 3);
 }
 .table tbody[data-selected] {
   background-color: var(--active);
@@ -205,23 +206,22 @@
   font-size: var(--fs-small);
   line-height: var(--lh-small);
 }
-.sku {
-  font-family: var(--font-mono);
-  overflow-wrap: anywhere;
-  color: var(--text);
-}
-.amount {
-  font-family: var(--font-mono);
-  text-align: right;
-  color: var(--text);
-}
+.sku,
+.amount,
 .calc {
   font-family: var(--font-mono);
-  color: var(--muted);
   overflow-wrap: anywhere;
 }
+.sku,
+.amount {
+  color: var(--text);
+}
+.amount,
 .charge {
   text-align: right;
+}
+.calc,
+.charge {
   color: var(--muted);
 }
 
@@ -241,15 +241,12 @@
 .skelRow {
   height: var(--row-cost);
 }
-.error .total {
-  margin: 0;
-  color: var(--faint);
-}
 .error {
   display: grid;
   gap: var(--space-3);
   justify-items: start;
 }
-.table tbody {
-  scroll-margin-top: calc(var(--space-7) * 3);
+.error .total {
+  margin: 0;
+  color: var(--faint);
 }
