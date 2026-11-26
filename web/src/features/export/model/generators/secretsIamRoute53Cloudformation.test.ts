@@ -163,9 +163,10 @@ describe('export do design com os blocos de nível B e C', () => {
     expect(text).toMatch(/^# Blocos exportados: (\d+) de \1\.$/m);
     expect(text).not.toMatch(SENSITIVE_LITERAL);
     expect(text).not.toMatch(/arn:aws|AKIA[0-9A-Z]{16}|-----BEGIN/);
-    // O único curinga permitido é o nome do objeto no bucket de logs da trilha.
+    // Os únicos curingas permitidos são nomes de objeto nos buckets de apoio (logs e artefatos).
     expect(allowedWildcards(kitGenerate(levelBcDesign))).toEqual([
       'format("%s/AWSLogs/%s/*", aws_s3_bucket.auditoria__logs.arn, data.aws_caller_identity.auditoria.account_id)',
+      'format("%s/*", aws_s3_bucket.entrega__artifacts.arn)',
     ]);
   });
 
