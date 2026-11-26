@@ -212,6 +212,16 @@ describe('exportDesign', () => {
       );
     });
 
+    it('gerador que lança não gera arquivo nem repassa a exceção', () => {
+      const broken = createExporter({
+        ...BLOCK_GENERATORS,
+        'aws.s3': () => {
+          throw new Error('defeito');
+        },
+      });
+      expect(broken(withLabels('x'))).toEqual({ ok: false, error: 'generation-failed' });
+    });
+
     it('nó que o construtor recusa não gera arquivo', () => {
       expect(withS3('bucket" {}')(withLabels('x'))).toEqual({
         ok: false,

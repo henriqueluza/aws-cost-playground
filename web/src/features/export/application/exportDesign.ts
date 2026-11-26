@@ -3,7 +3,7 @@ import { buildExportModel } from '../model/exportBlocks';
 import { BLOCK_GENERATORS } from '../model/generators';
 import type { BlockType } from '../../pricing';
 import type { BlockGenerator } from '../model/generator';
-import { HclError, hcl, renderHcl, type HclNode } from '../model/hcl';
+import { hcl, renderHcl, type HclNode } from '../model/hcl';
 
 /** Caminhos que o export pode produzir. Lista fixa: nenhum caminho sai de dado do usuário. */
 export const EXPORT_PATHS = ['main.tf'] as const;
@@ -92,7 +92,7 @@ function preamble(region: string): HclNode[] {
  * Export do design para Terraform (PRD F27): função pura e determinística, sem LLM, rede ou relógio.
  * Recebe o documento como dado não confiável e o valida de novo. Bloco sem gerador real, de tipo
  * desconhecido ou com atributo fora do contrato aparece como comentário e na lista do cabeçalho.
- * Se um gerador devolver um nó que o construtor recusa, nada é escrito: `generation-failed`.
+ * Se um gerador devolver um nó que o construtor recusa, ou lançar, nada é escrito: `generation-failed`.
  */
 export function createExporter(
   generators: Readonly<Record<BlockType, BlockGenerator>>,
@@ -100,9 +100,9 @@ export function createExporter(
   return (input) => {
     try {
       return exportWith(generators, input);
-    } catch (error) {
-      if (error instanceof HclError) return { ok: false, error: 'generation-failed' };
-      throw error;
+    } catch {
+      // Falha fechada: `HclError` ou defeito de um gerador. A mensagem não sai daqui.
+      return { ok: false, error: 'generation-failed' };
     }
   };
 }
