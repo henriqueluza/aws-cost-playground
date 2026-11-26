@@ -1,23 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError, type ApiErrorKind } from '../../../shared/lib/api';
-import {
-  CONFIRM_WORD,
-  confirmationMatches,
-  accountErrorMessage,
-  isRetryable,
-} from './accountMessages';
+import { CONFIRM_WORD, confirmationMatches, accountErrorMessage } from './accountMessages';
 import { formatResetsAt, quotaSummary } from './format';
 
 const KINDS: ApiErrorKind[] = [
   'unauthenticated',
-  'not-found',
-  'version-conflict',
-  'design-limit',
-  'too-large',
+  'network',
   'unavailable',
   'invalid-request',
-  'invalid-response',
-  'network',
   'quota-exhausted',
 ];
 
