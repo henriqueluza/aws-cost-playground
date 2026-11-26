@@ -65,7 +65,7 @@
     },
     {
       "path": "sa-east-1/sqs.json",
-      "sha256": "ecf89412e499a3041a24ac7536f421b3a189499bec03a39b1212b68f5c668cea"
+      "sha256": "8d1fd5e03360179330653c3b30f77122b6bce8b3b31b0ae14a90f7ca47dbd95b"
     },
     {
       "path": "sa-east-1/waf.json",
@@ -133,7 +133,7 @@
     },
     {
       "path": "us-east-1/sqs.json",
-      "sha256": "b9004124fbbbd387401d7d838244c5c4fcd3177ba0fef9079002c495da4358fd"
+      "sha256": "f9648f959f1ce6b238fadb38e0f64909690c2ea892a62fb4d24ae109e176f9e3"
     },
     {
       "path": "us-east-1/waf.json",

@@ -3,5 +3,52 @@
   "service": "sqs",
   "region": "us-east-1",
   "currency": "USD",
-  "prices": []
+  "prices": [
+    {
+      "sku": "sqs-requests-fifo",
+      "description": "Requisições (fila FIFO)",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": "100000000000",
+          "unitPrice": "0.0000005"
+        },
+        {
+          "upTo": "200000000000",
+          "unitPrice": "0.0000004"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.00000035"
+        }
+      ],
+      "freeTier": {
+        "quantity": "1000000",
+        "pool": "sqs-requests"
+      }
+    },
+    {
+      "sku": "sqs-requests-standard",
+      "description": "Requisições (fila padrão)",
+      "unit": "request",
+      "tiers": [
+        {
+          "upTo": "100000000000",
+          "unitPrice": "0.0000004"
+        },
+        {
+          "upTo": "200000000000",
+          "unitPrice": "0.0000003"
+        },
+        {
+          "upTo": null,
+          "unitPrice": "0.00000024"
+        }
+      ],
+      "freeTier": {
+        "quantity": "1000000",
+        "pool": "sqs-requests"
+      }
+    }
+  ]
 }
