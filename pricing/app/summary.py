@@ -34,6 +34,11 @@ _FOOTER = (
     "`pull_request`: feche e reabra o PR para rodar o CI."
 )
 _OUTSIDE = "linhas fora do padrão"
+_NOTHING_KEY = "nothing"
+_PROVISIONAL_KEY = "provisional"
+_TIERS_KEY = "tiers"
+_BAD_SKU_KEY = "bad_sku"
+_NO_BASELINE_KEY = "no_baseline"
 
 
 def _file(region: str, slug: str) -> str | None:
@@ -69,9 +74,9 @@ def pr_body(report: Sequence[str]) -> str:
         if not line.strip():
             continue
         if line == _NOTHING:
-            counts["nothing"] += 1
-        elif (m := _PROVISIONAL.fullmatch(line)) is not None:
-            counts["provisional"] += 1
+            counts[_NOTHING_KEY] += 1
+        elif _PROVISIONAL.fullmatch(line) is not None:
+            counts[_PROVISIONAL_KEY] += 1
         elif (m := _LINE.fullmatch(line)) is None or (
             path := _file(m["region"], m["slug"])
         ) is None:
@@ -83,22 +88,22 @@ def pr_body(report: Sequence[str]) -> str:
         elif (hit := _VARIATION.fullmatch(m["msg"])) and is_sku(hit["sku"]):
             varied.append(f"- `{path}`: `{hit['sku']}` faixa {hit['tier']}")
         elif (hit := _TIERS_CHANGED.fullmatch(m["msg"])) and is_sku(hit["sku"]):
-            counts["tiers"] += 1
+            counts[_TIERS_KEY] += 1
         elif m["msg"] == _BAD_SKU:
-            counts["bad_sku"] += 1
+            counts[_BAD_SKU_KEY] += 1
         elif m["msg"] == _NO_BASELINE:
-            counts["no_baseline"] += 1
+            counts[_NO_BASELINE_KEY] += 1
         else:
             counts[_OUTSIDE] += 1
 
     others = []
-    if counts["nothing"]:
+    if counts[_NOTHING_KEY]:
         others.append("Nenhum serviço com consulta: nada foi gravado.")
     for key, label in (
-        ("tiers", "faixas mudaram"),
-        ("no_baseline", "sem comparação"),
-        ("provisional", "serviço provisório"),
-        ("bad_sku", "SKU novo fora do formato"),
+        (_TIERS_KEY, "faixas mudaram"),
+        (_NO_BASELINE_KEY, "sem comparação"),
+        (_PROVISIONAL_KEY, "serviço provisório"),
+        (_BAD_SKU_KEY, "SKU novo fora do formato"),
         (_OUTSIDE, _OUTSIDE),
     ):
         if counts[key]:
