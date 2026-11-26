@@ -49,6 +49,8 @@ Nenhum segredo vai em código nem em variável commitada.
 - `design_document.py` — modelos Pydantic do documento do design, equivalentes ao schema zod do `web/`.
 - `contracts.py` — leitor de `contracts/blocks.json` e `contracts/edges.json` (`load_contracts()`, `get_contracts()`).
 - `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade. `designs/` segue `router` → `service` → `repository`, com `schemas.py` (entradas e saídas) e `errors.py` (`DesignError` e subclasses, com status e `detail` fixos). A `DesignRoute`, em `designs/router.py`, converte `DesignError` em problem details. `quotas/` também segue `router` → `service.py` → `repository.py`. Os demais têm só `router.py` (handlers que respondem 501) e `schemas.py` (`account/` não tem schemas); seguirão o mesmo desenho quando as rotas forem implementadas.
+- `estimates/prompt.py` — system prompt fixo, JSON Schema da saída e `build_plan()`, que monta a mensagem para a LLM. Puro: sem rede, SDK nem AWS.
+- `estimates/revalidation.py` — `revalidate()`, que trata a saída da LLM como entrada hostil e monta o resultado do zero. Puro.
 - `designs/schemas.py` também guarda `MAX_DOC_BYTES` (350.000) e `doc_size_bytes()`, que mede o `doc` em bytes UTF-8 do JSON compacto.
 
 ## Documento do design e contratos
@@ -73,7 +75,32 @@ Nenhum segredo vai em código nem em variável commitada.
 1. ao lado de `app/` — no zip da Lambda, `/var/task/contracts/`;
 2. um nível acima — a raiz do repositório, no desenvolvimento e nos testes (`api/app/contracts.py` → `contracts/`).
 
-Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **o zip precisa levar `contracts/blocks.json` e `contracts/edges.json` na raiz, ao lado de `app/`**. O `scripts/build-functions.sh` (#22, PR #218) copia esses dois arquivos, e só eles, para `contracts/` na raiz do zip (#242); exemplos e cenários ficam de fora, e arquivo ausente derruba o build. `api/tests/test_package.py` trava isso: roda o script e confere o conteúdo do zip e que `app.contracts` carrega do pacote extraído. Se o zip sair sem eles, `get_contracts()` levanta `RuntimeError` na Lambda (falha fechada: arquivo ausente, cortado ou fora do contrato nunca vira contrato vazio). Nenhuma rota chama `get_contracts()` ainda; as primeiras são as de estimativa (#61, #62).
+Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **o zip precisa levar `contracts/blocks.json` e `contracts/edges.json` na raiz, ao lado de `app/`**. O `scripts/build-functions.sh` da #22 (PR #218) hoje copia só `app/` e as dependências: enquanto ele não copiar `contracts/`, `get_contracts()` levanta `RuntimeError` na Lambda (falha fechada: arquivo ausente, cortado ou fora do contrato nunca vira contrato vazio). Nenhuma rota chama `get_contracts()` ainda; as primeiras são as de estimativa (#61, #62).
+
+## Estimativa de uso: pedido e revalidação
+
+`estimates/prompt.py` e `estimates/revalidation.py` preparam a chamada à Claude API e conferem a resposta. O cliente (`claude_client.py`) e as variáveis `LLM_*` chegam na #283.
+
+**O que vai para a LLM.** O `SYSTEM_PROMPT` constante e uma mensagem com duas seções: `<usage_catalog>` (dado confiável, de `contracts/`: chaves de uso com unidade, mínimo, máximo e se é inteiro) e `<input_data>` (dado do usuário: descrição, blocos com tipo e atributos, arestas). Blocos e arestas são citados pela posição `n`, nunca pelo id. Não vão região, rótulo, nome do design, `sub` nem e-mail. Atributo só vai se a chave e o valor forem do contrato; bloco de tipo fora do contrato não vai. O JSON sai compacto, com `<` e `>` escapados, para o texto do usuário não fechar o delimitador. `MAX_TOKENS` fixa o teto da saída em 4.096.
+
+**Saída pedida** (`output_schema()`): `key` é um `enum` com as chaves do contrato, `value` é número e não há campo de texto livre.
+
+```json
+{"blocks": [{"n": 0, "values": [{"key": "requestsPerMonth", "value": 1200000}]}],
+ "edges":  [{"n": 0, "values": [{"key": "gbPerMonth", "value": 12.5}]}]}
+```
+
+**Revalidação** (`revalidate()` devolve um `ItemUsage(id, values, source)` por bloco e por aresta, na ordem de entrada):
+
+- `n` fora do diagrama, não inteiro ou booleano: item descartado.
+- Chave que o tipo do bloco ou o kind da aresta não aceita: descartada.
+- Valor que não é número (inclui booleano, `NaN` e infinito): descartado, e a chave recebe o padrão do contrato.
+- Número fora da faixa: limitado a `min`/`max`; chave inteira é arredondada depois do limite.
+- Chave ou `n` repetido: vale a primeira ocorrência.
+- `source` é `llm` se ao menos um valor do item foi aceito; senão `default`, com todos os padrões.
+- Raiz fora de `{"blocks": [...], "edges": [...]}`: `ValueError`, e nada da resposta é usado.
+
+Nenhum texto livre da LLM chega ao resultado: ele só tem ids do diagrama, chaves do contrato e números dentro da faixa.
 
 ## Rotas
 
