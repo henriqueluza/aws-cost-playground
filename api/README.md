@@ -30,6 +30,8 @@ Os testes usam `moto` para o DynamoDB; não precisam de credenciais AWS. Os de q
 | `TABLE_NAME` | sim | Nome da tabela única do DynamoDB (3 a 255 caracteres). Sem ela, a função falha ao iniciar. |
 | `LOG_LEVEL` | não | `DEBUG`, `INFO` (padrão), `WARNING` ou `ERROR`. Vale só para os loggers `app.*`. |
 | `LLM_ENABLED` | não | Booleano, padrão `false`. Falha fechada: sem ela nenhuma estimativa é autorizada. Valor fora de booleano impede a função de subir. |
+| `LLM_MODEL` | não | Id do modelo da Claude API: `claude-` seguido de 1 a 60 caracteres entre `a-z`, `0-9` e `-` (padrão `claude-haiku-5-5`). Trocar o modelo muda o custo por chamada: é decisão de custo do autor (ADR). |
+| `ANTHROPIC_API_KEY_PARAMETER` | não | NOME do parâmetro do SSM que guarda a chave da Anthropic, nunca o valor: começa com `/` e tem até 255 caracteres entre letras, dígitos, `/`, `_`, `.` e `-`. Sem ele, a estimativa falha com `unavailable`. |
 | `QUOTA_USER_DAILY_LIMIT` | não | Estimativas por usuário por dia: inteiro de 1 a 100 (padrão 20). |
 | `QUOTA_GLOBAL_DAILY_LIMIT` | não | Estimativas por dia somando todos os usuários: inteiro de 1 a 1.000 (padrão 300). |
 
@@ -51,6 +53,7 @@ Nenhum segredo vai em código nem em variável commitada.
 - `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade. `designs/` segue `router` → `service` → `repository`, com `schemas.py` (entradas e saídas) e `errors.py` (`DesignError` e subclasses, com status e `detail` fixos). A `DesignRoute`, em `designs/router.py`, converte `DesignError` em problem details. `quotas/` também segue `router` → `service.py` → `repository.py`. Os demais têm só `router.py` (handlers que respondem 501) e `schemas.py` (`account/` não tem schemas); seguirão o mesmo desenho quando as rotas forem implementadas.
 - `estimates/prompt.py` — system prompt fixo, JSON Schema da saída e `build_plan()`, que monta a mensagem para a LLM. Puro: sem rede, SDK nem AWS.
 - `estimates/revalidation.py` — `revalidate()`, que trata a saída da LLM como entrada hostil e monta o resultado do zero. Puro.
+- `estimates/claude_client.py` — `ClaudeClient` (`prepare()` e `estimate()`), `EstimateError`, `UsageEstimate` e `get_claude_client()`. Único ponto que chama o SSM e a Claude API.
 - `designs/schemas.py` também guarda `MAX_DOC_BYTES` (350.000) e `doc_size_bytes()`, que mede o `doc` em bytes UTF-8 do JSON compacto.
 
 ## Documento do design e contratos
@@ -79,7 +82,7 @@ Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **
 
 ## Estimativa de uso: pedido e revalidação
 
-`estimates/prompt.py` e `estimates/revalidation.py` preparam a chamada à Claude API e conferem a resposta. O cliente (`claude_client.py`) e as variáveis `LLM_*` chegam na #283.
+`estimates/prompt.py` e `estimates/revalidation.py` preparam a chamada à Claude API e conferem a resposta. O cliente que faz a chamada está em `claude_client.py` (próxima subseção). A rota `POST /estimates` ainda responde 501: quem a liga ao cliente é a #62.
 
 **O que vai para a LLM.** O `SYSTEM_PROMPT` constante e uma mensagem com duas seções: `<usage_catalog>` (dado confiável, de `contracts/`: chaves de uso com unidade, mínimo, máximo e se é inteiro) e `<input_data>` (dado do usuário: descrição, blocos com tipo e atributos, arestas). Blocos e arestas são citados pela posição `n`, nunca pelo id. Não vão região, rótulo, nome do design, `sub` nem e-mail. Atributo só vai se a chave e o valor forem do contrato; bloco de tipo fora do contrato não vai. O JSON sai compacto, com `<` e `>` escapados, para o texto do usuário não fechar o delimitador. `MAX_TOKENS` fixa o teto da saída em 4.096.
 
@@ -101,6 +104,33 @@ Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **
 - Raiz fora de `{"blocks": [...], "edges": [...]}`: `ValueError`, e nada da resposta é usado.
 
 Nenhum texto livre da LLM chega ao resultado: ele só tem ids do diagrama, chaves do contrato e números dentro da faixa.
+
+### Cliente da Claude API
+
+`get_claude_client()` devolve o `ClaudeClient` do processo, configurado por `LLM_ENABLED`, `LLM_MODEL` e `ANTHROPIC_API_KEY_PARAMETER`. O uso tem dois passos:
+
+1. `prepare(body)` roda antes de consumir quota: confere o interruptor e o tamanho e devolve um `EstimatePlan`. Não lê a chave nem usa a rede.
+2. `estimate(plan)` roda depois da quota: faz uma chamada à API e devolve um `UsageEstimate` (`blocks` e `edges` revalidados, mais `input_tokens` e `output_tokens`). Plano sem nada a estimar (só padrões) volta sem chamada e sem custo.
+
+Toda falha é um `EstimateError` com `code` e mensagem fixos; os tokens vêm preenchidos quando a chamada foi paga.
+
+| `code` | Quando |
+|---|---|
+| `disabled` | `LLM_ENABLED=false` (em `prepare`). |
+| `too_large` | O diagrama não vira plano, ou a saída esperada passa de `MAX_TOKENS` (em `prepare`). |
+| `unavailable` | Parâmetro do SSM sem nome, ausente ou ilegível; chave vazia; falha de conexão; 400, 401, 402, 403, 404 ou 413 da API. |
+| `timeout` | A API não respondeu no prazo. |
+| `rate_limited` | 429 da API. |
+| `overloaded` | 5xx da API, inclusive 529. |
+| `refused` | A LLM recusou (`stop_reason` `refusal`). |
+| `truncated` | A saída bateu em `max_tokens`; resposta parcial nunca é usada. |
+| `invalid_output` | Outro `stop_reason` que não `end_turn`, ou saída que não é JSON ou não passa na revalidação. |
+
+- **Chamada.** Modelo de `LLM_MODEL`, `max_tokens` 4.096, thinking desligado, esforço `low` e saída em `json_schema`.
+- **Prazo.** `LLM_TIMEOUT`: 20 s de leitura e 3 s de conexão, abaixo dos 29 s da Lambda, que ainda precisa do início a frio, do SSM (até 5 s) e da quota.
+- **Sem nova tentativa.** `LLM_MAX_RETRIES=0` (o padrão do SDK é 2): uma segunda chamada depois de um timeout não cabe nos 29 s, e repetir sozinho multiplicaria o custo de uma estimativa que já consumiu quota.
+- **Chave.** Lida do SSM com `WithDecryption` na primeira chamada de cada execução fria e mantida só dentro do cliente do SDK. Um 401 descarta o cliente, e a chamada seguinte relê o SSM (chave trocada ou revogada). A chave não aparece em log, erro nem `repr`.
+- **Log.** Cada falha grava só `llm estimate failed` (WARNING) com `error_type` igual ao `code`: nada da descrição, do diagrama, da AWS nem da Anthropic.
 
 ## Rotas
 
