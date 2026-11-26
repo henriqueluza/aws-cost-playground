@@ -33,7 +33,8 @@ class FunctionsRuntimeTest(unittest.TestCase):
 
     def test_build_targets_the_runtime_version_and_architecture(self) -> None:
         self.assertEqual(module_values("architectures"), ['["arm64"]'])
-        script = (ROOT / "scripts/build-functions.sh").read_text(encoding="utf-8")
+        lines = (ROOT / "scripts/build-functions.sh").read_text(encoding="utf-8").splitlines()
+        script = "\n".join(line for line in lines if not line.lstrip().startswith("#"))
         self.assertIn(f"--python-platform {PLATFORMS['arm64']} ", script)
         # A versão não é escrita no script: sai do mesmo arquivo que o runtime acompanha.
         self.assertIn('--python-version "$(tr -d \'[:space:]\' < "$root/api/.python-version")"', script)
