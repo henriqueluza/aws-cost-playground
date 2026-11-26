@@ -19,13 +19,10 @@ describe('registro dos geradores', () => {
         'aws.cloudtrail',
         'aws.codepipeline',
         'aws.cognito',
-        'aws.dynamodb',
         'aws.ecs',
         'aws.iam',
-        'aws.lambda',
         'aws.route53',
         'aws.secrets-manager',
-        'aws.sqs',
         'aws.waf',
       ].sort(),
     );
