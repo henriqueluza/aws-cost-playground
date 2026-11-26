@@ -210,8 +210,3 @@ class DesignDocument(ContractModel):
             # Um `ValidationError` levantado aqui mantém o `loc` de cada erro (prefixado por fora).
             raise ValidationError.from_exception_data(type(self).__name__, issues)
         return self
-
-
-def doc_size_bytes(doc: DesignDocument) -> int:
-    """Bytes UTF-8 do JSON compacto do documento, como o `sizeBytes` do ADR."""
-    return len(doc.model_dump_json(by_alias=True, exclude_none=True).encode())
