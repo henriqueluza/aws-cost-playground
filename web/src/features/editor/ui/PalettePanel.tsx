@@ -108,22 +108,24 @@ export function PalettePanel() {
             title="Nenhum bloco encontrado"
             description={`Nada na paleta combina com a busca, entre os ${TOTAL} blocos.`}
             action={
-              <Button variant="secondary" onClick={() => onSearch('')}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  onSearch('');
+                  searchRef.current?.querySelector('input')?.focus();
+                }}
+              >
                 Limpar busca
               </Button>
             }
           />
         ) : (
           groups.map((group) => (
-            <section
-              key={group.id}
-              aria-labelledby={`${hintId}-${group.id}`}
-              className={palette.group}
-            >
+            <div key={group.id} className={palette.group}>
               <h3 id={`${hintId}-${group.id}`} className={palette.groupTitle}>
                 {group.label}
               </h3>
-              <ul className={palette.list}>
+              <ul className={palette.list} aria-labelledby={`${hintId}-${group.id}`}>
                 {group.items.map((item) => (
                   <li key={item.type}>
                     <button
@@ -134,7 +136,7 @@ export function PalettePanel() {
                       draggable
                       tabIndex={item.type === tabStop ? 0 : -1}
                       title={item.hint}
-                      aria-describedby={`${hintId}-dica`}
+                      aria-describedby={item.type === tabStop ? `${hintId}-dica` : undefined}
                       onFocus={() => setCurrent(item.type)}
                       onClick={() => add(item)}
                       onKeyDown={onItemKey}
@@ -152,7 +154,7 @@ export function PalettePanel() {
                   </li>
                 ))}
               </ul>
-            </section>
+            </div>
           ))
         )}
       </div>

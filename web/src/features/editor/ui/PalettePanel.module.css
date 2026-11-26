@@ -57,22 +57,25 @@
   line-height: var(--lh-body);
   font-weight: var(--fw-semibold);
   text-align: start;
-  cursor: grab;
+  cursor: pointer;
   transition:
     background-color var(--t-hover) var(--ease-out),
     transform var(--t-press) var(--ease-out);
 }
 
-.item:hover {
-  background-color: var(--active);
+.item:active {
+  transform: scale(0.98);
 }
 
-.item:active {
-  cursor: grabbing;
+@media (hover: hover) {
+  .item:hover {
+    background-color: var(--active);
+  }
 }
 
 /* Só o item que está por cima do canvas, durante o arrasto, ganha sombra. */
 .item[data-dragging] {
+  cursor: grabbing;
   background-color: var(--surface);
   box-shadow: var(--shadow-tip);
 }

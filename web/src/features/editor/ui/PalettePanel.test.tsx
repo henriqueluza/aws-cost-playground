@@ -5,7 +5,7 @@ import contract from '../../../../../contracts/blocks.json';
 import { expectNoAxeViolations } from '../../../test/axe';
 import { designStore } from '../hooks/designStore';
 import { EMPTY_STATE } from '../model/editorState';
-import { BLOCK_DRAG_MIME } from '../model/palette';
+import { BLOCK_DRAG_MIME, dropBlock } from '../model/palette';
 import { PalettePanel } from './PalettePanel';
 
 afterEach(() => designStore.setState(EMPTY_STATE));
@@ -23,7 +23,7 @@ describe('PalettePanel', () => {
       'Segurança',
       'Operação',
     ]);
-    const group = screen.getByRole('region', { name: 'Computação' });
+    const group = screen.getByRole('list', { name: 'Computação' });
     expect(
       within(group)
         .getAllByRole('button')
@@ -48,6 +48,7 @@ describe('PalettePanel', () => {
     await user.type(screen.getByLabelText('Buscar bloco'), 'zzz');
     expect(screen.getByRole('heading', { name: 'Nenhum bloco encontrado' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Limpar busca' }));
+    expect(screen.getByLabelText('Buscar bloco')).toHaveFocus();
     expect(screen.getAllByRole('button')).toHaveLength(20);
   });
 
@@ -98,6 +99,19 @@ describe('PalettePanel', () => {
     Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
     item.dispatchEvent(event);
     expect(data).toEqual({ [BLOCK_DRAG_MIME]: 'aws.s3' });
+  });
+
+  it('o soltar no canvas, com o contrato de dropBlock, adiciona o bloco na posição', () => {
+    const state = designStore.getState();
+    const dataTransfer = { types: [BLOCK_DRAG_MIME], getData: () => 'aws.lambda' };
+    expect(dropBlock(dataTransfer, { x: 300, y: 200 }, state.addBlock)).toBe(true);
+    const { document, layout } = designStore.getState();
+    expect(document.blocks).toHaveLength(1);
+    expect(document.blocks[0]).toMatchObject({
+      type: 'aws.lambda',
+      attributes: { architecture: 'arm64' },
+    });
+    expect(layout[document.blocks[0]?.id ?? '']).toEqual({ x: 300, y: 200 });
   });
 
   it('não tem violação de acessibilidade', async () => {
