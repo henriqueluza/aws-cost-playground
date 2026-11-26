@@ -10,6 +10,7 @@ import { adrExampleDesign } from '../../../test/designFixtures';
 import { designStore } from '../hooks/designStore';
 import { DESIGN_FILE_NAME, parseDesignFile } from '../model/designFile';
 import { EMPTY_STATE } from '../model/editorState';
+import { hasUnsavedChanges } from '../model/unsaved';
 import { ActionBar } from './ActionBar';
 
 const contracts = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../contracts');
@@ -176,6 +177,17 @@ describe('Baixar JSON', () => {
     expect(text).not.toContain('data:');
     await waitFor(() => expect(revoked).toEqual(['blob:test/1']));
     expect(document.querySelector('a[download]')).toBeNull();
+  });
+
+  it('baixar zera o aviso de alteração não salva', async () => {
+    designStore.setState({ ...CLEAN_EMPTY, document: adr });
+    expect(
+      hasUnsavedChanges(designStore.getState().document, designStore.getState().baseline),
+    ).toBe(true);
+    renderBar();
+    await userEvent.click(screen.getByRole('button', { name: 'Baixar JSON' }));
+    const { document: doc, baseline } = designStore.getState();
+    expect(hasUnsavedChanges(doc, baseline)).toBe(false);
   });
 
   it('ida e volta: o que foi baixado abre como o mesmo design', async () => {

@@ -38,8 +38,10 @@ export type DesignActions = {
   replaceDocument(doc: DesignDocument): Result<void>;
   /** Troca o design inteiro pelo template inicial (PRD F5); o confirmar antes é de quem chama. */
   newDesign(): void;
+  /** Marca o documento atual como salvo (baixado): zera o aviso de alteração pendente. */
+  markSaved(): void;
 };
-/** `baseline`: o último documento carregado ou salvo; a comparação com ele diz se há alteração pendente. */
+/** `baseline`: o último documento carregado ou salvo (`markSaved`, depois de baixar); a comparação com ele diz se há alteração pendente. */
 export type DesignStoreState = EditorState & DesignActions & { readonly baseline: DesignDocument };
 export type DesignStore = StoreApi<DesignStoreState>;
 
@@ -132,6 +134,7 @@ export function createDesignStore(
           ...prune(s, replaced),
           baseline: replaced,
         })),
+      markSaved: () => set({ baseline: get().document }),
       newDesign: () => {
         const template = referenceDesign();
         set({ document: template, baseline: template, layout: referenceLayout(), selection: null });

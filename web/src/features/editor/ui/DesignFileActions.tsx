@@ -28,6 +28,7 @@ function useDownload() {
     const text = serializeDesign(document);
     if (text === null) return setError('too-large');
     saveTextFile(text, DESIGN_FILE_NAME, DESIGN_FILE_MIME);
+    designStore.getState().markSaved();
   };
   return { download, error, clear: () => setError(null) };
 }

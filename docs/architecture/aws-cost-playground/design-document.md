@@ -42,7 +42,7 @@ Totais mensais do template com as sementes de preço de 2026-11-25: us-east-1 US
 
 ## Estado "não salvo" no editor
 
-A store guarda `baseline`, o último documento carregado (`loadDesign`, `replaceDocument`) ou o template. Há alteração não salva quando `document` difere do `baseline` por igualdade estrutural (`model/unsaved.ts`); posição de bloco e seleção não contam, porque não estão no documento. "Novo design" (`newDesign`) pede confirmação só nesse caso.
+A store guarda `baseline`, o último documento carregado (`loadDesign`, `replaceDocument`), baixado (`markSaved`, só depois de "Baixar JSON" bem-sucedido) ou o template. Há alteração não salva quando `document` difere do `baseline` por igualdade estrutural (`model/unsaved.ts`); posição de bloco e seleção não contam, porque não estão no documento. "Novo design" (`newDesign`) pede confirmação só nesse caso.
 
 ## Evolução
 
