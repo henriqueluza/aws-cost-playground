@@ -47,6 +47,8 @@ export function WorkloadPanel(): ReactElement {
   const reason = blockedReason({ blocks: document.blocks.length, description, locked: lock });
   const disabled = loading || reason !== null;
   const showFailure = run.failure !== null && run.failure.kind !== 'sign-in';
+  // A frase da trava (429) já está no aviso; repetir abaixo do botão seria ruído.
+  const hint = showFailure && lock === run.failure ? null : reason;
   const mustSignIn = !signedIn || run.failure?.kind === 'sign-in';
 
   const signIn = () => {
@@ -95,9 +97,7 @@ export function WorkloadPanel(): ReactElement {
             message="Entre na sua conta para estimar a carga com a LLM. Sem entrar, o editor continua calculando com os valores que você definir."
           />
           <div>
-            <Button variant="primary" onClick={signIn}>
-              Entrar
-            </Button>
+            <Button onClick={signIn}>Entrar</Button>
           </div>
           {signInFailed ? <Notice tone="negative" message={SIGN_IN_ERROR} /> : null}
         </div>
@@ -107,7 +107,7 @@ export function WorkloadPanel(): ReactElement {
             <Button
               variant="primary"
               aria-disabled={disabled}
-              aria-describedby={reason ? `${hintId}-why` : undefined}
+              aria-describedby={hint ? `${hintId}-why` : undefined}
               onClick={() => {
                 if (!disabled) void estimate();
               }}
@@ -118,9 +118,9 @@ export function WorkloadPanel(): ReactElement {
               <span className={styles.pill}>Estimativa desatualizada</span>
             ) : null}
           </div>
-          {reason ? (
+          {hint ? (
             <p id={`${hintId}-why`} className={styles.hint}>
-              {reason}
+              {hint}
             </p>
           ) : null}
           {run.quota ? (
