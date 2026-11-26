@@ -16,18 +16,13 @@ describe('registro dos geradores', () => {
     expect([...PROVISIONAL_BLOCK_TYPES].sort()).toEqual(
       [
         'aws.cloudformation',
-        'aws.cloudfront',
         'aws.cloudtrail',
         'aws.codepipeline',
         'aws.cognito',
-        'aws.dynamodb',
         'aws.ecs',
         'aws.iam',
-        'aws.lambda',
         'aws.route53',
-        'aws.s3',
         'aws.secrets-manager',
-        'aws.sqs',
         'aws.waf',
       ].sort(),
     );

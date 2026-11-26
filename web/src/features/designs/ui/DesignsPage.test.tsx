@@ -13,7 +13,7 @@ import { failingApi, newApi, renderWithApp } from './testUtils';
 const doc = adrExampleDesign as unknown as DesignDocument;
 
 afterEach(() => {
-  designStore.setState(EMPTY_STATE);
+  designStore.setState({ ...EMPTY_STATE, baseline: EMPTY_STATE.document });
   savedDesignStore.setState({ saved: null, saving: false, error: null });
 });
 
@@ -91,6 +91,7 @@ describe('DesignsPage', () => {
     const api = newApi();
     await seed(api, 'Loja v1');
     act(() => void designStore.getState().loadDesign(doc));
+    act(() => void designStore.getState().setRegion('sa-east-1')); // alteração além do carregado
     const user = userEvent.setup();
     const { router } = renderWithApp(api, <DesignsPage />);
     await user.click(await screen.findByRole('button', { name: 'Abrir Loja v1' }));
