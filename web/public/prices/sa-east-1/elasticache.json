@@ -3,5 +3,182 @@
   "service": "elasticache",
   "region": "sa-east-1",
   "currency": "USD",
-  "prices": []
+  "prices": [
+    {
+      "sku": "elasticache-memcached-cache.m5.large",
+      "description": "Nó cache.m5.large (Memcached)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.223"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-memcached-cache.r5.large",
+      "description": "Nó cache.r5.large (Memcached)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.432"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-memcached-cache.t3.medium",
+      "description": "Nó cache.t3.medium (Memcached)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.128"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-memcached-cache.t3.micro",
+      "description": "Nó cache.t3.micro (Memcached)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.032"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-memcached-cache.t3.small",
+      "description": "Nó cache.t3.small (Memcached)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.064"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-memcached-cache.t4g.medium",
+      "description": "Nó cache.t4g.medium (Memcached)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.122"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-memcached-cache.t4g.micro",
+      "description": "Nó cache.t4g.micro (Memcached)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.03"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-memcached-cache.t4g.small",
+      "description": "Nó cache.t4g.small (Memcached)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.061"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-redis-cache.m5.large",
+      "description": "Nó cache.m5.large (Redis OSS)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.223"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-redis-cache.r5.large",
+      "description": "Nó cache.r5.large (Redis OSS)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.432"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-redis-cache.t3.medium",
+      "description": "Nó cache.t3.medium (Redis OSS)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.128"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-redis-cache.t3.micro",
+      "description": "Nó cache.t3.micro (Redis OSS)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.032"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-redis-cache.t3.small",
+      "description": "Nó cache.t3.small (Redis OSS)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.064"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-redis-cache.t4g.medium",
+      "description": "Nó cache.t4g.medium (Redis OSS)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.122"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-redis-cache.t4g.micro",
+      "description": "Nó cache.t4g.micro (Redis OSS)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.03"
+        }
+      ]
+    },
+    {
+      "sku": "elasticache-redis-cache.t4g.small",
+      "description": "Nó cache.t4g.small (Redis OSS)",
+      "unit": "node-hour",
+      "tiers": [
+        {
+          "upTo": null,
+          "unitPrice": "0.061"
+        }
+      ]
+    }
+  ]
 }
