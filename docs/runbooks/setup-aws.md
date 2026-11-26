@@ -158,7 +158,7 @@ Antes do bootstrap, de [guardrails de custo](guardrails-de-custo.md) só vale a 
    aws iam list-roles --query "Roles[?starts_with(RoleName, 'acp-ci-')].RoleName" --output text
    ```
 
-   Como conferir: `acp-ci-plan`, `acp-ci-apply-staging` e `acp-ci-apply-production`. Depois da #125, também o papel `prices`.
+   Como conferir: `acp-ci-plan`, `acp-ci-apply-staging`, `acp-ci-apply-production` e `acp-ci-prices`.
 
 6. Confira o limite de permissões (`infra/bootstrap/boundary.tf`).
 
@@ -174,7 +174,7 @@ Antes do bootstrap, de [guardrails de custo](guardrails-de-custo.md) só vale a 
    terraform -chdir=infra/bootstrap output -json github_variables | jq 'keys'
    ```
 
-   Como conferir: `AWS_PLAN_ROLE_ARN`, `TF_STATE_BUCKET_PRODUCTION` e `TF_STATE_BUCKET_STAGING`. A saída `github_environment_variables` tem as chaves `staging` e `production`, cada uma com `AWS_APPLY_ROLE_ARN`.
+   Como conferir: `AWS_PLAN_ROLE_ARN`, `AWS_PRICES_ROLE_ARN`, `TF_STATE_BUCKET_PRODUCTION` e `TF_STATE_BUCKET_STAGING`. A saída `github_environment_variables` tem as chaves `staging` e `production`, cada uma com `AWS_APPLY_ROLE_ARN`.
 
 8. Guarde uma cópia de `infra/bootstrap/terraform.tfstate` fora do repositório, em local cifrado, e apague o `bootstrap.tfplan`. O arquivo de estado não tem segredo, mas tem o id da conta e os ARNs.
 
@@ -410,7 +410,7 @@ O catálogo versionado em `web/public/prices/` é a semente. O gerador (`pricing
 
 ### O que existe hoje em `main`
 
-O workflow semanal ainda não existe em `.github/workflows/` (#222 e #29 abertas), e o papel `prices` também não (#125). Até lá, o caminho é rodar o gerador na sua máquina, com a sua sessão da AWS (`pricing/README.md`, "Resumo do PR e publicação do catálogo").
+O workflow semanal ainda não existe em `.github/workflows/` (#222 e #29 abertas), e a variável `AWS_PRICES_ROLE_ARN` só vale quando ele existir. Até lá, o caminho é rodar o gerador na sua máquina, com a sua sessão da AWS (`pricing/README.md`, "Resumo do PR e publicação do catálogo").
 
 1. Na raiz do repositório, com `HEAD` igual a `origin/main` e a árvore limpa, instale as dependências.
 
@@ -452,9 +452,9 @@ O workflow semanal ainda não existe em `.github/workflows/` (#222 e #29 abertas
 
 ### O que passa a valer quando o workflow entrar (#222 e #125)
 
-Ainda não está em `main`: confirme os nomes no arquivo do workflow e em `infra/bootstrap/README.md` quando as duas Issues fecharem, e atualize esta seção.
+Ainda não está em `main`: confirme os nomes no arquivo do workflow e em `infra/bootstrap/README.md` quando a #222 fechar, e atualize esta seção.
 
-1. Reaplique o bootstrap (passo 3) para criar o papel `prices` e cadastre a variável que o workflow ler. O nome previsto na #222 é `AWS_PRICES_ROLE_ARN`. Sem ela, o workflow deve terminar com aviso e sem falhar.
+1. O papel `prices` já sai do bootstrap (#125, passo 3). Cadastre a variável que o workflow ler: o nome previsto na #222 é `AWS_PRICES_ROLE_ARN`, saída `github_variables`. Sem ela, o workflow deve terminar com aviso e sem falhar.
 2. Ligue "Allow GitHub Actions to create and approve pull requests" em Settings → Actions → General. Sem isso a criação do PR falha (`scripts/prices-pr.sh`, mensagem de erro de `create_pr`).
 3. Dispare o workflow à mão em `main` e espere o PR de `prices/catalogo`.
 4. O PR aberto pelo `GITHUB_TOKEN` não dispara os workflows de `pull_request`: feche e reabra o PR para o CI rodar (`pricing/README.md`).
