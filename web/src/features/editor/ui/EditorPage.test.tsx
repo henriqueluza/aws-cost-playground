@@ -98,9 +98,9 @@ describe.each([
     const paleta = screen.getByRole('complementary', { name: 'Paleta' });
     expect(within(paleta).getByRole('heading', { name: 'Paleta' })).toBeVisible();
     expect(within(screen.getByRole('main')).getByRole('heading', { name: 'Canvas' })).toBeVisible();
-    const tabs = within(screen.getByRole('tablist', { name: 'Custo, bloco e carga' })).getAllByRole(
-      'tab',
-    );
+    const tabs = within(
+      screen.getByRole('tablist', { name: 'Custo, bloco, carga e exportação' }),
+    ).getAllByRole('tab');
     expect(tabs.map((t) => t.textContent)).toEqual(['Custo', 'Bloco', 'Carga', 'Exportar']);
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
     expect(
@@ -209,12 +209,16 @@ describe('EditorPage e a largura em runtime', () => {
 
   it('alterna entre largo e estreito ao disparar change', () => {
     const { media } = renderPage(true);
-    expect(screen.getByRole('tablist', { name: 'Custo, bloco e carga' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Custo, bloco, carga e exportação' }),
+    ).toBeInTheDocument();
     media.set(false);
     expect(screen.queryByRole('tablist')).toBeNull();
     expect(screen.getByRole('main')).toBeInTheDocument();
     media.set(true);
-    expect(screen.getByRole('tablist', { name: 'Custo, bloco e carga' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Custo, bloco, carga e exportação' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('banner')).toBeInTheDocument();
   });
 });

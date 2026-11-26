@@ -12,6 +12,7 @@ import { exportDesign } from '../application/exportDesign';
 import { hcl, renderHcl } from '../model/hcl';
 import { design, relabel } from './generatorHarness';
 import { INJECTION_PAYLOADS } from './injectionPayloads';
+import { levelBcDesign } from './levelBcDesign';
 
 /**
  * Conferência com o binário `terraform`, fora do `npm test`. Local e opcional:
@@ -50,6 +51,8 @@ const SCENARIOS = {
   appClassico,
   pipelineDeFilas,
   serverlessOnly,
+  levelBcDesign,
+  nivelBcComRotulosHostis: relabel(levelBcDesign, INJECTION_PAYLOADS[0]?.[1] ?? ''),
   pipelineComRotulosHostis: relabel(pipelineDeFilas, INJECTION_PAYLOADS[0]?.[1] ?? ''),
   apiComInterpolacaoNosRotulos: relabel(apiServerless, INJECTION_PAYLOADS[1]?.[1] ?? ''),
 };

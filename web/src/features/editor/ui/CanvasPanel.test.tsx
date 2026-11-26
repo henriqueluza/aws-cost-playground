@@ -130,6 +130,26 @@ describe('CanvasPanel', () => {
     zoom.fitView.mockClear();
     fireEvent.click(within(tools).getByRole('button', { name: 'Ajustar à tela' }));
     expect(zoom.fitView).toHaveBeenCalledTimes(1);
+    // O ajuste desconta a legenda e os controles: recuo em px de cada lado, e o zoom mostra tudo.
+    expect(zoom.fitView).toHaveBeenCalledWith(
+      expect.objectContaining({
+        minZoom: expect.any(Number),
+        maxZoom: 1,
+        duration: 0,
+        padding: {
+          top: expect.stringMatching(/^\d+px$/),
+          right: expect.stringMatching(/^\d+px$/),
+          bottom: expect.stringMatching(/^\d+px$/),
+          left: expect.stringMatching(/^\d+px$/),
+        },
+      }),
+    );
+  });
+
+  it('a legenda e os controles ficam marcados como obstáculos do ajuste', async () => {
+    const { container } = renderCanvas();
+    await screen.findByRole('group', { name: 'Zoom do diagrama' });
+    expect(container.querySelectorAll('[data-fit-obstacle]')).toHaveLength(2);
   });
 
   it('com o design vazio, orienta e mantém só o client', async () => {

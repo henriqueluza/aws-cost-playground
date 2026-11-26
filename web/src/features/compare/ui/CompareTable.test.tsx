@@ -87,4 +87,23 @@ describe('CompareTable e SummaryStrip', () => {
     expect(container.querySelector('img')).toBeNull();
     expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
   });
+
+  it('a faixa separa fixo e variável por hachura, na mesma escala dos dois lados, e sem texto extra', () => {
+    const cmp = compareEstimates(
+      estimateOf([block('aws.ec2', '60', '40')]),
+      estimateOf([block('aws.ec2', '10', '10')]),
+    );
+    const { container } = render(<SummaryStrip comparison={cmp} />);
+    const svgs = container.querySelectorAll('div[aria-hidden="true"] svg');
+    expect(svgs).toHaveLength(2);
+    // A: 100 (largura toda), 60% sólido; B: 20 de 100 (20%), metade sólida.
+    const [a, b] = Array.from(svgs).map((svg) => svg.querySelectorAll('rect'));
+    expect(a![0]).toHaveAttribute('width', '100%');
+    expect(a![1]).toHaveAttribute('width', '60%');
+    expect(b![0]).toHaveAttribute('width', '20%');
+    expect(b![1]).toHaveAttribute('width', '10%');
+    expect(svgs[0]!.querySelector('pattern')).not.toBeNull();
+    expect(screen.getByRole('group', { name: 'Fixo' }).querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('group', { name: 'Variável' }).querySelector('pattern')).not.toBeNull();
+  });
 });

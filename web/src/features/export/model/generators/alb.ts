@@ -1,5 +1,6 @@
 import type { BlockGenerator, ExportBlock } from '../generator';
 import { hcl, type HclNode } from '../hcl';
+import { ecsClusterOf } from './links';
 import { APP_PORT, VPC_ID, securityGroupId, subnetIds, withNetwork } from './network';
 
 const resource = (type: string, name: string, body: readonly HclNode[]): HclNode =>
@@ -86,12 +87,18 @@ export const alb: BlockGenerator = (input) => {
       ),
     ]),
     ...targets(input.links).map((peer, i) =>
-      resource('aws_lb_target_group_attachment', `${block.name}_${i + 1}`, [
-        hcl.attr('count', hcl.number(peer.usage.instanceCount ?? 1)),
-        hcl.attr('target_group_arn', arn('aws_lb_target_group')),
-        hcl.attr('target_id', hcl.ref('aws_instance', peer.name, hcl.countIndex, 'id')),
-        hcl.attr('port', hcl.number(APP_PORT)),
-      ]),
+      // EC2 que hospeda um cluster ECS é um Auto Scaling group: o grupo inteiro entra no destino.
+      ecsClusterOf(input.designLinks.get(peer.id) ?? [])
+        ? resource('aws_autoscaling_attachment', `${block.name}_${i + 1}`, [
+            hcl.attr('autoscaling_group_name', hcl.ref('aws_autoscaling_group', peer.name, 'name')),
+            hcl.attr('lb_target_group_arn', arn('aws_lb_target_group')),
+          ])
+        : resource('aws_lb_target_group_attachment', `${block.name}_${i + 1}`, [
+            hcl.attr('count', hcl.number(peer.usage.instanceCount ?? 1)),
+            hcl.attr('target_group_arn', arn('aws_lb_target_group')),
+            hcl.attr('target_id', hcl.ref('aws_instance', peer.name, hcl.countIndex, 'id')),
+            hcl.attr('port', hcl.number(APP_PORT)),
+          ]),
     ),
   ]);
 };

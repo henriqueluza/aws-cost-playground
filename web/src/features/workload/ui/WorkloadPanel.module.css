@@ -1,0 +1,98 @@
+/* DESIGN.md: aba "Carga" da coluna direita. Só tokens; pílula e linha de capacidade como nos Estados. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  padding: 0 var(--space-1) var(--space-4) 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-semibold);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.counter {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: calc(var(--space-2) * -1);
+}
+
+.hint,
+.count,
+.quotaText {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+}
+
+.count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.count[data-full='true'] {
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* `aria-disabled` mantém o foco e a dica; o visual é o do botão desabilitado do Button. */
+.actions button[aria-disabled='true'] {
+  background-color: var(--raised);
+  border-color: var(--border);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: var(--pill-height);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background-color: var(--pill-warning-bg);
+  box-shadow: inset 0 0 0 var(--border-width) var(--pill-warning-border);
+  color: var(--pill-warning-ink);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+
+.status {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+}
+.status:empty {
+  display: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

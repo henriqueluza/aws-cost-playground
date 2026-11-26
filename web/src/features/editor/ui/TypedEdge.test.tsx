@@ -10,19 +10,19 @@ import { STROKE_CLASS, TypedEdge } from './TypedEdge';
 const css = readFileSync('src/features/editor/ui/CanvasPanel.module.css', 'utf8');
 const KINDS: EdgeKind[] = ['data', 'runs-on', 'logs'];
 
-function draw(kind: EdgeKind, selected = false) {
+function draw(kind: EdgeKind, selected = false, route?: { centerX: number }, targetX = 200) {
   const props = {
     id: 'edg_1',
     source: 'a',
     target: 'b',
     sourceX: 0,
     sourceY: 0,
-    targetX: 200,
+    targetX,
     targetY: 80,
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     selected,
-    data: { kind },
+    data: { kind, route },
   } as unknown as ComponentProps<typeof TypedEdge>;
   return render(
     <ReactFlowProvider>
@@ -32,6 +32,29 @@ function draw(kind: EdgeKind, selected = false) {
     </ReactFlowProvider>,
   );
 }
+
+describe('TypedEdge: corredor próprio', () => {
+  it('o trecho vertical passa no x do corredor planejado, não no meio', () => {
+    const vertical = (route?: { centerX: number }) =>
+      draw('data', false, route)
+        .container.querySelector('path.react-flow__edge-path')
+        ?.getAttribute('d');
+    expect(vertical()).toContain('100');
+    expect(vertical({ centerX: 30 })).toContain('L 30,');
+    expect(vertical({ centerX: 30 })).not.toBe(vertical());
+  });
+
+  it('em corredor estreito (menos de 40 px) o trecho vertical ainda cai na faixa, sem zigue-zague', () => {
+    const d =
+      draw('data', false, { centerX: 12 }, 28)
+        .container.querySelector('path.react-flow__edge-path')
+        ?.getAttribute('d') ?? '';
+    const xs = [...d.matchAll(/(-?\d+(?:\.\d+)?),/g)].map((m) => Number(m[1]));
+    expect(xs).toContain(12);
+    // monótono: o traçado só anda para a direita
+    expect(xs.every((x, i) => i === 0 || x >= xs[i - 1]!)).toBe(true);
+  });
+});
 
 describe('TypedEdge: o traçado diz o tipo', () => {
   it.each(KINDS)('%s desenha o caminho com a classe do tipo', (kind) => {

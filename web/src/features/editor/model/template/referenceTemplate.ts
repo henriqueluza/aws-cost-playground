@@ -6,21 +6,24 @@ import {
 import type { Layout } from '../editorState';
 import referenceTemplate from '../../../../../../contracts/templates/reference.json';
 
-/** Passo entre colunas e entre linhas do diagrama, em px (o bloco tem 216 de largura). */
-const STEP = { x: 248, y: 112 } as const;
+/** Início (x) de cada coluna, em px: o bloco tem 216 de largura. */
+const COLUMN_X = [0, 268, 520, 788, 1052] as const;
+/** Passo entre linhas, em px: o bloco tem 94 de altura. */
+const ROW = 104;
 
 /**
- * Coluna e linha de cada nó: camadas da esquerda para a direita (CDN e DNS, borda e balanceador, aplicação,
- * dados e operação, saída e logs). Meia linha de diferença abre passagem às arestas
- * entre dois blocos da mesma coluna.
+ * Coluna e linha de cada nó: camadas da esquerda para a direita (CDN e DNS, borda e balanceador,
+ * aplicação, dados e operação, saída e logs). Toda aresta liga colunas vizinhas. Os corredores entre
+ * colunas têm de 36 a 52 px; os mais largos são os que recebem mais linhas (5 saindo do ECS).
+ * As linhas são tão juntas quanto o bloco permite, porque o diagrama inteiro tem de caber no canvas.
  */
 const GRID: Readonly<Record<string, readonly [column: number, row: number]>> = {
   blk_cdn: [0, 1.5],
-  blk_route53: [0, 4],
+  blk_route53: [0, 4.5],
   [CLIENT_NODE_ID]: [1, 0],
-  blk_waf: [1, 1.25],
-  blk_assets: [1, 2.5],
-  blk_alb: [1, 4],
+  blk_waf: [1, 1.2],
+  blk_assets: [1, 2.4],
+  blk_alb: [1, 3.8],
   blk_ecs: [2, 2],
   blk_lambda: [2, 5.5],
   blk_ec2: [3, 0],
@@ -35,7 +38,7 @@ const GRID: Readonly<Record<string, readonly [column: number, row: number]>> = {
   blk_stack: [3, 9],
   blk_iam: [3, 10],
   blk_nat: [4, 0],
-  blk_logs: [4, 6],
+  blk_logs: [4, 5.5],
 };
 
 /**
@@ -52,7 +55,7 @@ export function referenceLayout(): Layout {
   return Object.fromEntries(
     Object.entries(GRID).map(([id, [column, row]]) => [
       id,
-      { x: column * STEP.x, y: row * STEP.y },
+      { x: COLUMN_X[column] ?? 0, y: row * ROW },
     ]),
   );
 }
