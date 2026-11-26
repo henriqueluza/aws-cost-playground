@@ -51,6 +51,13 @@ Um arquivo por serviço e região, em `public/prices/<region>/<service>.json`.
 | `freeTier`             | Opcional. `quantity` decimal por mês; `pool` (slug, opcional) junta SKUs que dividem a mesma franquia |
 | `minimumQuantity`      | Opcional. Quantidade mínima cobrada                                                                   |
 
+Como o motor interpreta (detalhe em [cost-estimate.md](cost-estimate.md#algoritmo)):
+
+- **`freeTier`:** abatida da quantidade do mês, antes das faixas, uma vez por conta (design inteiro). Dois blocos do mesmo SKU dividem uma franquia só.
+- **`pool`:** o nome vale para o catálogo inteiro, entre serviços. Todos os SKUs de um pool dividem a mesma franquia; quem gera o catálogo deve declarar a mesma `quantity` em todos eles (se divergirem, o motor usa a menor).
+- **`minimumQuantity`:** quantidade maior que zero e menor que o mínimo é cobrada como o mínimo; zero não cobra mínimo. Aplica-se antes da franquia.
+- **`tiers`:** aplicadas sobre a quantidade já sem franquia, com `upTo` cumulativo e inclusivo; a posição nas faixas é da conta, então o volume de blocos do mesmo SKU se soma.
+
 ## Manifest
 
 `public/prices/manifest.json` diz de onde vieram os preços, quando, e o hash de cada arquivo.
@@ -117,5 +124,5 @@ A porta lança `CatalogError` para `network`, `missing` e `too-large`; o carrega
 ## Fora do escopo
 
 - Hook com TanStack Query (#174).
-- Calcular custo com o catálogo (`PriceCatalog` é só o que o motor recebe).
+- Calcular custo com o catálogo: é o motor, em [cost-estimate.md](cost-estimate.md) (`PriceCatalog` é só o que ele recebe).
 - Gerar os arquivos: `pricing/` deve emitir este formato e o hash de cada arquivo no manifest.

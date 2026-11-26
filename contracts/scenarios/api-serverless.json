@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "region": "us-east-1",
+  "workload": {
+    "description": "API REST serverless com site estático: 10 milhões de chamadas de API por mês atrás do CloudFront, função Lambda de 512 MB (arm64) com 120 ms de duração média, tabela DynamoDB on-demand com 20 milhões de leituras, 5 milhões de escritas e 50 GB, site estático de 5 GB no S3 e 300 GB por mês entregues à internet."
+  },
+  "blocks": [
+    {
+      "id": "blk_cdn", "type": "aws.cloudfront", "label": "CDN",
+      "attributes": {},
+      "usage": {"source": "default", "values": {"requestsPerMonth": 12000000}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_site", "type": "aws.s3", "label": "Site estático",
+      "attributes": {"storageClass": "STANDARD"},
+      "usage": {"source": "default", "values": {"storageGb": 5, "putRequestsPerMonth": 2000, "getRequestsPerMonth": 500000}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_api", "type": "aws.lambda", "label": "API",
+      "attributes": {"architecture": "arm64", "memoryMb": 512},
+      "usage": {"source": "default", "values": {"requestsPerMonth": 10000000, "avgDurationMs": 120}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_table", "type": "aws.dynamodb", "label": "Tabela da API",
+      "attributes": {"capacityMode": "on-demand"},
+      "usage": {"source": "default", "values": {"readRequestsPerMonth": 20000000, "writeRequestsPerMonth": 5000000, "storageGb": 50, "provisionedReadUnits": 0, "provisionedWriteUnits": 0}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_logs", "type": "aws.cloudwatch", "label": "Logs e métricas",
+      "attributes": {},
+      "usage": {"source": "default", "values": {"logsIngestedGbPerMonth": 0, "logsStoredGb": 3, "customMetrics": 20, "alarms": 15}},
+      "overrides": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edg_cdn_client", "source": "blk_cdn", "target": "client", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 300}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_cdn_site", "source": "blk_cdn", "target": "blk_site", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 50}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_cdn_api", "source": "blk_cdn", "target": "blk_api", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 40}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_api_table", "source": "blk_api", "target": "blk_table", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 30}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_api_logs", "source": "blk_api", "target": "blk_logs", "kind": "logs",
+      "usage": {"source": "default", "values": {"gbPerMonth": 20}},
+      "overrides": {}
+    }
+  ],
+  "scenarios": []
+}

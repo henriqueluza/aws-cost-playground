@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "region": "us-east-1",
+  "workload": {
+    "description": "Aplicação web clássica em três camadas: CloudFront na frente de um ALB com duas instâncias EC2 t3.medium em zonas diferentes (a e b), RDS PostgreSQL db.t3.medium Multi-AZ com 100 GB, ElastiCache Redis com dois nós cache.t3.small, saída para a internet por um NAT Gateway, arquivos de 100 GB no S3, 500 GB por mês entregues pelo CloudFront e 50 GB baixados direto do S3."
+  },
+  "blocks": [
+    {
+      "id": "blk_cdn", "type": "aws.cloudfront", "label": "CDN",
+      "attributes": {},
+      "usage": {"source": "default", "values": {"requestsPerMonth": 20000000}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_assets", "type": "aws.s3", "label": "Arquivos",
+      "attributes": {"storageClass": "STANDARD"},
+      "usage": {"source": "default", "values": {"storageGb": 100, "putRequestsPerMonth": 50000, "getRequestsPerMonth": 2000000}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_alb", "type": "aws.alb", "label": "Balanceador",
+      "attributes": {},
+      "usage": {"source": "default", "values": {"newConnectionsPerSecond": 10, "activeConnectionsPerMinute": 600, "processedGbPerMonth": 365, "ruleEvaluationsPerSecond": 0}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_web_a", "type": "aws.ec2", "label": "Web (zona a)",
+      "attributes": {"instanceType": "t3.medium", "az": "a"},
+      "usage": {"source": "default", "values": {"instanceCount": 1, "hoursPerMonth": 730, "rootVolumeGb": 30}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_web_b", "type": "aws.ec2", "label": "Web (zona b)",
+      "attributes": {"instanceType": "t3.medium", "az": "b"},
+      "usage": {"source": "default", "values": {"instanceCount": 1, "hoursPerMonth": 730, "rootVolumeGb": 30}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_db", "type": "aws.rds", "label": "Banco",
+      "attributes": {"engine": "postgres", "instanceClass": "db.t3.medium", "deployment": "multi-az", "az": "a"},
+      "usage": {"source": "default", "values": {"storageGb": 100, "backupStorageGb": 0}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_cache", "type": "aws.elasticache", "label": "Cache",
+      "attributes": {"engine": "redis", "nodeType": "cache.t3.small", "az": "a"},
+      "usage": {"source": "default", "values": {"nodeCount": 2}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_nat", "type": "aws.nat-gateway", "label": "Saída para a internet",
+      "attributes": {},
+      "usage": {"source": "default", "values": {"processedGbPerMonth": 0}},
+      "overrides": {}
+    },
+    {
+      "id": "blk_logs", "type": "aws.cloudwatch", "label": "Logs e métricas",
+      "attributes": {},
+      "usage": {"source": "default", "values": {"logsIngestedGbPerMonth": 0, "logsStoredGb": 6, "customMetrics": 20, "alarms": 15}},
+      "overrides": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edg_cdn_client", "source": "blk_cdn", "target": "client", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 500}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_assets_client", "source": "blk_assets", "target": "client", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 50}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_cdn_assets", "source": "blk_cdn", "target": "blk_assets", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 150}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_cdn_alb", "source": "blk_cdn", "target": "blk_alb", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 365}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_alb_web_a", "source": "blk_alb", "target": "blk_web_a", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 182.5}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_alb_web_b", "source": "blk_alb", "target": "blk_web_b", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 182.5}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_web_a_db", "source": "blk_web_a", "target": "blk_db", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 30}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_web_b_db", "source": "blk_web_b", "target": "blk_db", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 30}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_web_a_cache", "source": "blk_web_a", "target": "blk_cache", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 10}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_web_b_cache", "source": "blk_web_b", "target": "blk_cache", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 10}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_web_a_nat", "source": "blk_web_a", "target": "blk_nat", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 25}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_web_b_nat", "source": "blk_web_b", "target": "blk_nat", "kind": "data",
+      "usage": {"source": "default", "values": {"gbPerMonth": 25}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_web_a_logs", "source": "blk_web_a", "target": "blk_logs", "kind": "logs",
+      "usage": {"source": "default", "values": {"gbPerMonth": 15}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_web_b_logs", "source": "blk_web_b", "target": "blk_logs", "kind": "logs",
+      "usage": {"source": "default", "values": {"gbPerMonth": 15}},
+      "overrides": {}
+    },
+    {
+      "id": "edg_db_logs", "source": "blk_db", "target": "blk_logs", "kind": "logs",
+      "usage": {"source": "default", "values": {"gbPerMonth": 10}},
+      "overrides": {}
+    }
+  ],
+  "scenarios": []
+}
