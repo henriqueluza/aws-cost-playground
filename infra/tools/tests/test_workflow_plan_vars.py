@@ -58,6 +58,14 @@ class PlanVariablesTest(unittest.TestCase):
     def test_job_is_still_skipped_without_the_plan_role(self) -> None:
         self.assertRegex(WORKFLOW, r"(?m)^    if: vars\.AWS_PLAN_ROLE_ARN != '' && ")
 
+    def test_readme_tells_the_author_what_to_register(self) -> None:
+        readme = (ROOT / "infra" / "README.md").read_text(encoding="utf-8")
+        section = readme.split("## Variáveis do job plan\n", 1)[1].split("\n## ", 1)[0]
+        for name in re.findall(r"(?:vars|secrets)\.(TF_VAR_\w+)", WORKFLOW):
+            self.assertIn(f"`{name}`", section)
+        self.assertIn("gh secret set TF_VAR_ALARM_EMAIL", section)
+
+
 
 if __name__ == "__main__":
     unittest.main()
