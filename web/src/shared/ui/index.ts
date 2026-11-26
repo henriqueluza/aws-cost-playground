@@ -11,3 +11,4 @@ export { Notice, type NoticeProps, type NoticeTone } from './Notice';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { ToastProvider, useToast } from './Toast';
 export type { ToastApi, ToastProviderProps } from './Toast';
+export { Dialog, type DialogProps } from './Dialog';
