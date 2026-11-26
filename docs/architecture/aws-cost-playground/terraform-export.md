@@ -123,6 +123,33 @@ Regras normativas; o revisor recusa o que fugir delas.
 5. Versões fixadas iguais às de `infra/`: Terraform `~> 1.16.0` e provider AWS `~> 6.73`. A região vem da variável `aws_region`, com o padrão tirado do design, e o provider leva `default_tags`.
 6. Saída determinística: nada de data, valor aleatório ou ordem de inserção de `Map` vinda do usuário.
 
+## Blocos sem VPC: S3 e CloudFront (#65)
+
+Geradores em `model/generators/s3.ts` e `cloudfront.ts`.
+
+### S3
+
+- **Recursos:** `aws_s3_bucket` (com `bucket_prefix` derivado do nome, até 36 caracteres; o provider completa com sufixo único), `aws_s3_bucket_public_access_block`, `aws_s3_bucket_ownership_controls`, `aws_s3_bucket_server_side_encryption_configuration`, `data "aws_iam_policy_document"` e `aws_s3_bucket_policy`. Com `storageClass = STANDARD_IA`, também `aws_s3_bucket_lifecycle_configuration` com transição para Standard-IA aos 30 dias.
+- **Do design:** só o atributo `storageClass`. O uso mensal não vira recurso.
+- **Padrões seguros:** os quatro bloqueios de acesso público ligados, ACLs desligadas (`BucketOwnerEnforced`), criptografia AES256 e política que nega `s3:*` no bucket e nos objetos quando a chamada não usa TLS.
+- **Aresta `data` CloudFront → S3:** a política do bucket ganha uma declaração que libera `s3:GetObject` nos objetos só para `cloudfront.amazonaws.com`, condicionada a `AWS:SourceArn` igual ao ARN da distribuição. Uma declaração por distribuição ligada.
+- **Sem aresta:** o bucket fica só com a negação sem TLS.
+
+### CloudFront
+
+- **Recursos:** `aws_cloudfront_distribution`, `data "aws_cloudfront_cache_policy"` (`Managed-CachingOptimized`) e, com bucket ligado, `aws_cloudfront_origin_access_control` (`s3`, `always`, `sigv4`).
+- **Do design:** nada. O bloco não tem atributos.
+- **Padrões seguros:** `redirect-to-https`, métodos `GET` e `HEAD`, certificado padrão do CloudFront, sem restrição geográfica.
+- **Aresta `data` CloudFront → S3:** cada bucket ligado vira uma origem privada na distribuição, lida pelo Origin Access Control. O comportamento padrão aponta para a primeira origem e a distribuição ganha `default_root_object = "index.html"`.
+- **Sem aresta:** a origem é o domínio informado em `var.<nome>__origin_domain` (variável sem padrão), só HTTPS e TLS 1.2.
+
+### Limites assumidos
+
+- Versionamento não é ligado: o design não o descreve e ele muda o custo.
+- Com o certificado padrão do CloudFront a AWS fixa o TLS mínimo do visitante. Exigir `TLSv1.2_2021` pede certificado próprio.
+- Origem que não é S3 (Lambda, ALB) não é gerada.
+- Uso mensal não vira recurso.
+
 ## Como conferir
 
 - **Testes do vitest** (`hcl.test.ts`, `names.test.ts`): rodam no `npm test` e no CI. Incluem a bateria de cargas de injeção (`test/injectionPayloads.ts`) em valor, chave, comentário e nome.
