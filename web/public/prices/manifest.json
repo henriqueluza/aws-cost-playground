@@ -41,7 +41,7 @@
     },
     {
       "path": "sa-east-1/lambda.json",
-      "sha256": "f7919645416ab139c4670e0b7f97d6fc1cd9fc95fce8bdab2a5e800457d493ae"
+      "sha256": "d6df1e15662b0f044ab60528dc0e5b59aea6f3a4a91f5af7c3837f811dd8727a"
     },
     {
       "path": "sa-east-1/nat-gateway.json",
@@ -109,7 +109,7 @@
     },
     {
       "path": "us-east-1/lambda.json",
-      "sha256": "96315ae074e8347a1c80191496efa739e9f566a4020e4b05d3d3e2ed9a747a4b"
+      "sha256": "5f64e54721d321d572115bd9e1dfbe5c924145c3572b77dc719c0584a760ad73"
     },
     {
       "path": "us-east-1/nat-gateway.json",
