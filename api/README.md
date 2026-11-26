@@ -37,12 +37,45 @@ Nenhum segredo vai em código nem em variável commitada.
 - `main.py` — composition root: `create_app()` e o `handler` da Lambda.
 - `config.py` — `Settings`, lidas só do ambiente.
 - `auth.py` — identidade do usuário.
+- `errors.py` — erros no formato problem details (`install_error_handlers`).
+- `logs.py` — logs JSON, id da requisição e `RequestLogMiddleware`.
 - `dynamo.py` — acesso à tabela única (`get_table()`).
 - `designs/`, `estimates/`, `quotas/`, `account/` — um pacote por funcionalidade (ainda vazios). Cada um segue `router` → `service` → repositório.
 
 ## Identidade
 
 A identidade vem só do claim `sub` do JWT, já validado pelo authorizer do API Gateway. `app/auth.py` é o único ponto que a lê (`CurrentUserId`, dependência do FastAPI), a partir do evento da Lambda; a API não lê o token nem cabeçalhos. Sem `sub` válido, responde 401. O `sub` aceita só `[A-Za-z0-9-]`, para não quebrar a chave `USER#<sub>`.
+
+## Erros
+
+Toda resposta de erro segue o problem details (RFC 9457), com `Content-Type: application/problem+json`, e sai de um handler único (`app/errors.py`) para `HTTPException`, erro de validação e exceção não tratada:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "...",
+  "requestId": "<id da requisição>"
+}
+```
+
+- `detail` é opcional e some quando repetiria o `title`.
+- No 422, `errors` lista só `loc` e `msg` de cada campo inválido. `input`, `ctx` e `url` ficam de fora, porque ecoariam o que o usuário enviou.
+- O 401 do `auth.py` usa o mesmo formato.
+- O 500 não tem `detail`: a mensagem da exceção nunca vai para o cliente.
+
+## Logs
+
+Uma linha JSON por registro, em stdout (`app/logs.py`). Campos fixos: `timestamp`, `level`, `logger`, `message` e `request_id`. Campos extras só entram se estiverem na allowlist `ALLOWED_FIELDS`: `method`, `route`, `status`, `duration_ms`, `error_type` e `stack`. Qualquer outro é descartado.
+
+- Nunca vão para o log cabeçalhos, corpo, query string nem e-mail.
+- `route` é o template da rota (`/designs/{design_id}`), nunca o path cru, que pode trazer dado pessoal. Sem rota casada (404), vale `<unmatched>`.
+- O `RequestLogMiddleware` (ASGI puro, camada mais externa) grava uma linha `request` por requisição. O id vem do `aws_request_id` da Lambda, com `uuid4` de fallback.
+- Toda exceção não tratada gera uma linha `app.error` (nível ERROR) no middleware, com `error_type` e `stack`. O `stack` traz só arquivo, linha e função de cada frame, sem a mensagem nem o texto da linha. Vale também para falha depois de a resposta começar.
+- `exc_info` é sempre descartado, inclusive em `logger.exception` de bibliotecas.
+- O mesmo id aparece como `requestId` no corpo do erro e como `request_id` no log: é a chave para correlacionar a resposta com o registro.
+- O logger `mangum` fica em WARNING, para a linha de acesso ser só a do middleware.
 
 ## Lint de arquitetura
 
