@@ -46,6 +46,19 @@ SCANNER_IGNORES = {
     ("modules/site/cloudfront.tf", "AVD-AWS-0011"),
     ("modules/site/s3.tf", "AVD-AWS-0132"),
 }
+# Rotas do API Gateway revistas (#73 e #375) e a função de destino. Rota nova muda esta lista.
+# Só o `llm-proxy` lê a chave da LLM e grava a quota; designs e conta vão para a `api`.
+REVIEWED_ROUTES = {
+    "POST /estimates": "llm-proxy",
+    "GET /quota": "llm-proxy",
+    "DELETE /me": "api",
+    "GET /designs": "api",
+    "POST /designs": "api",
+    "GET /designs/{design_id}": "api",
+    "PATCH /designs/{design_id}": "api",
+    "DELETE /designs/{design_id}": "api",
+    "POST /designs/{design_id}/duplicate": "api",
+}
 # Tudo que guarda dado ou identidade (ADR, "Travas contra destruição").
 PROTECTED = {
     "modules/database/main.tf": "aws_dynamodb_table",
@@ -97,6 +110,20 @@ def block(raw: str, header: str) -> str:
         if depth == 0:
             return raw[start:index]
     raise AssertionError(f"bloco `{header}` não fecha")
+
+
+def route_keys(env_main: str) -> list[str]:
+    """Chaves do `routes` passado ao módulo `http_api`, na ordem do arquivo."""
+    routes = block(block(env_main, r'module "http_api"'), r"routes\s*=")
+    return re.findall(r'(?m)^\s*"([A-Z]+ /[^"]*)"\s*=', routes)
+
+
+def route_target(module_main: str, key: str) -> str:
+    """Destino da rota pela mesma expressão que o módulo usa (`local.route_target`)."""
+    match = re.search(r'can\(regex\("([^"]+)", key\)\) \? "llm-proxy" : "api"', module_main)
+    if match is None:
+        raise AssertionError("regra de destino das rotas não encontrada no módulo http-api")
+    return "llm-proxy" if re.search(match.group(1), key) else "api"
 
 
 def directives(headers: str) -> list[str]:
@@ -173,6 +200,22 @@ class ApiEdge(unittest.TestCase):
                 self.assertRegex(api, r"jwt_issuer\s*=\s*module\.auth\.issuer\n")
                 self.assertRegex(api, r"jwt_audience\s*=\s*\[module\.auth\.client_id\]\n")
                 self.assertRegex(api, r'"POST /estimates"\s*=\s*\{ throttle = var\.estimates_throttle \}')
+
+    def test_rotas_do_gateway_sao_as_revistas_e_cada_uma_vai_para_a_funcao_esperada(self) -> None:
+        module = code(read("modules/http-api/main.tf"))
+        for env in ENVS:
+            with self.subTest(env=env):
+                keys = route_keys(code(read(f"envs/{env}/main.tf")))
+                self.assertEqual(len(keys), len(set(keys)))
+                self.assertEqual(set(keys), set(REVIEWED_ROUTES))
+                self.assertEqual({k: route_target(module, k) for k in keys}, REVIEWED_ROUTES)
+
+    def test_extrator_de_rotas_ve_rota_nova_e_destino_trocado(self) -> None:
+        main = code(read("envs/staging/main.tf"))
+        hostile = main.replace('"DELETE /me"      = {}', '"DELETE /me"      = {}\n    "GET /admin" = {}')
+        self.assertIn("GET /admin", route_keys(hostile))
+        module = code(read("modules/http-api/main.tf")).replace("(estimates|quota)", "(estimates|quota|designs)")
+        self.assertEqual(route_target(module, "GET /designs"), "llm-proxy")
 
 
 class ModulesAndEnvs(unittest.TestCase):

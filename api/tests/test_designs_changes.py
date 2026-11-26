@@ -126,9 +126,12 @@ def test_atualizar_design_de_outro_usuario_e_404_sem_gravar_nem_criar(
 ) -> None:
     of_a = create(app, "de A")
     before = stored(table)
+    # Versão certa ou errada, a resposta é a de inexistente: 409 diria que o id existe (#375).
     for body in (
         {"expectedVersion": 1, "name": "invasor"},
         {"expectedVersion": 1, "doc": edited_doc()},
+        {"expectedVersion": 2, "name": "invasor"},
+        {"expectedVersion": 9, "doc": edited_doc()},
     ):
         assert call(app, "PATCH", f"/designs/{of_a['id']}", body, sub=USER_B) == (404, NOT_FOUND)
     assert stored(table) == before  # nem o item de A mudou, nem nasceu item na partição de B
