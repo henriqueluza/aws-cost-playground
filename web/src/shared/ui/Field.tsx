@@ -57,7 +57,7 @@ export function Field({ controlId, errorId, label, error, children }: FieldProps
       </label>
       {children}
       {error ? (
-        <p id={errorId} className={styles.error}>
+        <p id={errorId} className={styles.error} role="alert">
           {errorIcon}
           {error}
         </p>

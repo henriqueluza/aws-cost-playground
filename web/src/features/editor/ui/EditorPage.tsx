@@ -7,20 +7,35 @@ import { catalogStamp } from '../model/estimateNotice';
 import { ActionBar } from './ActionBar';
 import { CanvasPanel } from './CanvasPanel';
 import styles from './EditorPage.module.css';
+import { DownloadDesignButton } from './DesignFileActions';
 import { EstimateNotice } from './EstimateNotice';
 import { InspectorPanel } from './InspectorPanel';
 import { PalettePanel } from './PalettePanel';
 import { RailTabs } from './RailTabs';
 
-const RAIL_TABS = [
-  { id: 'cost', label: 'Custo', panel: <PricingPanel /> },
-  { id: 'block', label: 'Bloco', panel: <InspectorPanel /> },
-  { id: 'load', label: 'Carga', panel: <WorkloadPanel /> },
-] as const;
-
 export function EditorPage() {
   const wide = useMediaQuery('(min-width: 1024px)', true);
-  const stamp = catalogStamp(usePriceCatalog(useDesignStore((s) => s.document)));
+  const design = useDesignStore((s) => s.document);
+  const selection = useDesignStore((s) => s.selection);
+  const select = useDesignStore((s) => s.select);
+  const catalog = usePriceCatalog(design);
+  const stamp = catalogStamp(catalog);
+  const railTabs = [
+    {
+      id: 'cost',
+      label: 'Custo',
+      panel: (
+        <PricingPanel
+          design={design}
+          catalog={catalog}
+          selection={selection}
+          onSelect={(next) => void select(next)}
+        />
+      ),
+    },
+    { id: 'block', label: 'Bloco', panel: <InspectorPanel /> },
+    { id: 'load', label: 'Carga', panel: <WorkloadPanel /> },
+  ];
 
   if (!wide) {
     return (
@@ -28,6 +43,7 @@ export function EditorPage() {
         <h1>Editor</h1>
         <p>A edição precisa de uma tela com pelo menos 1024 px de largura.</p>
         <Link to="/designs">Meus designs</Link>
+        <DownloadDesignButton variant="tertiary" />
         <EstimateNotice stamp={stamp} />
       </main>
     );
@@ -46,7 +62,7 @@ export function EditorPage() {
         <CanvasPanel />
       </main>
       <aside aria-label="Painéis do design" className={styles.rail}>
-        <RailTabs label="Custo, bloco e carga" tabs={RAIL_TABS} />
+        <RailTabs label="Custo, bloco e carga" tabs={railTabs} />
         <EstimateNotice stamp={stamp} />
       </aside>
     </div>

@@ -72,7 +72,7 @@ Nenhum bloco some: sem gerador real, de tipo desconhecido ou com atributo fora d
 Regras normativas; o revisor recusa o que fugir delas.
 
 1. O gerador só devolve nós do construtor. Texto do usuário entra apenas por `hcl.string` ou `hcl.comment`. `hcl.ref` nunca recebe texto do usuário, exceto `block.name`. Se faltar algo ao construtor (por exemplo chamada de função), a mudança é no construtor, com teste; nunca texto cru.
-2. O recurso principal do bloco leva `block.name` como rótulo.
+2. O recurso principal do bloco leva `block.name` como rótulo. As chaves de `hcl.map` são constantes do gerador: não monte o objeto com chave vinda do design (`__proto__` perde o valor e chave numérica muda de ordem).
 3. Nenhum segredo no arquivo: nada de senha, chave ou token em literal nem em `default` de variável. Onde o recurso exige senha (RDS), use `manage_master_user_password = true` ou variável com `sensitive = true` e sem `default`. Segredo do Secrets Manager é criado sem valor.
 4. Seguro por padrão:
    - nada de `0.0.0.0/0` em regra de entrada de banco, cache ou administração;
