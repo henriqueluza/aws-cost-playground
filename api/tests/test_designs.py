@@ -308,7 +308,9 @@ AWS_TEXT = "User arn:aws:sts::123456789012:assumed-role/acp-api is not authorize
     ],
     ids=["throttle", "capacidade", "acesso-negado", "codigo-estranho", "rede", "parametro"],
 )
-@pytest.mark.parametrize("operation", ["query", "get_item", "put_item"])
+@pytest.mark.parametrize(
+    "operation", ["query", "get_item", "put_item", "update_item", "delete_item"]
+)
 def test_falha_do_dynamodb_vira_problema_de_mensagem_fixa(  # type: ignore[no-untyped-def]
     app, table, monkeypatch, capsys, operation, error, status, logged
 ) -> None:
@@ -324,6 +326,8 @@ def test_falha_do_dynamodb_vira_problema_de_mensagem_fixa(  # type: ignore[no-un
         "query": ("GET", "/designs", None),
         "get_item": ("GET", f"/designs/{design_id}", None),
         "put_item": ("POST", "/designs", body),
+        "update_item": ("PATCH", f"/designs/{design_id}", {"expectedVersion": 1, **body}),
+        "delete_item": ("DELETE", f"/designs/{design_id}", None),
     }[operation]
     got, problem = call(app, method, path, sent)
     title = "Service Unavailable" if status == 503 else "Internal Server Error"
@@ -394,15 +398,17 @@ def test_repositorio_recusa_id_fora_do_formato(design_id: str) -> None:
 
 
 def test_so_as_acoes_concedidas_ao_papel_da_funcao(app: FastAPI, table: Any) -> None:
-    """`infra/modules/functions/iam.tf`: sem Scan, UpdateItem nem TransactWriteItems."""
+    """`infra/modules/functions/iam.tf`: sem Scan nem TransactWriteItems."""
     used: set[str] = set()
     events = table.meta.client.meta.events
     events.register("before-call.dynamodb", lambda model, **_: used.add(model.name))
     design = create(app)
     call(app, "GET", f"/designs/{design['id']}")
     call(app, "GET", "/designs")
-    repository.delete(USER_A, design["id"])
-    assert used == {"Query", "PutItem", "GetItem", "DeleteItem"}
+    call(app, "PATCH", f"/designs/{design['id']}", {"expectedVersion": 1, "name": "n"})
+    call(app, "POST", f"/designs/{design['id']}/duplicate", {"name": "c"})
+    call(app, "DELETE", f"/designs/{design['id']}")
+    assert used == {"Query", "PutItem", "GetItem", "UpdateItem", "DeleteItem"}
 
 
 def test_store_failure_e_500_por_padrao() -> None:

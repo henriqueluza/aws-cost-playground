@@ -74,6 +74,9 @@ IMPLEMENTED = {
     ("GET", "/designs"): 200,
     ("POST", "/designs"): 201,
     ("GET", f"/designs/{DID}"): 404,
+    ("PATCH", f"/designs/{DID}"): 404,
+    ("DELETE", f"/designs/{DID}"): 204,
+    ("POST", f"/designs/{DID}/duplicate"): 404,
     (
         "POST",
         "/estimates",
@@ -152,7 +155,7 @@ def test_log_da_rota_nao_traz_dado_do_usuario(
     invoke(app, event("PATCH", f"/designs/{DID}", {"expectedVersion": 1, "name": "segredo"}))
     out = capsys.readouterr().out
     assert '"route": "/designs/{design_id}"' in out
-    assert '"status": 501' in out
+    assert '"status": 404' in out
     assert not any(leak in out for leak in (DID, SUB, "segredo"))
 
 
@@ -232,7 +235,8 @@ def test_design_com_101_blocos_responde_422(app: FastAPI) -> None:
     ("method", "path", "wrap", "accepted"),
     [
         ("POST", "/designs", lambda d: {"name": "n", "doc": d}, 201),
-        ("PATCH", f"/designs/{DID}", lambda d: {"expectedVersion": 1, "doc": d}, 501),
+        # Passa da validação e chega ao banco, onde `DID` não existe.
+        ("PATCH", f"/designs/{DID}", lambda d: {"expectedVersion": 1, "doc": d}, 404),
     ],
     ids=["POST", "PATCH"],
 )
