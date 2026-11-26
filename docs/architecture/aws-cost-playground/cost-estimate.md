@@ -3,7 +3,7 @@
 `estimate(design, catalog)` recebe um design já validado e o catálogo da região dele e devolve o custo mensal em USD. O painel de custo (#43) consome este resultado.
 
 - **Origem:** [ADR-0001](ADR-0001-stack.md). Formato do design em [design-document.md](design-document.md); do catálogo em [price-catalog.md](price-catalog.md).
-- **Onde mora:** `web/src/features/pricing/model/engine.ts` (função `estimate` e os tipos `CostEstimate`, `BlockCost`, `EdgeCost`, `CostLine`, `CostStatus` e `ChargeKind`). Importe pelo `index.ts` da feature. Se este texto e o código divergirem, vale o código.
+- **Onde mora:** `web/src/features/pricing/model/engine.ts` (função `estimate` e os tipos `CostEstimate`, `BlockCost`, `EdgeCost`, `CostLine`, `CostStatus`, `ChargeKind`, `CostNote`, `CostWarning` e `CostWarningCode`). Importe pelo `index.ts` da feature. Se este texto e o código divergirem, vale o código.
 - **Função pura:** não altera as entradas nem faz I/O.
 
 ## Campos
@@ -12,11 +12,13 @@
 | -------------- | ---------------------------- | ------------------------------------------------------------------------ |
 | `CostEstimate` | `total`, `fixed`, `variable` | Custo mensal do design                                                   |
 | `CostEstimate` | `blocks`, `edges`            | Um item por bloco e por aresta                                           |
+| `CostEstimate` | `warnings`                   | Avisos (`CostWarning`: `code` e `blockId`), na ordem de `design.blocks`  |
 | `BlockCost`    | `blockId`, `blockType`       | `Block.id` e `Block.type` do design                                      |
 | `EdgeCost`     | `edgeId`, `kind`             | `Edge.id` e tipo da aresta                                               |
 | item           | `status`                     | `priced` ou `unavailable` (`CostStatus`)                                 |
 | item           | `total`, `fixed`, `variable` | Custo mensal do item                                                     |
 | item           | `lines`                      | Cobranças (`CostLine`) que somam o item                                  |
+| `BlockCost`    | `note`                       | `CostNote`, só em bloco `priced` de custo zero; diz por que é zero       |
 | `CostLine`     | `sku`                        | SKU do catálogo (`Price.sku`)                                            |
 | `CostLine`     | `quantity`                   | Quantidade cobrada no mês, na unidade do SKU, já sem a franquia gratuita |
 | `CostLine`     | `unitPrice`, `amount`        | Preço de uma unidade e `quantity × unitPrice`, em USD por mês            |
@@ -67,7 +69,12 @@ Se uma cobrança do bloco não tem preço, o bloco inteiro sai `unavailable`. To
 
 ## Casos especiais
 
-- Bloco sem cobranças (nível C) sai `priced` com zero e sem linhas.
+- **Bloco de custo zero** (nível C: `aws.iam`, `aws.cloudformation`, `aws.ecs`) sai `priced`, com zero, sem linhas e com `note` dizendo o motivo. Vale com ou sem catálogo carregado: não depende de arquivo de preço (não existe arquivo para `iam`, `cloudformation` nem `ecs`). A função de preço vem de `zeroCostPricer` (`model/zeroCost.ts`), que carrega a regra `ZeroCostRule`.
+  - `no-direct-cost` (IAM e CloudFormation): a AWS não cobra pelos recursos que o produto modela. `note` é `{ kind: 'no-direct-cost' }`.
+  - `billed-on-host` (ECS): modo EC2; o custo está nas instâncias EC2 ligadas por `runs-on`. `note` é `{ kind: 'billed-on-host', hostBlockIds }`, com os ids dos hosts na ordem de `design.edges`, sem repetição. Só conta `runs-on` que parte do ECS e chega a um `aws.ec2`.
+  - ECS sem essa aresta não é erro: `hostBlockIds` vem vazio e `warnings` ganha `{ code: 'missing-runs-on', blockId }`.
+  - Fargate não é modelado (o PRD o lista em "blocos de expansão", fora do MVP).
+- `warnings` não depende do catálogo: o aviso sai mesmo com o bloco `unavailable` (por exemplo, região diferente da do catálogo).
 - Arestas saem `priced` com zero e sem linhas até a #42.
 - A classificação fixo/variável vem do `charge` de cada `BlockCharge`; `fixed` e `variable` do item somam as linhas de cada tipo.
 
