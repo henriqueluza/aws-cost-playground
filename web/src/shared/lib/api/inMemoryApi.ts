@@ -1,13 +1,7 @@
 import { z } from 'zod';
 import { designDocumentSchema, type DesignDocument } from '../design';
 import { ApiError, type ApiErrorKind } from './errors';
-import {
-  designNameSchema,
-  type AccountApi,
-  type Design,
-  type DesignSummary,
-  type DesignsApi,
-} from './ports';
+import { designNameSchema, type Api, type Design, type DesignSummary } from './ports';
 
 /**
  * Fake em memória de `DesignsApi` e `AccountApi`, para testes e para o modo de desenvolvimento.
@@ -25,6 +19,14 @@ export type InMemoryApiOptions = {
 
 /** A entrada chega como `unknown` em runtime: os tipos das portas não validam nada. */
 const createInputSchema = z.object({ name: designNameSchema, doc: designDocumentSchema });
+const updateInputSchema = z
+  .object({
+    expectedVersion: z.number().int().min(1),
+    name: designNameSchema.optional(),
+    doc: designDocumentSchema.optional(),
+  })
+  .refine((input) => input.name !== undefined || input.doc !== undefined);
+const duplicateInputSchema = z.object({ name: designNameSchema });
 
 const encoder = new TextEncoder();
 
@@ -73,13 +75,7 @@ function sequentialIds(): () => string {
   return () => String(++last).padStart(26, '0');
 }
 
-/** A continuação da #151 acrescenta `update` e `duplicate` e alarga `designs` para `DesignsApi`. */
-export type InMemoryApi = {
-  designs: Pick<DesignsApi, 'list' | 'get' | 'create' | 'remove'>;
-  account: AccountApi;
-};
-
-export function createInMemoryApi(options: InMemoryApiOptions): InMemoryApi {
+export function createInMemoryApi(options: InMemoryApiOptions): Pick<Api, 'designs' | 'account'> {
   const { maxDesigns, maxDocBytes, now = () => new Date(), newId = sequentialIds() } = options;
   const store = new Map<string, Design>();
 
@@ -121,6 +117,38 @@ export function createInMemoryApi(options: InMemoryApiOptions): InMemoryApi {
           updatedAt: timestamp,
           version: 1,
           doc,
+        });
+      },
+
+      async update(id, input) {
+        const { expectedVersion, name, doc } = parse(updateInputSchema, input);
+        const current = find(id);
+        if (expectedVersion !== current.version) fail('version-conflict');
+        const nextDoc = doc ?? current.doc;
+        const derived = derive(nextDoc);
+        if (derived.sizeBytes > maxDocBytes) fail('too-large');
+        return save({
+          ...current,
+          ...derived,
+          name: name ?? current.name,
+          updatedAt: now().toISOString(),
+          version: current.version + 1,
+          doc: nextDoc,
+        });
+      },
+
+      async duplicate(id, input) {
+        const { name } = parse(duplicateInputSchema, input);
+        const original = find(id);
+        if (store.size >= maxDesigns) fail('design-limit');
+        const timestamp = now().toISOString();
+        return save({
+          ...original,
+          id: newId(),
+          name,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          version: 1,
         });
       },
 
