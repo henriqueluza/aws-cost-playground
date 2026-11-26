@@ -7,7 +7,7 @@ As duas funções Lambda da API, os papéis IAM e os log groups, conforme o `doc
 | Funções | `acp-<stg\|prod>-api` (timeout 10 s) e `acp-<stg\|prod>-llm-proxy` (timeout 29 s), do mesmo pacote zip |
 | Runtime | Python 3.13, `arm64`, 256 MB fixos |
 | Logs | Formato JSON; um log group por função, criado pelo Terraform, com retenção por variável (padrão 7 dias; aceita 1, 3, 5, 7, 14 ou 30) |
-| Papéis IAM | Um por função, com o mesmo nome dela, políticas inline sem curinga em ação ou recurso e `prevent_destroy` |
+| Papéis IAM | Um por função, com o mesmo nome dela, políticas inline sem curinga em ação ou recurso, limite de permissões (`acp-ci-boundary-<env>`) e `prevent_destroy` |
 | Parâmetro da chave | `/acp/<env>/anthropic-api-key`. **Fora do Terraform:** o autor o cria à mão; o módulo só usa o nome |
 
 As tags vêm do `default_tags` do provider de cada ambiente.
@@ -69,6 +69,15 @@ Nenhum segredo vai em variável de ambiente.
 | `api` | `dynamodb:GetItem`, `PutItem`, `DeleteItem`, `Query` e `BatchWriteItem` na tabela, restritas por `dynamodb:LeadingKeys` às partições `USER#*`; `cognito-idp:AdminDeleteUser` no pool. Não lê o parâmetro |
 | `llm-proxy` | `dynamodb:GetItem` e `UpdateItem` na tabela (o `TransactWriteItems` da quota é autorizado pela ação `UpdateItem`); `ssm:GetParameter` só no parâmetro da chave |
 | Ambos | `logs:CreateLogStream` e `logs:PutLogEvents` só no próprio log group. Sem `logs:CreateLogGroup`: o Terraform já criou o grupo |
+
+## Limite de permissões
+
+Os dois papéis levam `permissions_boundary = arn:aws:iam::<conta>:policy/acp-ci-boundary-<staging|production>`. O sufixo é o nome completo do ambiente (igual a `local.apply_boundary_arn` em `infra/bootstrap/apply.tf`) e a conta sai de `table_arn`. Não há variável nova. Os papéis de CI `acp-ci-apply-<env>` negam `iam:CreateRole` e `iam:PutRolePolicy` em papel sem esse limite.
+
+- A política nasce no bootstrap (#166), não neste módulo. Ela precisa existir antes do primeiro `apply`; sem ela o `apply` falha com política inexistente ou `AccessDenied`.
+- O limite não concede nada: a permissão efetiva é a interseção entre as políticas inline e o limite.
+- Permissão nova numa função exige ajustar primeiro o limite no bootstrap e depois a lista do teste `politicas_inline_cabem_no_limite`. Ação fora do limite é negada em execução, sem erro no plano.
+- Pôr o limite num papel que já existe é alteração in-place (`iam:PutRolePermissionsBoundary`). O papel não é recriado, então o `prevent_destroy` não reprova o plano.
 
 ## Parâmetro da chave
 
