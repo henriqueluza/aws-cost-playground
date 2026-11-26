@@ -38,9 +38,9 @@ const INSTANCE_CLASSES = [
 ];
 const DEPLOYMENTS = ['single-az', 'multi-az'];
 
-/** Bloco padrão do contrato (postgres, db.t3.micro, single-az, 20 GB, backup adicional 20). */
+/** Bloco padrão do contrato (postgres, db.t3.micro, single-az, 20 GB, sem backup adicional). */
 const ATTRIBUTES = { engine: 'postgres', instanceClass: 'db.t3.micro', deployment: 'single-az' };
-const USAGE = { storageGb: 20, backupStorageGb: 20 };
+const USAGE = { storageGb: 20, backupStorageGb: 0 };
 const input = (
   attributes: Record<string, string> = {},
   usage: Record<string, number> = {},
@@ -105,16 +105,16 @@ describe('priceRds', () => {
     );
   });
 
-  it('bloco padrão custa 17,34 USD', () => {
-    // 730 × 0,018 = 13,14; 20 × 0,115 = 2,30; 20 × 0,095 = 1,90.
-    // Total: 13,14 + 2,30 + 1,90 = 17,34.
+  it('bloco padrão custa 15,44 USD, sem backup pago', () => {
+    // 730 × 0,018 = 13,14; 20 × 0,115 = 2,30; backup adicional 0.
+    // Total: 13,14 + 2,30 = 15,44.
     expect(rate(createRater(catalog), input())).toStrictEqual({
       lines: [
         'rds-postgres-db.t3.micro-single-az fixed 730.000000 13.140000',
         'rds-postgres-gp3-single-az fixed 20.000000 2.300000',
-        'rds-postgres-backup variable 20.000000 1.900000',
+        'rds-postgres-backup variable 0.000000 0.000000',
       ],
-      total: '17.340000',
+      total: '15.440000',
     });
   });
 

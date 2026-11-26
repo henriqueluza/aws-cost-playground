@@ -59,6 +59,8 @@ export default defineConfig([
       'src/shared/lib/api/**',
       'src/shared/lib/money.ts',
     ],
+    // O provider React das portas (#185) é o único módulo de shared/lib/api fora do bloco.
+    ignores: ['src/shared/lib/api/ApiProvider.tsx'],
     rules: {
       'no-restricted-imports': [
         'error',

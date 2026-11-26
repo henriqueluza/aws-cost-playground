@@ -11,7 +11,7 @@ Workflow `deploy-staging.yml`, disparado por `push` em `main`.
 
 | Item | Conteúdo |
 |---|---|
-| `functions.zip` | Zip das Lambdas |
+| `functions.zip` | Zip das Lambdas: `app/`, dependências de runtime e `contracts/` (só `blocks.json` e `edges.json`) |
 | `site/` | Conteúdo de `web/dist` |
 | `SHA256SUMS` | Hashes para `sha256sum -c` |
 
