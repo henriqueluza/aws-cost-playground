@@ -15,10 +15,13 @@
 
 .warn {
   background-color: var(--pill-warning-bg);
-  color: var(--warning);
+  /* --pill-warning-bg fica perto do branco no claro: a borda mantém a forma (como no Notice). */
+  box-shadow: inset 0 0 0 var(--border-width) var(--pill-warning-border);
+  color: var(--pill-warning-ink);
 }
 
 .name {
+  min-width: 0;
   max-width: 24ch;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -33,6 +36,7 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
   white-space: nowrap;
+  padding-block: var(--space-2); /* alvo de clique maior que a linha de texto */
 }
 
 .link:hover {

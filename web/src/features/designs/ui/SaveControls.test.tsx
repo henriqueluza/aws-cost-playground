@@ -5,6 +5,7 @@ import { adrExampleDesign } from '../../../test/designFixtures';
 import { expectNoAxeViolations } from '../../../test/axe';
 import { designStore, EMPTY_STATE } from '../../editor';
 import type { DesignDocument } from '../../../shared/lib/design';
+import { ApiError } from '../../../shared/lib/api';
 import { savedDesignStore } from '../hooks/savedDesignStore';
 import { SaveControls } from './SaveControls';
 import { failingApi, newApi, renderWithApp } from './testUtils';
@@ -86,6 +87,68 @@ describe('SaveControls', () => {
     expect(screen.queryByRole('button', { name: 'Tentar de novo' }) !== null).toBe(
       kind === 'network',
     );
+  });
+
+  it('mostra Salvando… e trava o botão enquanto o servidor não responde', async () => {
+    const api = newApi();
+    let release = () => {};
+    const create = api.designs.create;
+    api.designs.create = async (input) => {
+      await new Promise<void>((resolve) => (release = resolve));
+      return create(input);
+    };
+    load(doc);
+    const user = userEvent.setup();
+    renderWithApp(api, <SaveControls />);
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Salvar' }));
+    expect(await screen.findByRole('button', { name: 'Salvando…' })).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Salvando…');
+    // edição durante o salvamento: depois de salvo, o que mudou continua pendente
+    act(() => void designStore.getState().setRegion('sa-east-1'));
+    await act(async () => release());
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Alterações não salvas'),
+    );
+  });
+
+  it('Tentar de novo reenvia com o nome digitado e oferece o botão Entrar sem sessão', async () => {
+    const base = newApi();
+    let calls = 0;
+    const names: string[] = [];
+    const api = {
+      ...base,
+      designs: {
+        ...base.designs,
+        create: async (input: Parameters<typeof base.designs.create>[0]) => {
+          names.push(input.name);
+          if (calls++ === 0) throw new ApiError({ kind: 'network' });
+          return base.designs.create(input);
+        },
+      },
+    };
+    load(doc);
+    const user = userEvent.setup();
+    renderWithApp(api, <SaveControls />);
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+    await user.clear(screen.getByLabelText('Nome do design'));
+    await user.type(screen.getByLabelText('Nome do design'), 'Loja v2');
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Salvar' }));
+    await user.click(await screen.findByRole('button', { name: 'Tentar de novo' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Salvo'));
+    expect(names).toEqual(['Loja v2', 'Loja v2']);
+  });
+
+  it('sem sessão, o aviso oferece o ponto de encaixe do Entrar', async () => {
+    load(doc);
+    const user = userEvent.setup();
+    renderWithApp(
+      failingApi('unauthenticated'),
+      <SaveControls signInAction={<button>Entrar</button>} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Salvar' }));
+    expect(await screen.findByRole('button', { name: 'Entrar' })).toBeInTheDocument();
   });
 
   it('pede confirmação ao ir para Meus designs com alterações e deixa ficar', async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useBlocker } from 'react-router';
 import { useDesignStore } from '../../editor';
 import { designNameSchema } from '../../../shared/lib/api';
@@ -97,46 +97,52 @@ function NameDialog(props: { open: boolean; onCancel: () => void; onSubmit: (n: 
 }
 
 /** Salvar, estado do salvamento e atalho para "Meus designs", na barra de ações do editor. */
-export function SaveControls() {
+/** `signInAction`: o botão "Entrar" do login (#52); entra no aviso de quem não está autenticado. */
+export function SaveControls({ signInAction }: { signInAction?: ReactNode } = {}) {
   const document = useDesignStore((s) => s.document);
   const saved = useSavedDesign((s) => s.saved);
   const saving = useSavedDesign((s) => s.saving);
   const error = useSavedDesign((s) => s.error);
   const save = useSaveDesign();
   const [naming, setNaming] = useState(false);
+  const lastName = useRef(DEFAULT_NAME); // o nome do último envio, para "Tentar de novo"
 
   const status = saveStatus(document, saved, saving);
   const unsaved = hasUnsavedChanges(document, saved);
-  const run = (name: string) => save.mutate({ name, doc: document });
+  const run = (name: string) => {
+    lastName.current = name;
+    save.mutate({ name, doc: document });
+  };
   const retry = () => {
     savedDesignStore.getState().clearError();
-    run(saved?.name ?? DEFAULT_NAME);
+    run(lastName.current);
   };
 
   return (
     <>
       <LeaveGuard active={unsaved} />
-      {saved !== null && <span className={styles.name}>{saved.name}</span>}
-      <StatusPill status={status} />
       <Link to="/designs" className={styles.link}>
         Meus designs
       </Link>
+      {saved !== null && <span className={styles.name}>{saved.name}</span>}
+      <StatusPill status={status} />
       <Button
         variant="primary"
         disabled={saving || status === 'saved'}
-        title={status === 'saved' ? 'Sem alterações para salvar' : undefined}
         onClick={() => (saved === null ? setNaming(true) : run(saved.name))}
       >
         {saving ? 'Salvando…' : 'Salvar'}
       </Button>
-      <NameDialog
-        open={naming}
-        onCancel={() => setNaming(false)}
-        onSubmit={(name) => {
-          setNaming(false);
-          run(name);
-        }}
-      />
+      {naming && (
+        <NameDialog
+          open
+          onCancel={() => setNaming(false)}
+          onSubmit={(name) => {
+            setNaming(false);
+            run(name);
+          }}
+        />
+      )}
       <Dialog
         open={error !== null}
         onClose={() => savedDesignStore.getState().clearError()}
@@ -145,6 +151,7 @@ export function SaveControls() {
         {error !== null && <Notice tone="negative" message={designErrorMessage(error)} />}
         <div className={styles.dialogActions}>
           <Button onClick={() => savedDesignStore.getState().clearError()}>Fechar</Button>
+          {error === 'unauthenticated' && signInAction}
           {error !== null && isRetryable(error) && (
             <Button variant="primary" onClick={retry}>
               Tentar de novo

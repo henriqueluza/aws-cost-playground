@@ -113,3 +113,11 @@ Hoje existe só o serviço de sessão, em TypeScript puro (sem React, React Flow
 - **`safeReturnTo`** (`model/returnTo.ts`): o destino pós-login só é aceito se for um caminho interno (uma `/` inicial, até 512 caracteres, sem `\` nem caractere de controle, mesma origem e fora de `/auth/`); qualquer outra coisa vira `/`. Passa por ele na ida (`signIn`) e na volta (`completeSignIn`). Uma mesma `callbackUrl` é processada uma única vez.
 - **`signOut`** limpa a sessão local (e o que estava em voo) antes de navegar para o encerramento no provedor, e nunca rejeita; se o provedor falhar, navega para `/`.
 - `crypto.getRandomValues` e SHA-256 do PKCE ficam em `infrastructure/webCrypto.ts`.
+
+## Designs salvos (`features/designs`)
+
+Parte 1 da #56: salvar o design atual e mostrar o estado do salvamento.
+
+- **Injeção pelo app**: `SaveControls` (botão "Salvar" e pílula de estado) não é importado pelo editor; o app o passa à `EditorPage` pela prop `actions` (`router.tsx`), que o renderiza na `ActionBar`. A feature `editor` não conhece `designs`.
+- **Estado do salvamento** é a função pura `saveStatus(atual, salvo, saving)` em `model/saveState.ts`: `saving` > `unsaved` (nunca salvo) > `saved` (documento igual ao salvo, comparado por `sameDocument`, sem depender da ordem das chaves) > `dirty`. Não é guardado: deriva do documento do editor e do último salvo. `hasUnsavedChanges` serve a quem for sair ou trocar de design.
+- **`savedDesignStore`** (Zustand, um por aba) guarda o que o servidor devolveu (`saved`: `id`, `name`, `version`, `doc`), além de `saving` e do tipo do último erro. `begin()` reserva o salvamento e devolve `false` se já há um em andamento, evitando salvamento duplo. Mensagens de erro são texto próprio da interface (`model/designMessages.ts`), nunca o detalhe do servidor.
