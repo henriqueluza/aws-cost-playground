@@ -68,7 +68,7 @@ Nenhum segredo vai em código nem em variável commitada.
 1. ao lado de `app/` — no zip da Lambda, `/var/task/contracts/`;
 2. um nível acima — a raiz do repositório, no desenvolvimento e nos testes (`api/app/contracts.py` → `contracts/`).
 
-Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **o zip precisa levar `contracts/blocks.json` e `contracts/edges.json` na raiz, ao lado de `app/`**. O `scripts/build-functions.sh` da #22 (PR #218) hoje copia só `app/` e as dependências: enquanto ele não copiar `contracts/`, `get_contracts()` levanta `RuntimeError` na Lambda (falha fechada: arquivo ausente, cortado ou fora do contrato nunca vira contrato vazio). Nenhuma rota chama `get_contracts()` ainda; as primeiras são as de estimativa (#61, #62).
+Não há variável de ambiente nem cópia dos JSON dentro de `api/`. Por isso **o zip precisa levar `contracts/blocks.json` e `contracts/edges.json` na raiz, ao lado de `app/`**. O `scripts/build-functions.sh` (#22, PR #218) copia esses dois arquivos, e só eles, para `contracts/` na raiz do zip (#242); exemplos e cenários ficam de fora, e arquivo ausente derruba o build. `api/tests/test_package.py` trava isso: roda o script e confere o conteúdo do zip e que `app.contracts` carrega do pacote extraído. Se o zip sair sem eles, `get_contracts()` levanta `RuntimeError` na Lambda (falha fechada: arquivo ausente, cortado ou fora do contrato nunca vira contrato vazio). Nenhuma rota chama `get_contracts()` ainda; as primeiras são as de estimativa (#61, #62).
 
 ## Rotas
 
