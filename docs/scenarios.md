@@ -202,7 +202,7 @@ A calculadora pede estes campos e `contracts/blocks.json` não os tem. Use o val
 
 Dois pontos do contrato dependem das Issues de preço e foram deixados fora do alcance da dúvida:
 
-- **Backup do RDS:** `backupStorageGb` é 0. A #34 decide se a chave é o backup total ou só o que passa do incluído; com zero, as duas leituras dão o mesmo valor.
+- **Backup do RDS:** `backupStorageGb` é 0. A #34 decidiu que a chave é o backup total do banco; só o que passa do armazenamento provisionado (`storageGb`) é cobrado. Com zero, o cenário não muda.
 - **Recuperação do Standard-IA:** `blk_archive` tem `getRequestsPerMonth` em 0, porque o contrato não tem GB recuperado.
 
 ## Franquias em jogo
