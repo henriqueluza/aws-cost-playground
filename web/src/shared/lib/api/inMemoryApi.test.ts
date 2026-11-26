@@ -421,10 +421,10 @@ describe('createInMemoryApi: estimateUsage', () => {
     expect(estimateResponseSchema.safeParse(response).success).toBe(true);
     expect(response).toEqual({
       blocks: [
-        { id: 'blk_fn_api', values: {} },
-        { id: 'blk_assets', values: {} },
+        { id: 'blk_fn_api', values: {}, source: 'default' },
+        { id: 'blk_assets', values: {}, source: 'default' },
       ],
-      edges: [{ id: 'edg_1', values: {} }],
+      edges: [{ id: 'edg_1', values: {}, source: 'default' }],
       quota: { limit: 2, remaining: 1, resetsAt: DAY_END },
     });
     expect(await quota.get()).toEqual(response.quota);
@@ -435,14 +435,19 @@ describe('createInMemoryApi: estimateUsage', () => {
     const { estimates } = setup({
       estimate: (request) => {
         seen.push(request);
-        const block = { id: 'blk_fn_api', values: { requestsPerMonth: 10 }, note: 'texto livre' };
+        const block = {
+          id: 'blk_fn_api',
+          values: { requestsPerMonth: 10 },
+          source: 'llm',
+          note: 'texto livre',
+        };
         return { blocks: [block], edges: [], quota: { remaining: 99 }, text: 'livre' } as never;
       },
     });
     const response = await estimates.estimateUsage(badRequest({ ...REQUEST, extra: 'x' }));
     expect(seen).toEqual([REQUEST]);
     expect(response).toEqual({
-      blocks: [{ id: 'blk_fn_api', values: { requestsPerMonth: 10 } }],
+      blocks: [{ id: 'blk_fn_api', values: { requestsPerMonth: 10 }, source: 'llm' }],
       edges: [],
       quota: { limit: 20, remaining: 19, resetsAt: DAY_END },
     });
