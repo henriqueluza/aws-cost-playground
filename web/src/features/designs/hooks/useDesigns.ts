@@ -22,11 +22,16 @@ export function useSaveDesign() {
   const api = useApi();
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { name: string; doc: DesignDocument }) => {
+    mutationFn: async (input: { name: string; doc: DesignDocument; asCopy?: boolean }) => {
       const store = savedDesignStore.getState();
       if (!store.begin()) return;
       try {
-        const saved = await saveDesign(api, { saved: store.saved, ...input });
+        // "Salvar como cópia" (após conflito) cria um design novo, nunca grava sobre o salvo.
+        const saved = await saveDesign(api, {
+          saved: input.asCopy ? null : store.saved,
+          name: input.name,
+          doc: input.doc,
+        });
         // O documento ENVIADO é o salvo: o que a pessoa editou durante a chamada continua pendente.
         if (savedDesignStore.getState().finish(saved, store.epoch)) {
           designStore.getState().markSaved(input.doc);
@@ -60,5 +65,54 @@ export function useOpenDesign() {
         .getState()
         .setSaved({ id: design.id, name: design.name, version: design.version, doc: doc.data });
     },
+  });
+}
+
+const invalidateList = (client: ReturnType<typeof useQueryClient>) =>
+  client.invalidateQueries({ queryKey: designsKeys.list });
+
+/** Renomear a partir da lista: `update` só com `name`, com a versão lida. */
+export function useRenameDesign() {
+  const api = useApi();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; version: number; name: string }) => {
+      const design = await api.designs.update(input.id, {
+        expectedVersion: input.version,
+        name: input.name,
+      });
+      const open = savedDesignStore.getState().saved;
+      // O design aberto no editor muda só de nome e versão; o documento fica como está.
+      if (open?.id === design.id) {
+        savedDesignStore.setState({
+          saved: { ...open, name: design.name, version: design.version },
+        });
+      }
+    },
+    onSettled: () => void invalidateList(client),
+  });
+}
+
+export function useDuplicateDesign() {
+  const api = useApi();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; name: string }) => {
+      await api.designs.duplicate(input.id, { name: input.name });
+    },
+    onSettled: () => void invalidateList(client),
+  });
+}
+
+/** Apagar é idempotente. Se o design apagado está aberto, o vínculo é solto: salvar cria outro. */
+export function useDeleteDesign() {
+  const api = useApi();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.designs.remove(id);
+      if (savedDesignStore.getState().saved?.id === id) savedDesignStore.getState().unlink();
+    },
+    onSettled: () => void invalidateList(client),
   });
 }
