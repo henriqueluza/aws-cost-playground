@@ -151,7 +151,7 @@ Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `mod
 | Quota global | `GLOBAL` | `QUOTA#<aaaa-mm-dd>` | `count`, `ttl` |
 
 - `<sub>` vem do JWT. Nunca do path nem do corpo.
-- `version` implementa trava otimista: o `PutItem` leva `ConditionExpression version = :esperada`. Duas abas abertas não se sobrescrevem em silêncio.
+- `version` implementa trava otimista: a atualização é um `UpdateItem` com `ConditionExpression attribute_exists(PK) AND version = :esperada`, sem ler antes (um `PutItem` regravaria o item inteiro e obrigaria a ler `createdAt` e o `doc` ao renomear). Duas abas abertas não se sobrescrevem em silêncio: a versão desatualizada é 409 e nada é gravado (#54).
 - Listagem: `Query` em `PK` com `begins_with(SK, "DESIGN#")`, projetando tudo menos `doc`.
 - Limites validados na API: 50 designs por usuário, `doc` até 350 KB, 100 blocos por design.
 - O ponteiro para S3 previsto no discovery fica fora do MVP: um design de 20 blocos tem poucos KB. Acima de 350 KB a API responde 413. O ponteiro vira Issue quando alguém bater no limite.
