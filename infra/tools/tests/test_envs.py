@@ -18,10 +18,10 @@ ENVS = {
         "self_signup_enabled": "false",
         "point_in_time_recovery_enabled": "false",
     },
-    # O critério da #21 pede cadastro aberto em produção; fica fechado até o autor decidir a #139.
+    # Cadastro aberto em produção: critério da #21, com o risco aceito pelo autor na #139.
     "production": {
         "environment": "production",
-        "self_signup_enabled": "false",
+        "self_signup_enabled": "true",
         "point_in_time_recovery_enabled": "true",
     },
 }
@@ -135,12 +135,12 @@ class EnvsTest(unittest.TestCase):
             self.assertEqual(generic["production"], generic["staging"], name)
             self.assertNotEqual(read("production", name), read("staging", name), name)
 
-    def test_tfvars_differ_only_in_environment_and_pitr(self) -> None:
-        """Só variáveis mudam entre os ambientes. O cadastro aberto entra aqui quando a #139 sair."""
+    def test_tfvars_differ_only_in_environment_signup_and_pitr(self) -> None:
+        """Só variáveis mudam entre os ambientes: nome, cadastro aberto e PITR."""
         staging, production = tfvars("staging"), tfvars("production")
         self.assertEqual(set(production), set(staging))
         changed = {key for key in staging if staging[key] != production[key]}
-        self.assertEqual(changed, {"environment", "point_in_time_recovery_enabled"})
+        self.assertEqual(changed, {"environment", "self_signup_enabled", "point_in_time_recovery_enabled"})
 
 
 if __name__ == "__main__":

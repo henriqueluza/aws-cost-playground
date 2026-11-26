@@ -38,7 +38,7 @@ python3 -m unittest discover -s infra/tools/tests   # tfvars sem segredo e arqui
 |---|---|---|
 | `environment` | `staging` (prefixo `acp-stg`, site em `staging.<zona>`) | `production` (prefixo `acp-prod`, site na própria zona) |
 | `point_in_time_recovery_enabled` | `false` | `true` |
-| `self_signup_enabled` | `false` | `false`, até o autor decidir a #139; para abrir o cadastro, troque essa linha para `true` por PR |
+| `self_signup_enabled` | `false` | `true`. Risco aceito pelo autor na #139 e registrado no ADR; para fechar o cadastro, troque essa linha para `false` por PR |
 | `llm_enabled`, `default_throttle`, `estimates_throttle` | iguais | iguais |
 
 ## Variáveis dos ambientes
