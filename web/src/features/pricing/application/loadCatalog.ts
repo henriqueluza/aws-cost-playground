@@ -16,7 +16,7 @@ export class CatalogError extends Error {
   }
 }
 
-/** Porta: bytes de um arquivo de `public/prices/`, pelo caminho relativo. Lança `CatalogError`. */
+/** Porta: bytes de um arquivo de `public/prices/`, pelo caminho relativo. */
 export type ReadPriceFile = (path: string) => Promise<Uint8Array<ArrayBuffer>>;
 
 export interface CatalogLoader {
@@ -35,6 +35,15 @@ function parse<S extends z.ZodType>(schema: S, bytes: Uint8Array): z.output<S> {
   }
 }
 
+/** Erro que não é `CatalogError` (da porta ou do Web Crypto) vira `kind`, sem `cause`. */
+async function typed<T>(kind: CatalogErrorKind, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw error instanceof CatalogError ? error : new CatalogError(kind);
+  }
+}
+
 async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -43,10 +52,12 @@ async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
 export function createCatalogLoader(read: ReadPriceFile): CatalogLoader {
   let cached: Promise<PriceManifest> | undefined;
   const manifest = async (): Promise<PriceManifest> => {
-    cached ??= read('manifest.json').then((bytes) => parse(priceManifestSchema, bytes));
+    const pending = (cached ??= typed('network', () => read('manifest.json')).then((bytes) =>
+      parse(priceManifestSchema, bytes),
+    ));
     // Falha não fica guardada: a próxima chamada tenta de novo.
-    cached.catch(() => (cached = undefined));
-    return cached;
+    pending.catch(() => cached === pending && (cached = undefined));
+    return pending;
   };
   return {
     manifest,
@@ -57,8 +68,9 @@ export function createCatalogLoader(read: ReadPriceFile): CatalogLoader {
         current.files
           .filter((file) => wanted.has(file.path))
           .map(async ({ path, sha256 }) => {
-            const bytes = await read(path);
-            if ((await sha256Hex(bytes)) !== sha256) throw new CatalogError('integrity');
+            const bytes = await typed('network', () => read(path));
+            const hash = await typed('integrity', () => sha256Hex(bytes));
+            if (hash !== sha256) throw new CatalogError('integrity');
             const file = parse(priceFileSchema, bytes);
             if (`${file.region}/${file.service}.json` !== path) throw new CatalogError('invalid');
             return [file.service, file] as const;

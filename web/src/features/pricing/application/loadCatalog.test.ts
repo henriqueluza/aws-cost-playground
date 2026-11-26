@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CatalogError, createCatalogLoader, type CatalogErrorKind } from '..';
 
 type Bytes = Uint8Array<ArrayBuffer>;
-type Files = Record<string, Bytes | undefined>;
+type Files = Record<string, Bytes | Error | undefined>;
 const encode = (value: unknown): Bytes => new TextEncoder().encode(JSON.stringify(value));
 const priceFile = (region: string, service: string, extra: object = {}) =>
   encode({ schemaVersion: 1, service, region, currency: 'USD', prices: [], ...extra });
@@ -31,7 +31,7 @@ function setup(files: Record<string, Bytes> = {}, served: Files = {}) {
   const store: Files = { 'manifest.json': manifest, ...listed, ...served };
   const read = vi.fn(async (path: string) => {
     const bytes = store[path];
-    if (!bytes) throw new CatalogError('missing');
+    if (!(bytes instanceof Uint8Array)) throw bytes ?? new CatalogError('missing');
     return bytes;
   });
   return { read, loader: createCatalogLoader(read) };
@@ -54,6 +54,8 @@ describe('createCatalogLoader', () => {
   });
 
   it.each<[string, CatalogErrorKind, Record<string, Bytes>, Files]>([
+    ['erro cru da porta', 'network', {}, { [s3]: new TypeError('<b>') }],
+    ['erro cru da porta no manifest', 'network', {}, { 'manifest.json': new Error('<b>') }],
     ['hash diferente do manifest', 'integrity', {}, { [s3]: usFile('s3', { x: 1 }) }],
     ['arquivo fora do schema', 'invalid', { [s3]: usFile('s3', { currency: '<b>' }) }, {}],
     ['arquivo de outro serviço', 'invalid', { [s3]: usFile('lambda') }, {}],
@@ -67,6 +69,14 @@ describe('createCatalogLoader', () => {
     const error = await loader.load('us-east-1', ['s3']).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(CatalogError);
     expect(error).toMatchObject({ kind, message: `Erro do catálogo de preços: ${kind}.` });
+    expect((error as Error).cause).toBeUndefined();
+  });
+
+  it('converte a falha do Web Crypto em erro tipado', async () => {
+    vi.spyOn(crypto.subtle, 'digest').mockRejectedValueOnce(new TypeError('<b>'));
+    const message = 'Erro do catálogo de preços: integrity.';
+    const loading = setup().loader.load('us-east-1', ['s3']);
+    await expect(loading).rejects.toMatchObject({ kind: 'integrity', message });
   });
 
   it('tenta o manifest de novo depois de uma falha da porta', async () => {

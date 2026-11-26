@@ -93,7 +93,7 @@ Um arquivo por serviço e região, em `public/prices/<region>/<service>.json`.
 - `manifest()`: lê e valida `manifest.json` uma só vez; falha não fica em cache, a próxima chamada tenta de novo.
 - `load(region, services)`: busca só os arquivos `<region>/<service>.json` pedidos que o manifest lista. Serviço fora do manifest não entra no mapa `services`. Para cada arquivo, confere o `sha256` (Web Crypto) contra o manifest **antes** do parse, valida com o schema zod e recusa o arquivo cujo `region`/`service` não bate com o caminho. Qualquer falha derruba a carga inteira; não há catálogo parcial.
 
-A porta lança `CatalogError` para `network`, `missing` e `too-large`; o carregador lança `invalid` e `integrity`. Toda falha é um `CatalogError`, com mensagem fixa (sem texto do arquivo ou da rede) e `kind`:
+A porta lança `CatalogError` para `network`, `missing` e `too-large`; o carregador lança `invalid` e `integrity`, e converte qualquer outro erro da porta em `network` e a falha do Web Crypto em `integrity`. Toda falha é um `CatalogError`, com mensagem fixa (sem texto do arquivo ou da rede) e `kind`:
 
 | `kind`      | Quando                                                         |
 | ----------- | -------------------------------------------------------------- |
