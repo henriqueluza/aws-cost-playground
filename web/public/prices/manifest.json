@@ -28,10 +28,6 @@
       "sha256": "8530d83ebe2d7594af729cecc3cc8c207604db0111ef091e2d9b30518becb74e"
     },
     {
-      "path": "sa-east-1/data-transfer.json",
-      "sha256": "83d76d46f09fde9df349ea48e80d855f3fe7baff23c240dbd74123bcf52d50d4"
-    },
-    {
       "path": "sa-east-1/dynamodb.json",
       "sha256": "142a82baa54724200b779a6c3f4cee3f8b2e3fd17d5c0f8b9cc4c1f6760335e5"
     },
@@ -98,10 +94,6 @@
     {
       "path": "us-east-1/cognito.json",
       "sha256": "1b1565e81e302961734b6ab0ec52f27dfeeab8d837c6dc2daf29ecd9845d2993"
-    },
-    {
-      "path": "us-east-1/data-transfer.json",
-      "sha256": "965fd1833fee6e722d116a8ea3aac1793e06078c64dfe02afe7221ccf8356238"
     },
     {
       "path": "us-east-1/dynamodb.json",
