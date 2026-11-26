@@ -14,7 +14,7 @@ from botocore.exceptions import ClientError, EndpointConnectionError, ParamValid
 from fastapi import FastAPI
 
 from app.designs import repository, service
-from app.designs.errors import StoreFailure
+from app.designs.errors import StoreFailure, StoreUnavailable
 from app.designs.schemas import DESIGN_ID_PATTERN, MAX_DOC_BYTES
 from app.logs import configure_logging
 from tests.conftest import invoke, make_event
@@ -354,6 +354,24 @@ def test_falha_ao_desfazer_a_criacao_excedente_e_erro_tratado(
 
     monkeypatch.setattr(table, "delete_item", failing)
     assert call(app, "POST", "/designs", {"name": "n", "doc": ADR})[0] == 503
+
+
+def test_recontagem_que_falha_desfaz_a_criacao(
+    app: FastAPI, table: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sem confirmar o limite, o design não fica: o cliente nem recebeu o id."""
+    counts = iter([0])
+
+    def flaky(_: str) -> int:
+        return next(counts, None) or _raise(StoreUnavailable())
+
+    monkeypatch.setattr(repository, "count", flaky)
+    assert call(app, "POST", "/designs", {"name": "n", "doc": ADR})[0] == 503
+    assert stored(table) == []
+
+
+def _raise(error: Exception) -> int:
+    raise error
 
 
 @pytest.mark.parametrize("sub", ["", "a#b", "USER#x", "a b", "x" * 129])

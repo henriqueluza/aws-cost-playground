@@ -11,6 +11,7 @@ from app.design_document import DesignDocument
 from app.designs import repository
 from app.designs.errors import (
     CorruptedDesign,
+    DesignError,
     DesignLimitReached,
     DesignNotFound,
     StoreFailure,
@@ -45,8 +46,9 @@ def create_design(user_id: str, body: DesignCreate) -> DesignOut:
     """Cria com id, versão e datas do servidor. No limite, `DesignLimitReached` sem gravar.
 
     Sem transação (o papel da função não tem `TransactWriteItems`), o limite vale assim: conta,
-    grava com condição de não existência e conta de novo; se passou, apaga o que gravou e
-    recusa. Duas criações simultâneas no limite podem ser ambas recusadas, nunca ambas aceitas.
+    grava com condição de não existência e conta de novo; se passou (ou se a recontagem
+    falhou), apaga o que gravou e recusa. Duas criações simultâneas no limite podem ser ambas
+    recusadas, nunca ambas aceitas.
     """
     if repository.count(user_id) >= MAX_DESIGNS:
         raise DesignLimitReached
@@ -68,9 +70,13 @@ def create_design(user_id: str, body: DesignCreate) -> DesignOut:
             break
     else:
         raise StoreFailure
-    if repository.count(user_id) > MAX_DESIGNS:
+    try:
+        if repository.count(user_id) > MAX_DESIGNS:
+            raise DesignLimitReached
+    except DesignError:
+        # Passou do limite, ou a recontagem falhou e o limite não foi confirmado: desfaz.
         repository.delete(user_id, design_id)
-        raise DesignLimitReached
+        raise
     return DesignOut.model_validate(attributes | {"id": design_id, "doc": body.doc})
 
 
