@@ -63,7 +63,7 @@ gh secret set TF_VAR_ALARM_EMAIL --repo henriqueluza/aws-cost-playground   # ped
 Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 
 1. #210: runtime `python3.14` nas Lambdas. Sem ela o zip não carrega, e o smoke não percebe.
-2. #166, #167 e #169: permissões de escrita do apply. Além do Terraform, o deploy precisa de `s3:PutObject`/`s3:GetObject` no bucket de artefatos, de objetos do bucket do site, de `lambda:GetFunctionConfiguration` e de `cloudfront:CreateInvalidation`/`cloudfront:GetInvalidation`.
+2. #166, #167 e #169 (em `main`) e #338 (decisão do autor, aberta): permissões de escrita do apply. Além do Terraform, o deploy precisa de `s3:PutObject`/`s3:GetObject` no bucket de artefatos, de objetos do bucket do site, de `lambda:GetFunctionConfiguration` e de `cloudfront:CreateInvalidation`/`cloudfront:GetInvalidation`.
 3. #209: bucket de artefatos.
 4. #77: bootstrap aplicado, Environment `staging` restrito a `main` e primeiro apply manual.
 5. As variáveis da seção anterior.

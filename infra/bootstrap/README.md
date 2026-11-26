@@ -12,12 +12,19 @@ O que precisa existir antes de qualquer ambiente: os buckets de estado, o proved
 | Bucket de estado de produção | `acp-prod-tfstate-<id da conta>` | Idem |
 | Provedor OIDC | `token.actions.githubusercontent.com` | Audiência `sts.amazonaws.com`; `prevent_destroy` |
 | Papel `plan` | `acp-ci-plan` | Somente leitura; usado pelo job `plan` do `terraform.yml` |
-| Papéis `apply` | `acp-ci-apply-staging` e `acp-ci-apply-production` | Um por ambiente, sessão de 1 hora, `prevent_destroy`. Gravam o próprio estado, escrevem nos recursos com nome do ambiente (política abaixo) e carregam as negações |
+| Papéis `apply` | `acp-ci-apply-staging` e `acp-ci-apply-production` | Um por ambiente, sessão de 1 hora, `prevent_destroy`. Gravam o próprio estado, escrevem nos recursos do ambiente (duas políticas gerenciadas, abaixo) e carregam as negações |
 | Papel `prices` | `acp-ci-prices` | Só `pricing:GetProducts`, sessão de 1 hora, `prevent_destroy`. Usado pelo workflow semanal de preços (#222) |
 | Limite de permissões | `acp-ci-boundary-staging` e `acp-ci-boundary-production` | Política gerenciada pelo cliente (sem custo), uma por ambiente, `prevent_destroy`. Teto dos papéis que o apply cria |
 | Política de escrita do apply | `acp-ci-apply-named-staging` e `acp-ci-apply-named-production` | Política gerenciada pelo cliente (sem custo), uma por ambiente, `prevent_destroy`, anexada ao papel `apply` do ambiente pelo bootstrap. Só `Allow` |
+| Política de escrita por ID | `acp-ci-apply-id-staging` e `acp-ci-apply-id-production` | Idem, para CloudFront, API Gateway, Cognito, ACM e Route 53: o ambiente vem da tag `environment` e do nome do registro DNS |
+| Papel vinculado a serviço do API Gateway | `AWSServiceRoleForAPIGateway` | Criado aqui porque os papéis `apply` negam `iam:CreateServiceLinkedRole`; `prevent_destroy`. Sem custo |
 
-Os papéis `apply` ainda não completam um deploy: faltam os serviços cujo ARN leva um ID (a #169, que também liga o log do HTTP API e fecha a #124), o bucket de artefatos com o `s3:GetObject` do pacote das funções (#209). O módulo `functions` passa a declarar o limite na #165; sem ele, a negação `DenyRoleWithoutBoundary` impede o apply de criar ou alterar os papéis das funções (falha fechada).
+Os papéis `apply` ainda não completam um deploy. Falta:
+
+- a decisão do autor sobre as ações de escrita que não se delimitam por ambiente (#338): sem a entrega de log do HTTP API e sem o `cloudfront:UpdateDistribution` que o Cognito exige, o deploy deve parar no stage da API e no domínio do user pool;
+- o bucket de artefatos, com o `s3:GetObject` do pacote das funções (#209).
+
+O módulo `functions` declara o limite de permissões (#165); sem ele, a negação `DenyRoleWithoutBoundary` impede o apply de criar ou alterar os papéis das funções (falha fechada).
 
 Nada aqui tem custo fixo: sem chave própria do KMS e sem tabela de lock (o lock é o nativo do S3). O ID da conta vem da credencial de quem aplica, nunca do código.
 
@@ -41,7 +48,7 @@ O job `plan` roda código do próprio PR, então o papel parte do princípio de 
 | Pergunta | Resposta |
 |---|---|
 | Quem assume | Só um job do GitHub Actions deste repositório que declare o GitHub Environment do papel e rode em `main`: `aud` igual a `sts.amazonaws.com`, `sub` igual a `repo:henriqueluza/aws-cost-playground:environment:<env>` e `ref` igual a `refs/heads/main`, tudo por `StringEquals` |
-| O que pode | O estado do próprio ambiente (política inline `state`): `s3:ListBucket` no bucket, `GetObject` e `PutObject` em `acp-<stg\|prod>/terraform.tfstate`, e `GetObject`, `PutObject` e `DeleteObject` no `.tflock`. E, pela política gerenciada `acp-ci-apply-named-<env>`, criar, ler, atualizar e etiquetar os recursos com nome do ambiente (tabela abaixo). Os serviços com ARN por ID ficam para a #169 |
+| O que pode | O estado do próprio ambiente (política inline `state`): `s3:ListBucket` no bucket, `GetObject` e `PutObject` em `acp-<stg\|prod>/terraform.tfstate`, e `GetObject`, `PutObject` e `DeleteObject` no `.tflock`. E, pela política gerenciada `acp-ci-apply-named-<env>`, criar, ler, atualizar e etiquetar os recursos com nome do ambiente (tabela abaixo). E, pela `acp-ci-apply-id-<env>`, os recursos com ARN por ID que levam a tag do ambiente e os registros DNS do ambiente (seção "Recursos com ARN por ID") |
 | O que não pode | O que as políticas inline `deny-guardrails` e `deny-data` negam, nas tabelas abaixo. Negação explícita vence qualquer `Allow` futuro |
 
 O `sub` de environment não carrega o branch, então o `ref` é fixado no IAM. Um job de `pull_request` não passa, porque o `ref` dele não é `refs/heads/main`.
@@ -71,6 +78,59 @@ Por que o `SiteBucket` tem tantos `Get*`: a leitura do `aws_s3_bucket` consulta 
 - Atualizações que os módulos não disparam: `iam:UpdateRole`, `iam:UpdateRoleDescription`, `iam:PutRolePermissionsBoundary`, `sns:SetSubscriptionAttributes`, `logs:DeleteRetentionPolicy` e a concorrência reservada da função (configuração de custo, manual do autor).
 
 Na prática, viram tarefa manual do autor: o `replace` de `aws_lambda_permission` (todo atributo força recriação), a troca do e-mail da assinatura, renomear alarme ou política inline e qualquer exclusão.
+
+### Recursos com ARN por ID (`acp-ci-apply-id-<env>`)
+
+CloudFront, API Gateway v2, Cognito, ACM e Route 53 têm ARN com ID gerado: o prefixo `acp-<prefixo>-*` não os delimita. A política gerenciada `acp-ci-apply-id-<env>` (`by_id.tf`, cerca de 3,4 mil dos 6.144 caracteres, só `Allow`) usa a tag `environment`, que os roots de `infra/envs/*` aplicam por `default_tags`, e o nome do registro no Route 53. `<env>` é `staging` ou `production`.
+
+| Sid | Permite | Onde | Condição |
+|---|---|---|---|
+| `CreateTagged` | `acm:RequestCertificate`, `cloudfront:CreateDistribution`, `cognito-idp:CreateUserPool` | `*` (criar não aceita recurso) | `aws:RequestTag/environment` igual a `<env>` |
+| `TagOwn` | `acm:AddTagsToCertificate`, `cloudfront:TagResource`, `cognito-idp:TagResource` | Certificados, distribuições e user pools da conta | `aws:RequestTag/environment` igual a `<env>` e, se o recurso já tiver a tag, `aws:ResourceTag/environment` igual a `<env>` |
+| `Distribution` | `cloudfront:CreateInvalidation`, `GetDistribution`, `GetInvalidation`, `ListTagsForResource`, `UpdateDistribution` | Distribuições da conta | `aws:ResourceTag/environment` igual a `<env>` |
+| `EdgePolicies` | `cloudfront:CreateCachePolicy`, `CreateOriginAccessControl`, `CreateResponseHeadersPolicy`, `GetCachePolicy`, `GetOriginAccessControl`, `GetResponseHeadersPolicy`, `ListCachePolicies` | `*` | Nenhuma: esses recursos não aceitam tag. Só criar e ler |
+| `Certificates` | `acm:DescribeCertificate`, `ListTagsForCertificate` | Certificados da conta | `aws:ResourceTag/environment` igual a `<env>` |
+| `UserPool` | `cognito-idp:CreateManagedLoginBranding`, `CreateUserPoolClient`, `CreateUserPoolDomain`, `DescribeManagedLoginBranding`, `DescribeManagedLoginBrandingByClient`, `DescribeUserPool`, `DescribeUserPoolClient`, `GetUserPoolMfaConfig`, `ListUserPoolClients`, `UpdateManagedLoginBranding`, `UpdateUserPool`, `UpdateUserPoolClient`, `UpdateUserPoolDomain` | User pools da conta | `aws:ResourceTag/environment` igual a `<env>` |
+| `UserPoolDomainRead` | `cognito-idp:DescribeUserPoolDomain` | `*` (a ação não aceita recurso) | Nenhuma: só leitura |
+| `ApiCreate` | `apigateway:POST` | `/apis` e `/domainnames` | `aws:RequestTag/environment` igual a `<env>` |
+| `Api` | `apigateway:GET`, `PATCH`, `POST` | `/apis/*` e `/domainnames/*` | `aws:ResourceTag/environment` igual a `<env>` |
+| `ZoneRead` | `route53:GetChange`, `GetHostedZone`, `ListResourceRecordSets`, `ListTagsForResource` | A zona do produto e `change/*` | Nenhuma: só leitura |
+| `ZoneList` | `route53:ListHostedZones` | `*` (a ação não aceita recurso) | Nenhuma: só leitura |
+| `Records` | `route53:ChangeResourceRecordSets` | A zona do produto | Nome do registro, tipo `A` ou `CNAME` e ação `CREATE` ou `UPSERT` (abaixo) |
+
+**Tags.** O escopo por tag só vale se o papel não puder trocar a tag. Etiquetar (`TagOwn`) exige o próprio ambiente no pedido e recusa recurso que já tenha `environment` de outro ambiente; não há ação de tirar etiqueta. A condição do recurso é `StringEqualsIfExists` porque criar com tags chama a ação de etiquetar antes de a tag existir (o `CreateDistributionWithTags` do CloudFront exige `cloudfront:TagResource`). O API Gateway fica sem ação de etiquetar: o recurso `/tags/*` não aceita `aws:ResourceTag`.
+
+**Route 53.** A zona é uma só para os dois ambientes; o que separa é a chave `route53:ChangeResourceRecordSetsNormalizedRecordNames`:
+
+| Ambiente | Nomes que o papel grava | Nomes recusados |
+|---|---|---|
+| `staging` | `staging.<domínio>` e `*.staging.<domínio>` | Todo o resto |
+| `production` | `<domínio>`, `api.<domínio>`, `auth.<domínio>` e `_*.<domínio>` (CNAMEs de validação do ACM) | `staging.<domínio>` e `*.staging.<domínio>`, por `ForAllValues:StringNotLike` |
+
+O domínio entra pela variável `zone_name`, sem default, a mesma `TF_VAR_zone_name` dos ambientes: em minúsculas e sem ponto final, como a chave de condição compara. O bootstrap lê a zona pública com esse nome (`data.aws_route53_zone.product`) para pôr o ARN exato no `Resource`; por isso a zona precisa existir antes (#74). Sem `DELETE`: apagar ou renomear registro é tarefa manual do autor.
+
+**Papel vinculado a serviço.** O API Gateway cria `AWSServiceRoleForAPIGateway` na primeira API ou domínio, com a permissão de quem chama, e os papéis `apply` negam `iam:CreateServiceLinkedRole` (`DenyIamOutsideEnvironment`). A negação não foi aberta: o papel nasce aqui (`aws_iam_service_linked_role.apigateway`, com `prevent_destroy`). Se ele já existir na conta, importe-o antes de aplicar ("Estado deste diretório").
+
+**Fora, à espera de decisão do autor (#338).** Ações de escrita que não podem ser limitadas ao ambiente não entram só com um registro aqui:
+
+- a entrega de log do stage do HTTP API (`logs:CreateLogDelivery`, `UpdateLogDelivery`, `DeleteLogDelivery`, `PutResourcePolicy` e as leituras `GetLogDelivery`, `ListLogDeliveries`, `DescribeResourcePolicies`, todas só em `*`);
+- `cloudfront:UpdateDistribution` em `*`, que o Cognito exige de quem cria o domínio próprio do user pool;
+- alterar política de cache, política de cabeçalhos e OAC que já existem (`cloudfront:UpdateCachePolicy`, `UpdateResponseHeadersPolicy`, `UpdateOriginAccessControl`);
+- etiquetar recurso do API Gateway (`apigateway:PUT` e `DELETE` em `/tags/*`).
+
+Sem as duas primeiras, o primeiro deploy de staging deve parar no stage do HTTP API e no domínio do Cognito.
+
+**Limites conhecidos desta política:**
+
+- `EdgePolicies` vale em `*`: o papel de um ambiente lê as políticas e o OAC do outro e cria novos, mas não altera nem apaga os que existem.
+- `TagOwn` aceita recurso sem a tag `environment`: um certificado, distribuição ou user pool criado fora do Terraform, sem tags, pode ser etiquetado por qualquer um dos dois papéis e passa a ser dele. Os recursos dos ambientes nascem etiquetados.
+- `ZoneRead` e `ZoneList` deixam ler todos os registros da zona, inclusive os do outro ambiente. São dados públicos de DNS.
+- Produção grava qualquer registro `A` ou `CNAME` que comece com `_` (fora de `staging.`), não só os CNAMEs de validação: o nome deles é gerado pelo ACM.
+- Em `apigateway:POST`, `PATCH` e `GET` sobre rotas, integrações, authorizer e mapeamentos, a condição depende de o API Gateway v2 aplicar a tag da API aos recursos filhos. O Service Reference lista `aws:ResourceTag` nesses tipos; a documentação só afirma a herança para a API v1. Se não valer, o deploy falha fechado e a saída é decisão do autor (#338).
+- Nada aqui foi testado contra a AWS. Primeiros suspeitos no primeiro deploy, todos com falha fechada: a herança acima; criar API, stage ou domínio com tags pedir `apigateway:PUT` em `/tags/*`; e `aws:ResourceTag` não chegar a `cloudfront:CreateInvalidation`.
+- `#trivy:ignore:AVD-AWS-0057` na política: `Resource: *` em `CreateTagged`, `EdgePolicies`, `UserPoolDomainRead` e `ZoneList`, e o `*` no lugar do ID nos demais. Nenhuma ação tem curinga.
+
+### Negações
 
 As negações da política inline `deny-guardrails` vencem qualquer `Allow` acima:
 
@@ -104,7 +164,7 @@ Limites conhecidos:
 - A negação de dado cobre os serviços que o projeto usa. Serviço novo com dado (fila, stream, bucket com dado de usuário) pede negação nova aqui.
 - Ela não fecha o caminho pela configuração: quem aplica pode trocar o código de uma função, um gatilho do user pool ou o destino de um alarme. A revisão do PR e o `plan-guard` são as outras camadas.
 - O branch é garantido no IAM pelo `ref`. Restringir os GitHub Environments `staging` e `production` ao branch `main` é a segunda camada e é feita pelo autor (#77).
-- Não existe chave de condição para o evento, e o trust não fixa o arquivo de workflow. Qualquer job de um workflow que esteja em `main`, declare o Environment e rode com `ref` igual a `refs/heads/main` assume o papel: push, `workflow_dispatch`, `schedule` e também `pull_request_target` e `workflow_run`. Por isso nenhum job com `environment:` pode rodar em `pull_request_target` ou `workflow_run` executando código do PR (regra para a #22 e a #23). Quando os workflows de deploy existirem, o trust pode fixar também `job_workflow_ref` (#169).
+- Não existe chave de condição para o evento, e o trust não fixa o arquivo de workflow. Qualquer job de um workflow que esteja em `main`, declare o Environment e rode com `ref` igual a `refs/heads/main` assume o papel: push, `workflow_dispatch`, `schedule` e também `pull_request_target` e `workflow_run`. Por isso nenhum job com `environment:` pode rodar em `pull_request_target` ou `workflow_run` executando código do PR (regra para a #22 e a #23). A AWS aceita a chave `job_workflow_ref` para o provedor do GitHub, mas o trust **não** a fixa (decisão da #169): o workflow de produção (#23) ainda não existe; um valor errado tranca o deploy e só se corrige reaplicando o bootstrap à mão; e o ganho é pequeno contra o adversário deste papel, porque um PR malicioso mergeado pode editar o próprio arquivo fixado. Vale rever depois do primeiro deploy, com o valor real da claim lido de um job.
 - O papel grava o próprio estado, então consegue sobrescrevê-lo. O que ele não consegue é excluir versões nem desligar o versionamento: o autor recupera a versão anterior. A negação `DenyStateBucketConfig` não escolhe quais objetos do bucket são lidos ou gravados; isso é do `Allow`, que só cita o estado e o `.tflock`. O bucket de estado casa com `acp-<prefixo>-*`: nenhum `Allow` de S3 das continuações pode usar esse prefixo.
 - O trust só é provado no primeiro deploy depois da #77: os testes usam provider simulado.
 - `iam:CreateRole` aceita qualquer trust, e não existe chave de condição que o restrinja. O apply pode criar um dos dois papéis de nome fixo (`acp-<prefixo>-api` e `acp-<prefixo>-llm-proxy`) com trust para outra conta, sempre dentro do limite; veja "Limite de permissões" abaixo para o que esse papel alcança. Sem `DeleteRole`, o apply não recria um papel que já existe.
@@ -179,22 +239,30 @@ Limites conhecidos:
 
 ## Como aplicar (autor)
 
-Pré-requisitos: Terraform 1.16, credencial temporária de administrador da conta (SSO ou sessão de curta duração, nunca chave de acesso gravada em arquivo). Os guardrails de custo (`docs/runbooks/guardrails-de-custo.md`) vêm depois, por ambiente, com a infra dele já aplicada; antes do bootstrap só cabe a leitura da quota de concorrência da conta (guardrail 1 do runbook).
+Pré-requisitos: Terraform 1.16, credencial temporária de administrador da conta (SSO ou sessão de curta duração, nunca chave de acesso gravada em arquivo) e a zona pública do domínio já criada no Route 53 (#74): o bootstrap lê o ID dela. Os guardrails de custo (`docs/runbooks/guardrails-de-custo.md`) vêm depois, por ambiente, com a infra dele já aplicada; antes do bootstrap só cabe a leitura da quota de concorrência da conta (guardrail 1 do runbook).
 
 ```bash
 cd infra/bootstrap
+export TF_VAR_zone_name="<domínio>"   # o mesmo de TF_VAR_ZONE_NAME no GitHub: minúsculas, sem ponto final
 terraform init -lockfile=readonly
 terraform plan -out=bootstrap.tfplan   # confira: só criação, nenhum delete ou replace
 terraform apply bootstrap.tfplan
 ```
 
-Reaplicar depois de uma mudança neste diretório é o mesmo roteiro. Na reaplicação que traz a política `acp-ci-apply-named-<env>` (#167), o `plan` deve mostrar 4 criações (2 políticas e 2 anexos) e 2 atualizações no lugar (a política inline `deny-data` de cada papel), sem `delete` nem `replace`. Aplique o bootstrap **antes** do primeiro apply de um ambiente que use o limite (#165): sem a política, a criação dos papéis das funções falha.
+Reaplicar depois de uma mudança neste diretório é o mesmo roteiro. Na reaplicação que traz a política `acp-ci-apply-named-<env>` (#167), o `plan` deve mostrar 4 criações (2 políticas e 2 anexos) e 2 atualizações no lugar (a política inline `deny-data` de cada papel), sem `delete` nem `replace`. Na que traz a política `acp-ci-apply-id-<env>` (#169), 5 criações (2 políticas, 2 anexos e o papel vinculado a serviço do API Gateway) e nenhuma atualização; se o papel vinculado já existir na conta, importe-o antes (abaixo) e o plano mostra 4. Aplique o bootstrap **antes** do primeiro apply de um ambiente que use o limite (#165): sem a política, a criação dos papéis das funções falha.
 
 Se a conta já tiver um provedor OIDC do GitHub (só pode haver um por conta), importe-o antes do `apply`:
 
 ```bash
 terraform import aws_iam_openid_connect_provider.github \
   "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):oidc-provider/token.actions.githubusercontent.com"
+```
+
+O mesmo vale para o papel vinculado a serviço do API Gateway, que só existe uma vez por conta e nasce sozinho se alguém já criou uma API ou um domínio do API Gateway nela. `aws iam get-role --role-name AWSServiceRoleForAPIGateway` diz se ele existe; se existir:
+
+```bash
+terraform import aws_iam_service_linked_role.apigateway \
+  "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway"
 ```
 
 ## Saídas que viram variáveis do GitHub
@@ -259,6 +327,9 @@ O bootstrap cria o bucket onde o estado dos ambientes mora, então o estado dele
 | `aws_iam_policy.apply_boundary["<env>"]` | `arn:aws:iam::<id da conta>:policy/acp-ci-boundary-<env>` |
 | `aws_iam_policy.apply_named["<env>"]` | `arn:aws:iam::<id da conta>:policy/acp-ci-apply-named-<env>` |
 | `aws_iam_role_policy_attachment.apply_named["<env>"]` | `acp-ci-apply-<env>/arn:aws:iam::<id da conta>:policy/acp-ci-apply-named-<env>` |
+| `aws_iam_policy.apply_id["<env>"]` | `arn:aws:iam::<id da conta>:policy/acp-ci-apply-id-<env>` |
+| `aws_iam_role_policy_attachment.apply_id["<env>"]` | `acp-ci-apply-<env>/arn:aws:iam::<id da conta>:policy/acp-ci-apply-id-<env>` |
+| `aws_iam_service_linked_role.apigateway` | `arn:aws:iam::<id da conta>:role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway` |
 
 ## Verificação sem credenciais
 
@@ -268,6 +339,6 @@ terraform -chdir=infra/bootstrap validate
 terraform -chdir=infra/bootstrap test
 ```
 
-Os testes (`tests/bootstrap.tftest.hcl`, `tests/apply.tftest.hcl`, `tests/boundary.tftest.hcl`, `tests/named.tftest.hcl` e `tests/prices.tftest.hcl`) usam provider simulado. O CI roda `fmt`, `validate`, `terraform test`, `tflint` e `trivy config` neste diretório (`infra/tools/tf_checks.sh`). O `terraform test` não enxerga `lifecycle` nem recurso que não foi declarado: o `prevent_destroy` dos buckets e do provedor OIDC é conferido por leitura. Para os papéis `apply`, o limite e a política de escrita, isso fica com `infra/tools/tests/test_bootstrap_apply_roles.py`, que o CI roda com os testes do `plan-guard`: ele confere o `prevent_destroy` dos três (papéis, limite e política de escrita) e do papel `prices`, a paridade do nome do bucket do site entre `infra/envs/*/main.tf` e `named.tf`, e compara os recursos de IAM do diretório com um inventário fechado. Política inline, política gerenciada, anexo ou papel novo reprova até entrar no inventário de propósito. O conteúdo das políticas dos papéis `apply` é travado por igualdade em `tests/apply.tftest.hcl`, o do limite e da negação de dado em `tests/boundary.tftest.hcl`, e o da política de escrita em `tests/named.tftest.hcl`: igualdade da lista, o teto de 6.144 caracteres, escopo por ambiente (com sondas do outro ambiente), bucket de estado fora, `PassRole` e `AddPermission` com condição, e nenhuma ação de dado, de exclusão ou já negada. É assim que o critério "sem `AdministratorAccess`" e o "único `Allow`" são verificados.
+Os testes (`tests/bootstrap.tftest.hcl`, `tests/apply.tftest.hcl`, `tests/boundary.tftest.hcl`, `tests/named.tftest.hcl`, `tests/by_id.tftest.hcl` e `tests/prices.tftest.hcl`) usam provider simulado, com `zone_name = "example.com"`. O CI roda `fmt`, `validate`, `terraform test`, `tflint` e `trivy config` neste diretório (`infra/tools/tf_checks.sh`). O `terraform test` não enxerga `lifecycle` nem recurso que não foi declarado: o `prevent_destroy` dos buckets e do provedor OIDC é conferido por leitura. Para os papéis `apply`, o limite e a política de escrita, isso fica com `infra/tools/tests/test_bootstrap_apply_roles.py`, que o CI roda com os testes do `plan-guard`: ele confere o `prevent_destroy` dos três (papéis, limite e política de escrita) e do papel `prices`, a paridade do nome do bucket do site entre `infra/envs/*/main.tf` e `named.tf`, e compara os recursos de IAM do diretório com um inventário fechado. Política inline, política gerenciada, anexo ou papel novo reprova até entrar no inventário de propósito. O conteúdo das políticas dos papéis `apply` é travado por igualdade em `tests/apply.tftest.hcl`, o do limite e da negação de dado em `tests/boundary.tftest.hcl`, e o da política de escrita em `tests/named.tftest.hcl`: igualdade da lista, o teto de 6.144 caracteres, escopo por ambiente (com sondas do outro ambiente), bucket de estado fora, `PassRole` e `AddPermission` com condição, e nenhuma ação de dado, de exclusão ou já negada. `tests/by_id.tftest.hcl` faz o mesmo para a política por ID: igualdade da lista, os tetos por política e por papel (6.144 caracteres por gerenciada, 10.240 de inline, duas gerenciadas anexadas das 10 possíveis), a tag do próprio ambiente em toda escrita, nomes de registro DNS de um ambiente recusados pelo outro (sondas), nenhuma ação de usuário do Cognito, e o domínio inválido recusado. O teste Python também confere que toda ação das duas políticas de escrita está na tabela deste README, pelo nome `serviço:Ação`. É assim que o critério "sem `AdministratorAccess`" e o "único `Allow`" são verificados.
 
 `.terraform.lock.hcl` é versionado, com os hashes `h1:` de linux_amd64, linux_arm64 e darwin_arm64.
