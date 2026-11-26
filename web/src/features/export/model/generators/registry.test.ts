@@ -17,7 +17,6 @@ describe('registro dos geradores', () => {
       [
         'aws.alb',
         'aws.cloudformation',
-        'aws.cloudfront',
         'aws.cloudtrail',
         'aws.cloudwatch',
         'aws.codepipeline',
@@ -30,7 +29,6 @@ describe('registro dos geradores', () => {
         'aws.nat-gateway',
         'aws.rds',
         'aws.route53',
-        'aws.s3',
         'aws.secrets-manager',
         'aws.sqs',
         'aws.waf',
