@@ -5,7 +5,7 @@
   "files": [
     {
       "path": "sa-east-1/alb.json",
-      "sha256": "3199085679874ccae96b6e481089f7b1be290044dc672943bd07d0a153c95d2a"
+      "sha256": "735a2a1fb27211dad61fcce9f36049bc74ba26300052186845c57072f09b0481"
     },
     {
       "path": "sa-east-1/cloudfront.json",
@@ -45,7 +45,7 @@
     },
     {
       "path": "sa-east-1/nat-gateway.json",
-      "sha256": "fa73355740f05ba4529b93656bb8656b34a92678e7117d3bd1cd3ca1544387c6"
+      "sha256": "9458e33e99def7fedbdfb26b2ebe3ed31d6e77cbd59bd3617af3c8955a186098"
     },
     {
       "path": "sa-east-1/rds.json",
@@ -73,7 +73,7 @@
     },
     {
       "path": "us-east-1/alb.json",
-      "sha256": "f61802200852d44a198f616e606408b77dd54fd9bd80a667d1f2706fc8295955"
+      "sha256": "2560d413e0ab97f3bea7ff1c717eee4761d2e3d7bf2c20c2af6270b9f18764f5"
     },
     {
       "path": "us-east-1/cloudfront.json",
@@ -113,7 +113,7 @@
     },
     {
       "path": "us-east-1/nat-gateway.json",
-      "sha256": "9a36887fe8fa4e3c827bbda2cf07e9bf64711bda34b01a88d1f216f2443aee48"
+      "sha256": "7cf6ed8924797f59b7b40c3bd376b9ef5b9dfb5d448a44172a4bfb8863552725"
     },
     {
       "path": "us-east-1/rds.json",
