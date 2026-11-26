@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations } from '../../../test/axe';
@@ -11,12 +11,14 @@ import { EMPTY_STATE } from '../model/editorState';
 import { CanvasPanel } from './CanvasPanel';
 
 // O jsdom não mede o canvas nem preenche as coordenadas do soltar: a conversão de tela para fluxo é fixa.
+const zoom = vi.hoisted(() => ({ zoomIn: vi.fn(), zoomOut: vi.fn(), fitView: vi.fn() }));
 vi.mock('@xyflow/react', async (importOriginal) => {
   const original = await importOriginal<typeof import('@xyflow/react')>();
   return {
     ...original,
     useReactFlow: () => ({
       ...original.useReactFlow(),
+      ...zoom,
       screenToFlowPosition: () => ({ x: 120, y: 80 }),
     }),
   };
@@ -98,11 +100,19 @@ describe('CanvasPanel', () => {
     expect(designStore.getState().selection).toBeNull();
   });
 
-  it('oferece zoom e ajustar à tela por botões nomeados', async () => {
+  it('os botões de zoom e de ajustar chamam o React Flow', async () => {
     renderCanvas();
-    for (const name of ['Aumentar o zoom', 'Diminuir o zoom', 'Ajustar à tela']) {
-      expect(await screen.findByRole('button', { name })).toBeEnabled();
+    const tools = await screen.findByRole('group', { name: 'Zoom do diagrama' });
+    for (const [name, spy] of [
+      ['Aumentar o zoom', zoom.zoomIn],
+      ['Diminuir o zoom', zoom.zoomOut],
+    ] as const) {
+      fireEvent.click(within(tools).getByRole('button', { name }));
+      expect(spy).toHaveBeenCalledTimes(1);
     }
+    zoom.fitView.mockClear();
+    fireEvent.click(within(tools).getByRole('button', { name: 'Ajustar à tela' }));
+    expect(zoom.fitView).toHaveBeenCalledTimes(1);
   });
 
   it('com o design vazio, orienta e mantém só o client', async () => {
@@ -112,7 +122,8 @@ describe('CanvasPanel', () => {
         <CanvasPanel />
       </QueryClientProvider>,
     );
-    expect(await screen.findByText(/Adicione um bloco pela paleta/)).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Canvas vazio' })).toBeVisible();
+    expect(container.querySelector('[aria-live=polite]')).toBeInTheDocument();
     expect(container.querySelectorAll('.react-flow__node')).toHaveLength(1);
   });
 

@@ -20,8 +20,14 @@ import {
   type ReactElement,
 } from 'react';
 import { CLIENT_NODE_ID } from '../../../shared/lib/design';
-import { IconButton, Notice } from '../../../shared/ui';
-import { applyEdgeChanges, applyNodeChanges, type FlowChange } from '../hooks/canvasHandlers';
+import { EmptyState, IconButton, Notice } from '../../../shared/ui';
+import {
+  applyEdgeChanges,
+  applyNodeChanges,
+  connectBlocks,
+  refusalMessage,
+  type FlowChange,
+} from '../hooks/canvasHandlers';
 import { designStore } from '../hooks/designStore';
 import { useCanvasCosts } from '../hooks/useCanvasCosts';
 import { useDesignStore } from '../hooks/useDesignStore';
@@ -85,23 +91,26 @@ function Canvas(): ReactElement {
     [],
   );
   const onConnect = useCallback((c: Connection) => {
-    const check = checkConnection(designStore.getState().document, c.source, c.target);
-    if (!check.ok) return setRefusal(check.message);
-    const result = designStore
-      .getState()
-      .connect({ source: c.source, target: c.target, kind: check.kind });
-    setRefusal(result.ok ? null : 'Não foi possível criar a conexão.');
+    setRefusal(connectBlocks(c, designStore.getState()));
   }, []);
   // O React Flow recusa em silêncio; aqui o motivo chega ao usuário.
   const onConnectEnd = useCallback((_: unknown, state: FinalConnectionState) => {
     if (state.isValid !== false || !state.fromNode || !state.toNode) return;
-    const fromSource = state.fromHandle?.type !== 'target';
-    const [source, target] = fromSource
-      ? [state.fromNode.id, state.toNode.id]
-      : [state.toNode.id, state.fromNode.id];
-    const check = checkConnection(designStore.getState().document, source, target);
-    if (!check.ok) setRefusal(check.message);
+    const from = state.fromNode.id;
+    const to = state.toNode.id;
+    const ends =
+      state.fromHandle?.type === 'target'
+        ? { source: to, target: from }
+        : { source: from, target: to };
+    setRefusal(refusalMessage(designStore.getState().document, ends));
   }, []);
+  // Quem usa teclado dispensa o aviso com Esc.
+  useEffect(() => {
+    if (!refusal) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setRefusal(null);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [refusal]);
 
   // Soltar bloco da paleta (contrato da #47): só o tipo viaja; o bloco nasce com o padrão do contrato.
   const onDragOver = useCallback((e: DragEvent) => {
@@ -148,7 +157,12 @@ function Canvas(): ReactElement {
         aria-label="Diagrama da arquitetura"
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
-        <Panel position="top-right" className={styles.tools}>
+        <Panel
+          position="top-right"
+          className={styles.tools}
+          role="group"
+          aria-label="Zoom do diagrama"
+        >
           <IconButton aria-label="Aumentar o zoom" onClick={() => void flow.zoomIn()}>
             <Icon name="plus" />
           </IconButton>
@@ -161,13 +175,21 @@ function Canvas(): ReactElement {
         </Panel>
       </ReactFlow>
       {document.blocks.length === 0 && (
-        <p className={styles.empty}>Adicione um bloco pela paleta para começar o desenho.</p>
-      )}
-      {refusal && (
-        <div className={styles.refusal}>
-          <Notice tone="warning" message={refusal} />
+        <div className={styles.empty}>
+          <EmptyState
+            title="Canvas vazio"
+            description="Arraste um bloco da paleta para começar o desenho."
+            action={
+              <span className={styles.hint}>
+                Enter ou Espaço num item da paleta também adiciona.
+              </span>
+            }
+          />
         </div>
       )}
+      <div className={styles.refusal} aria-live="polite">
+        {refusal && <Notice tone="warning" message={refusal} />}
+      </div>
     </div>
   );
 }

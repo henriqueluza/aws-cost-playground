@@ -1,4 +1,6 @@
-import type { DesignActions } from './designStore';
+import type { DesignDocument } from '../../../shared/lib/design';
+import { checkConnection } from '../model/canvasModel';
+import type { DesignActions, DesignStoreState } from './designStore';
 import type { Selection } from '../model/editorState';
 
 /** Subconjunto das mudanças do React Flow que o canvas traduz; o resto (dimensões) é ignorado. */
@@ -56,4 +58,26 @@ function applySelection(
   }
   const dropped = picks.some((c) => selection?.kind === kind && c.id === selection.id);
   if (dropped) actions.select(null);
+}
+
+type ConnectionEnds = { readonly source: string; readonly target: string };
+
+/**
+ * `onConnect`: valida pelo contrato e chama `connect`. Devolve a frase da recusa, ou `null` se a
+ * aresta foi criada.
+ */
+export function connectBlocks(
+  ends: ConnectionEnds,
+  store: Pick<DesignStoreState, 'document' | 'connect'>,
+): string | null {
+  const check = checkConnection(store.document, ends.source, ends.target);
+  if (!check.ok) return check.message;
+  const result = store.connect({ source: ends.source, target: ends.target, kind: check.kind });
+  return result.ok ? null : 'Não foi possível criar a conexão.';
+}
+
+/** `onConnectEnd`: o motivo de uma conexão que o React Flow recusou em silêncio. */
+export function refusalMessage(document: DesignDocument, ends: ConnectionEnds): string | null {
+  const check = checkConnection(document, ends.source, ends.target);
+  return check.ok ? null : check.message;
 }

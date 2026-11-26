@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { applyEdgeChanges, applyNodeChanges } from './canvasHandlers';
+import { designDocumentSchema } from '../../../shared/lib/design';
+import { adrExampleDesign } from '../../../test/designFixtures';
+import {
+  applyEdgeChanges,
+  applyNodeChanges,
+  connectBlocks,
+  refusalMessage,
+} from './canvasHandlers';
+import { createDesignStore } from './designStore';
 
 const actions = () => ({
   moveBlock: vi.fn(),
@@ -89,5 +97,41 @@ describe('applyEdgeChanges', () => {
       id: 'blk_a',
     });
     expect(a.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('conectar pela store', () => {
+  const document = designDocumentSchema.parse({
+    ...adrExampleDesign,
+    edges: [],
+    blocks: [
+      ...adrExampleDesign.blocks,
+      { ...adrExampleDesign.blocks[0]!, id: 'blk_iam', type: 'aws.iam', attributes: {} },
+    ],
+  });
+  const storeOf = () => createDesignStore({ document, layout: {}, selection: null });
+
+  it('conexão do contrato cria a aresta pela ação `connect` e não devolve recusa', () => {
+    const store = storeOf();
+    expect(
+      connectBlocks({ source: 'blk_fn_api', target: 'blk_assets' }, store.getState()),
+    ).toBeNull();
+    expect(store.getState().document.edges).toMatchObject([
+      { source: 'blk_fn_api', target: 'blk_assets', kind: 'data' },
+    ]);
+  });
+
+  it('conexão fora do contrato devolve a explicação e não altera o design', () => {
+    const store = storeOf();
+    const message = connectBlocks({ source: 'blk_iam', target: 'blk_fn_api' }, store.getState());
+    expect(message).toContain('IAM não se conecta com Lambda');
+    expect(store.getState().document.edges).toEqual([]);
+  });
+
+  it('explica a recusa do React Flow e cala quando o par vale', () => {
+    expect(refusalMessage(document, { source: 'blk_fn_api', target: 'client' })).toContain(
+      'internet',
+    );
+    expect(refusalMessage(document, { source: 'blk_fn_api', target: 'blk_assets' })).toBeNull();
   });
 });

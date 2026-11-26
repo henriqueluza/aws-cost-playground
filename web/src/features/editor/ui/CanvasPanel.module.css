@@ -204,14 +204,17 @@
 
 .empty {
   position: absolute;
-  inset-inline: 0;
-  bottom: var(--space-6);
-  margin: 0;
-  text-align: center;
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--muted);
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding-bottom: var(--space-6);
+  background-color: transparent;
   pointer-events: none;
+}
+
+.hint {
+  font-size: var(--fs-small);
+  color: var(--muted);
 }
 
 .refusal {
@@ -221,4 +224,17 @@
   display: flex;
   justify-content: center;
   pointer-events: none;
+}
+
+/* Durante a conexão, o destino sob o cursor ganha a tinta de seleção. */
+.canvas :global(.react-flow__handle.connectingfrom)::after,
+.canvas :global(.react-flow__handle.connectingto)::after {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+@media (forced-colors: active) {
+  .canvas :global(.react-flow__edge.selected .react-flow__edge-path) {
+    stroke: Highlight;
+  }
 }
