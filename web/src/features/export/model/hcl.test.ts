@@ -9,6 +9,8 @@ const SAFE_LITERAL =
 describe('quoteHclString', () => {
   it.each([
     ['simples', 'fila de pedidos', '"fila de pedidos"'],
+    ['vazia', '', '""'],
+    ['escape Unicode escrito pelo usuário', '\\u0022 \\n', '"\\\\u0022 \\\\n"'],
     ['aspas e barra', 'a"b\\c', '"a\\"b\\\\c"'],
     ['quebra de linha e tab', 'a\nb\r\tc', '"a\\nb\\r\\tc"'],
     ['interpolação', '${var.x}', '"$${var.x}"'],
@@ -111,6 +113,38 @@ describe('renderHcl', () => {
     );
   });
 
+  it('isola o valor de várias linhas, alinha por símbolo e aceita identificador de 64 caracteres', () => {
+    const long = 'a'.repeat(64);
+    const text = renderHcl([
+      hcl.block(
+        'locals',
+        [],
+        [
+          hcl.attr('x', hcl.number(1)),
+          hcl.attr('rules', hcl.list([hcl.map({ port: hcl.number(443) }), hcl.map({})])),
+          hcl.attr(long, hcl.map({ '🚀': hcl.bool(true), ab: hcl.bool(false) })),
+        ],
+      ),
+    ]);
+    expect(text).toBe(
+      [
+        'locals {',
+        '  x = 1',
+        '',
+        '  rules = [{',
+        '    "port" = 443',
+        '  }, {}]',
+        '',
+        `  ${long} = {`,
+        '    "🚀"  = true',
+        '    "ab" = false',
+        '  }',
+        '}',
+        '',
+      ].join('\n'),
+    );
+  });
+
   const evil = 'x" {}\nresource "aws_iam_user" "y';
   it.each([
     ['nome de atributo', () => hcl.attr(evil, hcl.bool(true))],
@@ -118,6 +152,8 @@ describe('renderHcl', () => {
     ['tipo de bloco', () => hcl.block(evil, [], [])],
     ['rótulo de bloco', () => hcl.block('resource', ['aws_s3_bucket', evil], [])],
     ['rótulo vazio', () => hcl.block('resource', ['aws_s3_bucket', ''], [])],
+    ['identificador de 65 caracteres', () => hcl.attr('a'.repeat(65), hcl.bool(true))],
+    ['referência com parte vazia', () => hcl.attr('a', hcl.ref('var', '', 'x'))],
     ['referência', () => hcl.attr('a', hcl.ref('var', 'x}\nb = file("/etc/passwd")'))],
     ['referência com chamada', () => hcl.attr('a', hcl.ref('file("/etc/passwd")'))],
     ['referência vazia', () => hcl.attr('a', hcl.ref())],
