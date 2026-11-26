@@ -12,7 +12,6 @@ import {
   failureMessage,
   lockOf,
   quotaLine,
-  quotaRatio,
 } from '../model/messages';
 import styles from './WorkloadPanel.module.css';
 
@@ -126,14 +125,7 @@ export function WorkloadPanel(): ReactElement {
               {hint}
             </p>
           ) : null}
-          {run.quota ? (
-            <div className={styles.quota}>
-              <p className={styles.quotaText}>{quotaLine(run.quota)}</p>
-              <div className={styles.track} aria-hidden="true">
-                <div className={styles.fill} style={{ width: `${quotaRatio(run.quota) * 100}%` }} />
-              </div>
-            </div>
-          ) : null}
+          {run.quota ? <p className={styles.quotaText}>{quotaLine(run.quota)}</p> : null}
           <p role="status" className={styles.status}>
             {run.applied ? appliedMessage(run.applied.blocks, run.applied.edges) : ''}
           </p>

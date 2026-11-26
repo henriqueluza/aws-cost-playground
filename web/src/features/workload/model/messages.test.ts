@@ -6,7 +6,6 @@ import {
   failureOf,
   lockOf,
   quotaLine,
-  quotaRatio,
   type EstimateFailure,
 } from './messages';
 
@@ -70,19 +69,15 @@ const FUTURE = '2999-01-01T00:00:00.000Z';
 const PAST = '2020-01-01T00:00:00.000Z';
 const NOW = Date.parse('2026-11-26T12:00:00.000Z');
 
-describe('appliedMessage, quotaLine e quotaRatio', () => {
+describe('appliedMessage e quotaLine', () => {
   it('conta no singular e no plural; sem nada aproveitável diz que nada mudou', () => {
     expect(appliedMessage(1, 1)).toBe('Estimativa aplicada: 1 bloco e 1 conexão.');
     expect(appliedMessage(3, 2)).toBe('Estimativa aplicada: 3 blocos e 2 conexões.');
     expect(appliedMessage(0, 0)).toMatch(/não trouxe valores utilizáveis; nada foi alterado/);
   });
 
-  it('linha de quota e proporção da barra, com limite 0 e valores fora da faixa', () => {
+  it('linha da quota restante', () => {
     expect(quotaLine({ limit: 20, remaining: 12 })).toBe('Restam 12 de 20 hoje');
-    expect(quotaRatio({ limit: 20, remaining: 5 })).toBe(0.25);
-    expect(quotaRatio({ limit: 0, remaining: 0 })).toBe(0);
-    expect(quotaRatio({ limit: 1, remaining: 1 })).toBe(1);
-    expect(quotaRatio({ limit: 2, remaining: 9 })).toBe(1);
   });
 });
 

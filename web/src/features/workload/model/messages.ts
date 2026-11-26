@@ -55,13 +55,9 @@ export function failureMessage(failure: EstimateFailure): string {
   }
 }
 
-/** "Restam 12 de 20 hoje"; a proporção da barra vai de 0 a 1. */
+/** "Restam 12 de 20 hoje". */
 export function quotaLine(quota: Pick<Quota, 'limit' | 'remaining'>): string {
   return `Restam ${quota.remaining} de ${quota.limit} hoje`;
-}
-
-export function quotaRatio(quota: Pick<Quota, 'limit' | 'remaining'>): number {
-  return quota.limit > 0 ? Math.min(1, Math.max(0, quota.remaining / quota.limit)) : 0;
 }
 
 export function appliedMessage(blocks: number, edges: number): string {
