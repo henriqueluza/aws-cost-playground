@@ -13,7 +13,7 @@ import pytest
 from fastapi import FastAPI
 
 from app.designs import repository
-from app.designs.schemas import DESIGN_ID_PATTERN, MAX_DOC_BYTES
+from app.designs.schemas import DESIGN_ID_PATTERN, MAX_DOC_BYTES, MAX_VERSION
 from tests.test_design_document import ADR, js_size
 from tests.test_designs import (
     MISSING,
@@ -232,3 +232,27 @@ def test_atualizar_sem_expected_version_e_422_sem_gravar(app: FastAPI, table: An
     status, problem = call(app, "PATCH", f"/designs/{design['id']}", {"name": "sem versão"})
     assert (status, problem["errors"][0]["loc"]) == (422, ["body", "expectedVersion"])
     assert stored(table) == before
+
+
+@pytest.mark.parametrize("version", [MAX_VERSION + 1, 10**38 - 1, 10**38, 10**400])
+def test_expected_version_acima_do_teto_e_422_sem_chegar_ao_dynamodb(
+    app: FastAPI, table: Any, version: int
+) -> None:
+    """INP-1: sem o teto, 10^38 - 1 estourava no serializador do boto3 e virava 500."""
+    design = create(app)
+    before = stored(table)
+    used = operations(table)
+    body = {"expectedVersion": version, "name": "acima do teto"}
+    status, problem = call(app, "PATCH", f"/designs/{design['id']}", body)
+    assert (status, problem["errors"][0]["loc"]) == (422, ["body", "expectedVersion"])
+    assert str(version) not in str(problem)  # o valor recusado não é ecoado
+    assert used == []  # antes do `stored` abaixo, que faz um Scan
+    assert stored(table) == before
+
+
+def test_expected_version_no_teto_passa_na_validacao_e_e_409(app: FastAPI, table: Any) -> None:
+    design = create(app)
+    used = operations(table)
+    body = {"expectedVersion": MAX_VERSION, "name": "no teto"}
+    assert call(app, "PATCH", f"/designs/{design['id']}", body) == (409, CONFLICT)
+    assert used == ["UpdateItem"]

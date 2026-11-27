@@ -17,6 +17,9 @@ from app.errors import TOO_LARGE_ERROR
 DESIGN_ID_PATTERN = r"^[0-9A-HJKMNP-TV-Z]{26}$"
 MAX_DOC_BYTES = 350_000
 """Teto do documento (ADR-0001): o item do DynamoDB aceita 400 KB."""
+MAX_VERSION = 2**53 - 1
+"""Maior inteiro exato do JS (`Number.MAX_SAFE_INTEGER`). Acima disso o `web/` não representa a
+versão, e um inteiro de 38 dígitos ou mais nem cabe no número do DynamoDB."""
 
 DesignId = Annotated[str, StringConstraints(pattern=DESIGN_ID_PATTERN)]
 DesignName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
@@ -42,7 +45,7 @@ class DesignCreate(ContractModel):
 
 
 class DesignUpdate(ContractModel):
-    expected_version: Annotated[int, Field(ge=1)]
+    expected_version: Annotated[int, Field(ge=1, le=MAX_VERSION)]
     # `null` explícito é recusado (`NotNull`): o web omite a chave quando não altera o campo.
     name: Annotated[DesignName | None, NotNull] = None
     doc: Annotated[SizedDesignDocument | None, NotNull] = None
