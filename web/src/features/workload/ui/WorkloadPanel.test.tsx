@@ -12,6 +12,9 @@ import { AuthProvider } from '../../auth';
 import { EMPTY_STATE, designStore } from '../../editor';
 import { WorkloadPanel } from './WorkloadPanel';
 
+// Data de reset sempre no futuro: o painel compara com o relógio real (#389).
+const FUTURE_RESET = '2999-01-01T00:00:00.000Z';
+
 const doc = designDocumentSchema.parse(adrExampleDesign);
 const state = (document: DesignDocument) =>
   designStore.setState({ ...EMPTY_STATE, document, history: { past: [], future: [] } });
@@ -120,7 +123,7 @@ describe('WorkloadPanel: estimar', () => {
     const { container } = setup({
       estimate: async () => (
         await gate,
-        { ...LLM, quota: { limit: 20, remaining: 18, resetsAt: '2026-11-27T00:00:00.000Z' } }
+        { ...LLM, quota: { limit: 20, remaining: 18, resetsAt: FUTURE_RESET } }
       ),
     });
     expect(await screen.findByText('Restam 20 de 20 hoje')).toBeInTheDocument();
@@ -149,7 +152,7 @@ describe('WorkloadPanel: estimar', () => {
     const { api } = setup({
       estimate: async () => (
         await gate,
-        { ...LLM, quota: { limit: 20, remaining: 1, resetsAt: '2026-11-27T00:00:00.000Z' } }
+        { ...LLM, quota: { limit: 20, remaining: 1, resetsAt: FUTURE_RESET } }
       ),
     });
     await userEvent.dblClick(button());
@@ -183,7 +186,7 @@ describe('WorkloadPanel: estimar', () => {
     const { unmount, api } = setup({
       estimate: async () => (
         await gate,
-        { ...LLM, quota: { limit: 20, remaining: 1, resetsAt: '2026-11-27T00:00:00.000Z' } }
+        { ...LLM, quota: { limit: 20, remaining: 1, resetsAt: FUTURE_RESET } }
       ),
     });
     await userEvent.click(button());
@@ -228,7 +231,7 @@ describe('WorkloadPanel: quota zerada e resposta vazia', () => {
 });
 
 describe('WorkloadPanel: erros', () => {
-  const reset = '2026-11-27T00:00:00.000Z';
+  const reset = FUTURE_RESET;
   it.each([
     [
       { kind: 'quota-exhausted', scope: 'user', resetsAt: reset } as const,
