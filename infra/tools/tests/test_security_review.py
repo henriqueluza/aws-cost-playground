@@ -37,6 +37,7 @@ CONNECT_SRC = [
 ]
 # Exceções de scanner aceitas, com o motivo em docs/security/revisao.md. Exceção nova muda esta lista.
 SCANNER_IGNORES = {
+    ("bootstrap/artifacts.tf", "AVD-AWS-0132"),
     ("bootstrap/boundary.tf", "AVD-AWS-0057"),
     ("bootstrap/by_id.tf", "AVD-AWS-0057"),
     ("bootstrap/named.tf", "AVD-AWS-0057"),

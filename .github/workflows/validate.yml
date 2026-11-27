@@ -95,6 +95,12 @@ jobs:
           uv run mypy app
           uv run lint-imports
           uv run pytest -q --cov
+      # O mesmo script do deploy de staging: `main` nunca recebe um pacote que não monta (#211).
+      # Só confere e mede; o zip fica em $RUNNER_TEMP e não é publicado como artefato.
+      - name: Funções — monta o zip das Lambdas (mesmo script do deploy)
+        run: |
+          scripts/build-functions.sh "$RUNNER_TEMP/functions.zip" > /dev/null
+          echo "functions.zip: $(stat -c %s "$RUNNER_TEMP/functions.zip") bytes"
       - name: Pricing — format, lint, tipos, arquitetura e testes
         working-directory: pricing
         env:

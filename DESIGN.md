@@ -309,7 +309,7 @@ Densidade é três ajustes movidos juntos: passo da linha, padding e tamanho do 
 | Inspetor (atributos e uso) | 32px por linha chave-valor; campos de 32px | Rótulo em 12px/500 `--muted` acima do campo, 4px de distância | 16px; 12px entre campos | Unidade dentro do campo, à direita, em `--faint`. Um grupo por assunto (SKU, uso), separado por 24px. |
 | Carimbo | 32px por linha | KPI de 28px para o total; o resto em 12px a 14px | 12px | Células separadas por régua `--rule` de 1px, como o carimbo de uma prancha. |
 | Tabela de comparação | 40px; cabeçalho de 36px | 14px; cabeçalho em 12px `--muted`, sem caixa alta | Laterais de 16px | Coluna de identidade com 40% da largura. Números à direita, mono, colunas A, B e Diferença. Totais (total, fixo, variável) numa faixa dividida acima da tabela, não numa linha de rodapé. |
-| Lista de designs | 40px | 14px; data em mono 12px | Laterais de 16px | Até 50 itens (limite da API) sem paginação: total no topo e cabeçalho fixo na rolagem. |
+| Lista de designs | 40px | 14px; data em mono 12px | Laterais de 16px | Até 10 itens (limite da API) sem paginação: total no topo e cabeçalho fixo na rolagem. |
 
 - Sem zebra, sem faixa no cabeçalho, sem caixa alta espaçada. Réguas de 1px em `--rule`, ou só espaço.
 - Uma borda direita por linha: todos os valores de uma lista terminam na mesma linha de padding.

@@ -18,7 +18,7 @@ resource "aws_iam_role" "prices" {
       Condition = {
         StringEquals = {
           "${local.oidc_host}:aud" = "sts.amazonaws.com"
-          "${local.oidc_host}:sub" = "repo:${local.github_repository}:ref:refs/heads/main"
+          "${local.oidc_host}:sub" = "${local.github_sub_prefix}:ref:refs/heads/main"
         }
       }
     }]

@@ -38,7 +38,7 @@ resource "aws_iam_role" "apply" {
         StringEquals = {
           "${local.oidc_host}:aud" = "sts.amazonaws.com"
           "${local.oidc_host}:ref" = "refs/heads/main"
-          "${local.oidc_host}:sub" = "repo:${local.github_repository}:environment:${each.key}"
+          "${local.oidc_host}:sub" = "${local.github_sub_prefix}:environment:${each.key}"
         }
       }
     }]
@@ -143,6 +143,20 @@ resource "aws_iam_role_policy" "apply_deny" {
         Effect   = "Deny"
         Action   = "s3:*"
         Resource = flatten([for env, arn in local.state_bucket_arn : [arn, "${arn}/*"] if env != each.key])
+      },
+      {
+        # Par do `Allow` em `*` de `UserPoolDomainDistribution` (`by_id.tf`, #338): distribuição
+        # com a tag `environment` de outro ambiente nunca é alterada, nem por um `Allow` futuro.
+        # `Null` deixa passar a que não tem a tag (a do domínio do Cognito, que é da AWS); sem ele,
+        # `StringNotEquals` negaria também a chave ausente.
+        Sid      = "DenyOtherEnvironmentDistribution"
+        Effect   = "Deny"
+        Action   = "cloudfront:UpdateDistribution"
+        Resource = "*"
+        Condition = {
+          Null            = { "aws:ResourceTag/environment" = "false" }
+          StringNotEquals = { "aws:ResourceTag/environment" = each.key }
+        }
       },
     ]
   })
