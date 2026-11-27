@@ -42,7 +42,7 @@ run "trust_dos_papeis_apply" {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
             "token.actions.githubusercontent.com:ref" = "refs/heads/main"
-            "token.actions.githubusercontent.com:sub" = "repo:henriqueluza/aws-cost-playground:environment:${env}"
+            "token.actions.githubusercontent.com:sub" = "repo:henriqueluza@60079862/aws-cost-playground@1463554125:environment:${env}"
           }
         }
     }]]
@@ -158,13 +158,27 @@ run "negacoes_do_papel_apply" {
   }
 
   assert {
+    condition = alltrue([for env in ["staging", "production"] : jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement[8] == {
+      Sid      = "DenyOtherEnvironmentDistribution"
+      Effect   = "Deny"
+      Action   = "cloudfront:UpdateDistribution"
+      Resource = "*"
+      Condition = {
+        Null            = { "aws:ResourceTag/environment" = "false" }
+        StringNotEquals = { "aws:ResourceTag/environment" = env }
+      }
+    }])
+    error_message = "O papel apply não altera distribuição do CloudFront que tenha a tag environment de outro ambiente (#338)."
+  }
+
+  assert {
     condition = alltrue([
       for env in ["staging", "production"] : alltrue([for s in jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement : s.Effect == "Deny"])
-      && length(jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement) == 8
+      && length(jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement) == 9
       && aws_iam_role_policy.apply_deny[env].name == "deny-guardrails"
       && aws_iam_role_policy.apply_deny[env].role == "acp-ci-apply-${env}"
     ])
-    error_message = "A política deny-guardrails tem exatamente oito statements, todos Deny, presa ao papel apply do próprio ambiente."
+    error_message = "A política deny-guardrails tem exatamente nove statements, todos Deny, presa ao papel apply do próprio ambiente."
   }
 }
 
@@ -173,16 +187,16 @@ run "saidas_e_limites_da_aws" {
 
   assert {
     condition = output.github_environment_variables == {
-      staging    = { AWS_APPLY_ROLE_ARN = aws_iam_role.apply["staging"].arn }
-      production = { AWS_APPLY_ROLE_ARN = aws_iam_role.apply["production"].arn }
+      staging    = { AWS_APPLY_ROLE_ARN = aws_iam_role.apply["staging"].arn, TF_VAR_PACKAGE_BUCKET = "acp-artifacts-stg-123456789012" }
+      production = { AWS_APPLY_ROLE_ARN = aws_iam_role.apply["production"].arn, TF_VAR_PACKAGE_BUCKET = "acp-artifacts-prod-123456789012" }
     }
-    error_message = "Cada environment do GitHub recebe só o ARN do seu próprio papel apply."
+    error_message = "Cada environment do GitHub recebe só o ARN do seu próprio papel apply e o seu próprio bucket de artefatos."
   }
 
   assert {
     condition = alltrue([
       for env in ["staging", "production"] :
-      length(aws_iam_role_policy.apply_state[env].policy) + length(aws_iam_role_policy.apply_deny[env].policy) + length(aws_iam_role_policy.apply_deny_data[env].policy) <= 10240
+      length(aws_iam_role_policy.apply_state[env].policy) + length(aws_iam_role_policy.apply_deny[env].policy) + length(aws_iam_role_policy.apply_deny_data[env].policy) + length(aws_iam_role_policy.apply_artifacts[env].policy) <= 10240
     ])
     error_message = "A soma das políticas inline de um papel não pode passar de 10240 caracteres, o limite da AWS."
   }

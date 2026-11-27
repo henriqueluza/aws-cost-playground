@@ -55,7 +55,7 @@ Nenhum segredo vai em código nem em variável commitada.
 - `estimates/prompt.py` — system prompt fixo, JSON Schema da saída e `build_plan()`, que monta a mensagem para a LLM. Puro: sem rede, SDK nem AWS.
 - `estimates/revalidation.py` — `revalidate()`, que trata a saída da LLM como entrada hostil e monta o resultado do zero. Puro.
 - `estimates/claude_client.py` — `ClaudeClient` (`prepare()` e `estimate()`), `EstimateError`, `UsageEstimate` e `get_claude_client()`. Único ponto que chama o SSM e a Claude API.
-- `designs/schemas.py` também guarda `MAX_DOC_BYTES` (350.000) e `doc_size_bytes()`, que mede o `doc` em bytes UTF-8 do JSON compacto.
+- `designs/schemas.py` também guarda `MAX_DOC_BYTES` (100.000) e `doc_size_bytes()`, que mede o `doc` em bytes UTF-8 do JSON compacto.
 
 ## Documento do design e contratos
 
@@ -111,7 +111,7 @@ Nenhum texto livre da LLM chega ao resultado: ele só tem ids do diagrama, chave
 `get_claude_client()` devolve o `ClaudeClient` do processo, configurado por `LLM_ENABLED`, `LLM_MODEL` e `ANTHROPIC_API_KEY_PARAMETER`. O uso tem dois passos:
 
 1. `prepare(body)` roda antes de consumir quota: confere o interruptor e o tamanho e devolve um `EstimatePlan`. Não lê a chave nem usa a rede.
-2. `estimate(plan)` roda depois da quota: faz uma chamada à API e devolve um `UsageEstimate` (`blocks` e `edges` revalidados, mais `input_tokens` e `output_tokens`). Plano sem nada a estimar (só padrões) volta sem chamada e sem custo.
+2. `estimate(plan)` roda depois da quota: faz uma chamada à API e devolve um `UsageEstimate` (`blocks` e `edges` revalidados, mais `input_tokens` e `output_tokens`). Plano sem nada a estimar (só padrões) volta sem chamada e sem custo, e a rota não consome quota para ele.
 
 Toda falha é um `EstimateError` com `code` e mensagem fixos; os tokens vêm preenchidos quando a chamada foi paga.
 
@@ -135,9 +135,10 @@ Toda falha é um `EstimateError` com `code` e mensagem fixos; os tokens vêm pre
 
 ### Rota de estimativa
 
-`POST /estimates` (`estimates/service.py`, `estimate_usage`) é onde o teto de gasto com a LLM é aplicado. Ordem: 401 → 413 (corpo) → 422 (`ProtectedRoute` e Pydantic) → `prepare` (interruptor e tamanho, sem rede) → `consume` (quota) → `estimate` (uma chamada, sem nova tentativa).
+`POST /estimates` (`estimates/service.py`, `estimate_usage`) é onde o teto de gasto com a LLM é aplicado. Ordem: 401 → 413 (corpo) → 422 (`ProtectedRoute` e Pydantic) → `prepare` (interruptor e tamanho, sem rede) → `consume` (quota) → `estimate` (uma chamada, sem nova tentativa). Sem nada a estimar, o `consume` é trocado por uma leitura da quota e não há chamada.
 
 - Entrada inválida e interruptor desligado não consomem quota.
+- Diagrama sem nada a estimar (sem blocos, ou só com itens sem chave de uso no contrato) também não: a decisão sai do plano (`EstimatePlan.nothing_to_estimate`) antes do `consume`. A resposta é 200 com os padrões e a quota atual, lida sem consumir (`read`); a LLM não é chamada. Se a leitura da quota falhar, 503.
 - Quota recusada ou indisponível nunca chama a LLM.
 - Falha da LLM depois do consumo NÃO devolve a quota: devolver abriria repetição gratuita, bastaria provocar a falha.
 
@@ -181,12 +182,12 @@ Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo
 - `PATCH` exige ao menos um entre `name` e `doc` e recusa `null` explícito nos dois: omita a chave para não alterar.
 - 409 `Design limit reached` (`design-limit` no cliente) em `POST /designs` e em duplicate; 409 `Version conflict` (`version-conflict`) no `PATCH`. Nos dois casos, nada fica gravado.
 - `PATCH`: 404 se o design não existe na partição do usuário (também quando é de outro usuário), sem criar item; 409 se `expectedVersion` não é a `version` gravada. Renomear é mandar só `name`. Na resposta, `version` avança 1 e `updatedAt` muda; `createdAt` fica.
-- Duplicate: 404 se a origem não existe na partição do usuário, conferido antes do limite de 50. A cópia tem id novo, `version` 1, datas novas e o `doc` da origem.
+- Duplicate: 404 se a origem não existe na partição do usuário, conferido antes do limite de 10. Origem gravada acima do teto atual do `doc` (o teto já foi 350.000 bytes) responde 413 e não é copiada. A cópia tem id novo, `version` 1, datas novas e o `doc` da origem.
 - `DELETE /designs/{design_id}`: 204 sem corpo e idempotente, também para id inexistente ou de outro usuário (nada é apagado fora da partição do `sub`).
 - `DELETE /me`: 204 sem corpo; 401 sem `sub` ou `username` válido; 503 `Account deletion incomplete, retry` com `Retry-After: 5`. Detalhes em "Exclusão de conta".
 - As rotas de designs ainda não estão no API Gateway (`infra/envs/*/main.tf`): é outra Issue.
 
-Ordem das respostas: 401 (sem `sub`) → 413 (corpo cru acima de 1 MiB, ou `doc` acima de 350.000 bytes) → 400 (JSON que o parser recusa, como inteiro com mais de 4.300 dígitos ou aninhamento extremo) / 422 (validação) → handler (resposta da rota). A `ProtectedRoute` garante que o 401 saia sem olhar o corpo e que o 413 do corpo cru saia antes de o JSON ser decodificado. O limite de 350.000 bytes do `doc` é medido depois do parse completo do documento (sem as chaves desconhecidas) e tem precedência sobre o 422: se algum erro de validação for `doc_too_large`, a resposta é 413 mesmo que haja outros campos inválidos.
+Ordem das respostas: 401 (sem `sub`) → 413 (corpo cru acima de 1 MiB, ou `doc` acima de 100.000 bytes) → 400 (JSON que o parser recusa, como inteiro com mais de 4.300 dígitos ou aninhamento extremo) / 422 (validação) → handler (resposta da rota). A `ProtectedRoute` garante que o 401 saia sem olhar o corpo e que o 413 do corpo cru saia antes de o JSON ser decodificado. O limite de 350.000 bytes do `doc` é medido depois do parse completo do documento (sem as chaves desconhecidas) e tem precedência sobre o 422: se algum erro de validação for `doc_too_large`, a resposta é 413 mesmo que haja outros campos inválidos.
 
 ## Designs no DynamoDB
 
@@ -195,11 +196,11 @@ Item na tabela única (`app/designs/repository.py`):
 - `PK = USER#<sub>`, `SK = DESIGN#<ulid>`. O `id` do design vem da `SK`: não há atributo `id`. Não há `ttl`.
 - Atributos: `name`, `region`, `schemaVersion`, `blockCount`, `sizeBytes`, `createdAt`, `updatedAt`, `version` e `doc` (JSON compacto, em string).
 - O id é um ULID gerado no servidor: 48 bits de tempo e 80 bits de `secrets`. Datas em UTC, com milissegundos e `Z`.
-- Leituras usam `ConsistentRead`. A listagem é uma `Query` com `begins_with(SK, "DESIGN#")` e projeção sem `doc`, que percorre todas as páginas e ordena por `updatedAt` decrescente e depois `id` decrescente, com no máximo 50 resumos.
+- Leituras usam `ConsistentRead`. A listagem é uma `Query` com `begins_with(SK, "DESIGN#")` e projeção sem `doc`, que percorre todas as páginas e ordena por `updatedAt` decrescente e depois `id` decrescente, com no máximo 10 resumos (`MAX_DESIGNS`).
 - Só `GetItem`, `PutItem`, `UpdateItem`, `DeleteItem` e `Query`, as ações da política do papel da função (`UpdateItem` entrou com a #54). Nunca `Scan`.
 - Design de outro usuário responde 404, igual a inexistente: a chave sempre leva o `sub` do JWT.
 
-**Limite de 50 designs por usuário.** Sem transação, `POST /designs` (e o duplicate, pelo mesmo caminho) conta (`Query` com `Select=COUNT`), grava com `attribute_not_exists(PK)`, conta de novo e, se passou de 50, apaga o que gravou e responde 409. Se a recontagem falhar, também apaga e devolve o erro (o cliente não recebeu o id). Duas criações simultâneas no limite podem ser ambas recusadas, nunca ambas aceitas. Resíduo: se a função morrer entre a gravação e a remoção, ou se a remoção falhar, pode sobrar 1 item acima do limite; a listagem continua devolvendo no máximo 50.
+**Limite de 10 designs por usuário (`MAX_DESIGNS`; eram 50 até a #386).** Sem transação, `POST /designs` (e o duplicate, pelo mesmo caminho) conta (`Query` com `Select=COUNT`), grava com `attribute_not_exists(PK)`, conta de novo e, se passou de 10, apaga o que gravou e responde 409. Se a recontagem falhar, também apaga e devolve o erro (o cliente não recebeu o id). Duas criações simultâneas no limite podem ser ambas recusadas, nunca ambas aceitas. Resíduo: se a função morrer entre a gravação e a remoção, ou se a remoção falhar, pode sobrar 1 item acima do limite; a listagem continua devolvendo no máximo 50.
 
 **Trava otimista.** O `PATCH` é um único `UpdateItem` com `ConditionExpression` `attribute_exists(PK) AND version = :esperada`, sem leitura antes (ADR-0001). Na recusa, o item antigo devolvido pela condição (`ReturnValuesOnConditionCheckFailure`) só decide entre 409 (existe, versão outra) e 404 (não existe); `attribute_exists(PK)` impede que o `UpdateItem` crie item. Os nomes de atributo vêm do serviço, nunca do corpo, e `PK`, `SK` e `version` não podem ser alterados por ele.
 
@@ -219,7 +220,7 @@ Content-Type: application/problem+json
 {"type": "about:blank", "title": "Conflict", "status": 409, "detail": "Version conflict", "requestId": "<id da requisição>"}
 ```
 
-**Custo de leitura.** `Select=COUNT` e a projeção não reduzem a leitura cobrada: o DynamoDB cobra os itens inteiros, com o `doc`. Uma partição cheia (50 designs de 350 KB) custa cerca de 4.400 unidades de leitura por listagem ou contagem. Separar o `doc` dos metadados ou limitar a taxa por usuário é decisão de ADR (#277).
+**Custo de leitura.** `Select=COUNT` e a projeção não reduzem a leitura cobrada: o DynamoDB cobra os itens inteiros, com o `doc`. Uma partição cheia (10 designs de 100.000 bytes, 1 MB) custa cerca de 250 unidades de leitura por listagem ou contagem; com os limites anteriores (50 designs de 350 KB) eram cerca de 4.400. A decisão da #277 está no ADR-0001, "Custo da listagem de designs": limites menores (#386) e limite de taxa por rota (manual do autor) agora; separar o `doc` dos metadados depois do prazo, obrigatório antes de reabrir o cadastro.
 
 **Falhas.** Item gravado que não passa no schema de saída responde 500 sem detalhe e registra `error_type: CorruptedItem`. Falha do DynamoDB responde 503 (throttling, indisponibilidade, rede) ou 500 (o resto), nunca com texto da AWS, e grava uma linha de log `app.designs` só com o código do erro em `error_type`.
 
@@ -242,7 +243,7 @@ Repetir a chamada após qualquer falha termina o trabalho (idempotente). IAM da 
 
 **Não apaga:** a quota global (`PK = GLOBAL`, que não é do usuário e o papel da `api` não alcança); backups de recuperação pontual (PITR, só em produção; 35 dias, o padrão do DynamoDB, já que `infra/modules/database` não define outro período; o dado apagado continua recuperável nessa janela e some sozinho ao fim dela); logs do CloudWatch até a retenção de 7 dias (o log da aplicação não tem e-mail; o evento de exclusão não leva `sub`, mas os eventos de quota e de estimativa do `llm-proxy` levam o `sub`, pseudônimo; o log de acesso do API Gateway registra o `sub`, pseudônimo, em toda requisição, inclusive nesta); o que já foi enviado à Anthropic nas estimativas.
 
-**Tempo no pior caso:** 50 designs de até 350 KB (cerca de 17,5 MB, 18 páginas de `Query`) mais até 35 contadores: cerca de 85 itens, 4 lotes e 22 chamadas por volta, normalmente bem abaixo de 1 a 2 s. As esperas de reenvio somam menos de 2 s. Se a Lambda estourar os 10 s, o cliente repete.
+**Tempo no pior caso:** 10 designs de até 100 KB (cerca de 1 MB, 1 ou 2 páginas de `Query`) mais até 35 contadores: cerca de 45 itens em 2 lotes, bem abaixo de 1 a 2 s (com os limites anteriores, de 50 designs de 350 KB, eram cerca de 85 itens, 4 lotes e 22 chamadas por volta). As esperas de reenvio somam menos de 2 s. Se a Lambda estourar os 10 s, o cliente repete.
 
 **Token ainda válido (risco residual, decisão pendente do autor).** O access token vale até 15 min após a exclusão: o authorizer valida só assinatura e expiração (os refresh tokens morrem com o usuário). Nesse intervalo, leituras voltam vazias, mas uma escrita (criar design, ou estimativa que incrementa a quota) recria itens em `USER#<sub>` de um usuário que não existe mais. Contadores somem pelo `ttl` de 35 dias; designs órfãos não têm `ttl`. Não há revogação de token (exigiria custo ou infra nova). Mitigação: o cliente encerra a sessão e descarta os tokens logo após o 204 (#58).
 

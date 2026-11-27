@@ -240,7 +240,7 @@ def test_design_com_101_blocos_responde_422(app: FastAPI) -> None:
     ],
     ids=["POST", "PATCH"],
 )
-def test_limite_de_350000_bytes_do_doc(app, method, path, wrap, accepted) -> None:  # type: ignore[no-untyped-def]
+def test_limite_de_bytes_do_doc(app, method, path, wrap, accepted) -> None:  # type: ignore[no-untyped-def]
     at_limit = doc_of_size(MAX_DOC_BYTES)
     assert doc_size_bytes(DesignDocument.model_validate(at_limit)) == MAX_DOC_BYTES
     assert invoke(app, event(method, path, wrap(at_limit)))[0] == accepted
