@@ -272,33 +272,36 @@ run "forma_e_escopo_por_ambiente" {
 }
 
 # #338: o Cognito exige cloudfront:UpdateDistribution em "*". Avalia Allow e Deny como o IAM, com
-# a tag environment do recurso em cada caso; "" é o recurso sem a tag (a distribuição da AWS).
+# a tag environment do recurso em cada caso; `null` é o recurso sem a tag (a distribuição da AWS).
 run "distribuicao_do_outro_ambiente" {
   command = apply
 
   assert {
     condition = alltrue(flatten([
       for env, other in { staging = "production", production = "staging" } : [
-        for tag, expected in { "" = true, (env) = true, (other) = false, shared = false, (title(env)) = false } : [
+        for probe in [
+          { tag = null, expected = true }, { tag = env, expected = true }, { tag = other, expected = false },
+          { tag = "shared", expected = false }, { tag = title(env), expected = false }, { tag = "", expected = false },
+          ] : [
           for verdict in [{
             for effect in ["Allow", "Deny"] : effect => [
               for s in concat(jsondecode(aws_iam_policy.apply_id[env].policy).Statement, jsondecode(aws_iam_policy.apply_named[env].policy).Statement, jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement, jsondecode(aws_iam_role_policy.apply_deny_data[env].policy).Statement) : s.Sid
               if s.Effect == effect && contains(flatten([try(s.Action, [])]), "cloudfront:UpdateDistribution") && alltrue(flatten([
                 for operator, keys in try(s.Condition, {}) : [
                   for key, value in keys : key != "aws:ResourceTag/environment" ? false : {
-                    StringEquals         = tag == value
-                    StringEqualsIfExists = tag == "" || tag == value
-                    StringNotEquals      = tag != value
-                    Null                 = (tag == "") == (value == "true")
+                    StringEquals         = probe.tag != null && probe.tag == value
+                    StringEqualsIfExists = probe.tag == null || probe.tag == value
+                    StringNotEquals      = probe.tag == null || probe.tag != value
+                    Null                 = (probe.tag == null) == (value == "true")
                   }[operator]
                 ]
               ]))
             ]
-          }] : (length(verdict.Allow) > 0 && length(verdict.Deny) == 0) == expected && (tag != other || verdict.Deny == ["DenyOtherEnvironmentDistribution"])
+          }] : (length(verdict.Allow) > 0 && length(verdict.Deny) == 0) == probe.expected && (probe.tag != other || verdict.Deny == ["DenyOtherEnvironmentDistribution"])
         ]
       ]
     ]))
-    error_message = "cloudfront:UpdateDistribution só passa em distribuição sem a tag environment (a do domínio do Cognito, que é da AWS) ou com a do próprio ambiente. Com a tag do outro ambiente, ou qualquer outro valor, nenhum Allow casa; a do outro ambiente ainda cai em DenyOtherEnvironmentDistribution."
+    error_message = "cloudfront:UpdateDistribution só passa em distribuição sem a tag environment (a do domínio do Cognito, que é da AWS) ou com a do próprio ambiente. Com a tag do outro ambiente, ou qualquer outro valor (inclusive vazio), nenhum Allow casa; a do outro ambiente ainda cai em DenyOtherEnvironmentDistribution."
   }
 
   # O Allow amplo e a negação andam juntos: tirar um dos dois reprova.
