@@ -57,7 +57,7 @@ Todas atrás do authorizer JWT do Cognito (nenhuma anônima). `/estimates` e `/q
 | Nome | Onde | Tipo | Origem | Para quê |
 |---|---|---|---|---|
 | `AWS_APPLY_ROLE_ARN` | Environment `staging` | variável | Saída `github_environment_variables` do bootstrap | Papel `acp-ci-apply-staging` assumido por OIDC. Sem ele o deploy só avisa |
-| `TF_VAR_PACKAGE_BUCKET` | Environment `staging` | variável | Bucket de artefatos criado pela #209 | Destino de `functions/<sha>.zip`; vira `TF_VAR_package_bucket` |
+| `TF_VAR_PACKAGE_BUCKET` | Environment `staging` | variável | Saída `github_environment_variables` do bootstrap (#209): `acp-artifacts-stg-<id da conta>` | Destino de `functions/<sha>.zip`; vira `TF_VAR_package_bucket` |
 | `TF_STATE_BUCKET_STAGING` | repositório | variável | Saída `github_variables` do bootstrap | Backend do Terraform (já usada pelo job `plan`) |
 | `TF_VAR_ZONE_NAME` | repositório | variável | Domínio da zona do Route 53 | Zona pública (já usada pelo job `plan`) |
 | `TF_VAR_ALARM_EMAIL` | repositório | secret | E-mail dos alarmes | Tem de ser o mesmo do primeiro apply; outro valor faz o SNS sofrer `replace` e o plan-guard barra |
@@ -78,7 +78,7 @@ Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 O runtime `python3.14` das Lambdas já está resolvido (#307): o módulo `functions` acompanha `api/.python-version` e um teste reprova a divergência. Sem isso o zip não carregaria, e o smoke não perceberia.
 
 1. #166, #167, #169 e #338 (em `main`; a #338 traz o risco aceito pelo autor e o que ficou manual, em `infra/bootstrap/README.md`): permissões de escrita do apply. Além do Terraform, o deploy precisa de `s3:PutObject`/`s3:GetObject` no bucket de artefatos, de objetos do bucket do site, de `lambda:GetFunctionConfiguration` e de `cloudfront:CreateInvalidation`/`cloudfront:GetInvalidation`.
-2. #209: bucket de artefatos.
+2. #209 (em `main`): bucket de artefatos, um por ambiente, criado no bootstrap com `s3:PutObject`/`s3:GetObject` do papel apply só em `functions/*` (`infra/bootstrap/README.md`, "Bucket de artefatos"). O autor reaplica o bootstrap para criá-lo.
 3. #77: bootstrap aplicado, Environment `staging` restrito a `main` e primeiro apply manual.
 4. As variáveis da seção anterior.
 
@@ -120,7 +120,7 @@ O mesmo artefato vale para os dois ambientes: o zip das funções vai para `func
 | Nome | Onde | Tipo | Origem |
 |---|---|---|---|
 | `AWS_APPLY_ROLE_ARN` | Environment `production` | variável | Saída `github_environment_variables` do bootstrap (papel `acp-ci-apply-production`) |
-| `TF_VAR_PACKAGE_BUCKET` | Environment `production` | variável | Bucket de artefatos de produção, criado pela #209 |
+| `TF_VAR_PACKAGE_BUCKET` | Environment `production` | variável | Saída `github_environment_variables` do bootstrap (#209): `acp-artifacts-prod-<id da conta>` |
 | `TF_STATE_BUCKET_PRODUCTION` | repositório | variável | Saída `github_variables` do bootstrap (já usada pelo job `plan`) |
 | `TF_VAR_ZONE_NAME` | repositório | variável | A mesma de staging |
 | `TF_VAR_ALARM_EMAIL` | repositório | secret | O mesmo de staging |
@@ -130,7 +130,7 @@ gh variable set AWS_APPLY_ROLE_ARN --env production --body "<arn>" --repo henriq
 gh variable set TF_VAR_PACKAGE_BUCKET --env production --body "<bucket>" --repo henriqueluza/aws-cost-playground
 ```
 
-O Environment `production` tem de aceitar só o branch `main` (Settings → Environments → Deployment branches). O trust do papel exige `environment:production`, `ref` igual a `refs/heads/main` e `aud` `sts.amazonaws.com`; o release-gate recusa qualquer outro `ref` antes disso. As permissões de escrita do papel estão em `main` (#167, #169 e #338; o que a #338 deixou como tarefa manual do autor está em `infra/bootstrap/README.md`); o bucket de artefatos depende da #209, como em staging.
+O Environment `production` tem de aceitar só o branch `main` (Settings → Environments → Deployment branches). O trust do papel exige `environment:production`, `ref` igual a `refs/heads/main` e `aud` `sts.amazonaws.com`; o release-gate recusa qualquer outro `ref` antes disso. As permissões de escrita do papel estão em `main` (#167, #169 e #338; o que a #338 deixou como tarefa manual do autor está em `infra/bootstrap/README.md`); o bucket de artefatos vem do bootstrap (#209), como em staging.
 
 ## Limites de produção
 

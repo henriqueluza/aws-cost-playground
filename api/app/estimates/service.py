@@ -4,6 +4,9 @@ A ordem é o controle: tamanho e interruptor (`prepare`, sem rede) → quota (`c
 chamada à LLM (`estimate`). Entrada recusada ou interruptor desligado não consomem quota; sem
 quota confirmada a LLM não é chamada; falha da LLM depois do consumo não devolve a quota (devolver
 abriria repetição gratuita: bastaria provocar a falha). Não há nova tentativa aqui.
+
+Diagrama sem nada a estimar é decidido antes do `consume`: a LLM não é chamada, então não há
+custo a proteger e a quota é só lida (`read`), não consumida.
 """
 
 import logging
@@ -14,7 +17,7 @@ from fastapi import HTTPException
 from app.estimates.claude_client import ClaudeClient, ErrorCode, EstimateError
 from app.estimates.revalidation import ItemUsage
 from app.estimates.schemas import EstimateIn, EstimateOut
-from app.quotas.service import QuotaExhausted, QuotaUnavailable, consume
+from app.quotas.service import QuotaExhausted, QuotaUnavailable, consume, read
 
 RETRY_AFTER_SECONDS = "30"
 # Código interno → (status, Retry-After). O `web/` lê só o status: 413 é `too-large`; 502 e 503
@@ -52,6 +55,8 @@ def _items(items: tuple[ItemUsage, ...]) -> list[dict[str, object]]:
 def estimate_usage(sub: str, body: EstimateIn, client: ClaudeClient) -> EstimateOut:
     """Consome uma estimativa da quota de `sub` e devolve só ids, números e o restante da quota.
 
+    Sem nada a estimar, responde só com os padrões e a quota atual: não consome e não chama a LLM.
+
     As exceções da quota (429 e 503) sobem como vieram. Um evento `app.estimate` por chamada
     registra duração, tokens e resultado, sem conteúdo do pedido nem da resposta.
     """
@@ -59,9 +64,12 @@ def estimate_usage(sub: str, body: EstimateIn, client: ClaudeClient) -> Estimate
     result, tokens, consumed = "error", (0, 0), False
     try:
         plan = client.prepare(body)  # tamanho e interruptor: sem rede, sem custo, sem quota
-        quota = consume(sub)  # levanta se não autorizar: nada abaixo roda
-        consumed = True
-        usage = client.estimate(plan)  # a única chamada paga
+        if plan.nothing_to_estimate:
+            quota = read(sub)  # sem chamada paga não há consumo: só o restante, para a resposta
+        else:
+            quota = consume(sub)  # levanta se não autorizar: nada abaixo roda
+            consumed = True
+        usage = client.estimate(plan)  # a única chamada paga; sem nada a estimar, só os padrões
         tokens = (usage.input_tokens, usage.output_tokens)
         response = EstimateOut.model_validate(
             {"blocks": _items(usage.blocks), "edges": _items(usage.edges), "quota": quota}

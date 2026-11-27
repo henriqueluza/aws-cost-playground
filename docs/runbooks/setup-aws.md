@@ -17,7 +17,7 @@ Cada passo cita o arquivo do repositório de onde saiu. Se o arquivo e este runb
 | `<DOMINIO>` | Domínio do produto, igual ao nome da zona pública do Route 53 |
 | `<EMAIL_DE_TESTE>` | E-mail de uma conta de teste de staging |
 | `<USER_POOL_ID>` | Id do User Pool de staging |
-| `<BUCKET_DE_ARTEFATOS_STAGING>` | Bucket de artefatos de staging, criado pelo bootstrap depois da #209 |
+| `<BUCKET_DE_ARTEFATOS_STAGING>` | Bucket de artefatos de staging, criado pelo bootstrap (#209): `acp-artifacts-stg-<ACCOUNT_ID>`, lido da saída `github_environment_variables` |
 | `<RUN_ID>` | Id de uma execução do GitHub Actions |
 
 ### Ordem e Issues do autor
@@ -42,7 +42,7 @@ Em 26/11/2026 o código de `main` ainda não deixa o primeiro deploy passar. Con
 | Issue | O que falta | Trava o passo |
 |---|---|---|
 | #338 | Ações de escrita dos papéis `acp-ci-apply-<env>` que não se delimitam por ambiente. Decisão do autor em 26/11/2026: a entrega de log do HTTP API e o `cloudfront:UpdateDistribution` do domínio do Cognito entram como risco aceito; alterar política de cache, de cabeçalhos (CSP) ou OAC e etiquetar no API Gateway são tarefa manual do autor (`infra/bootstrap/README.md`, "Recursos com ARN por ID", com o passo a passo). Com o código em `main`, **reaplique o bootstrap** (6 atualizações no lugar, nenhuma criação); sem isso o deploy para no stage do HTTP API e no domínio do Cognito | 6 |
-| #209 | Bucket de artefatos das funções no bootstrap. É a origem de `TF_VAR_PACKAGE_BUCKET` (`infra/README.md`, "Variáveis dos ambientes") | 4 e 6 |
+| #209 | Bucket de artefatos das funções no bootstrap, um por ambiente. É a origem de `TF_VAR_PACKAGE_BUCKET`: a saída `github_environment_variables` traz o nome (`infra/bootstrap/README.md`, "Bucket de artefatos"). Com o código em `main`, **reaplique o bootstrap** (12 criações) antes de cadastrar a variável | 4 e 6 |
 | #307 (e #210, mesmo assunto) | Runtime das Lambdas: `python3.13` em `infra/modules/functions/main.tf`, contra o pacote montado para Python 3.14 (`api/.python-version`) | 6 |
 | #125 | Papel `prices` do bootstrap (já em `main`; reaplique o bootstrap se ainda não o aplicou) | 8, só para o workflow |
 
@@ -193,7 +193,7 @@ A lista abaixo foi conferida nos workflows de `main`. Só `terraform.yml` e `dep
 | `TF_STATE_BUCKET_STAGING` | variável | repositório | Saída `github_variables` do bootstrap | `terraform.yml` (job `plan`) e `deploy-staging.yml` |
 | `TF_STATE_BUCKET_PRODUCTION` | variável | repositório | Saída `github_variables` do bootstrap | `terraform.yml` (job `plan`) |
 | `AWS_PLAN_ROLE_ARN` | variável | repositório | Saída `github_variables` do bootstrap | `terraform.yml` (liga o job `plan`) |
-| `TF_VAR_PACKAGE_BUCKET` | variável | Environment `staging` | Bucket de artefatos de staging, criado pela #209 | `deploy-staging.yml` |
+| `TF_VAR_PACKAGE_BUCKET` | variável | Environment `staging` | Saída `github_environment_variables` do bootstrap (#209) | `deploy-staging.yml` |
 | `AWS_APPLY_ROLE_ARN` | variável | Environment `staging` | Saída `github_environment_variables` do bootstrap | `deploy-staging.yml` (liga o deploy) |
 | `AWS_APPLY_ROLE_ARN` | variável | Environment `production` | Saída `github_environment_variables` do bootstrap | `deploy-production.yml` (só por disparo manual do autor) |
 
@@ -250,13 +250,16 @@ A ordem importa. `AWS_PLAN_ROLE_ARN` liga o job `plan`, que falha fechado se fal
 
    Como conferir: as quatro variáveis de repositório da tabela e o segredo `TF_VAR_ALARM_EMAIL`. A prova do papel `plan` é o próximo PR que tocar `infra/`: os jobs `plan + plan-guard (staging)` e `plan + plan-guard (production)` rodam, em vez de pulados, e ficam verdes. É o primeiro teste real do trust do papel (`docs/handoff/13.md`).
 
-7. Cadastre o bucket de artefatos no Environment `staging`. O nome sai da saída do bootstrap que a #209 definir; com a #209 aberta, pare aqui.
+7. Cadastre o bucket de artefatos no Environment `staging`. O nome vem da saída `github_environment_variables` do bootstrap (#209); se a saída não trouxer `TF_VAR_PACKAGE_BUCKET`, o bootstrap aplicado é anterior à #209: reaplique-o e pare aqui até lá.
 
    ```bash
+   terraform -chdir=infra/bootstrap output -json github_environment_variables | jq -er '.staging.TF_VAR_PACKAGE_BUCKET'
    gh variable set TF_VAR_PACKAGE_BUCKET --env staging --body "<BUCKET_DE_ARTEFATOS_STAGING>" --repo henriqueluza/aws-cost-playground
    ```
 
-8. Por último, e só com as Issues da tabela "O que precisa estar em `main` antes" fechadas, cadastre `AWS_APPLY_ROLE_ARN` nos dois Environments. Isto liga o deploy de staging.
+   O bucket nasce sem regra de lifecycle. Aplique nele o guardrail 7 de [`guardrails-de-custo.md`](guardrails-de-custo.md) (e no de produção, quando chegar a vez): é configuração de custo, manual.
+
+8. Por último, e só com as Issues da tabela "O que precisa estar em `main` antes" fechadas, cadastre `AWS_APPLY_ROLE_ARN` nos dois Environments. Isto liga o deploy de staging. O laço abaixo grava todas as variáveis da saída, então também põe `TF_VAR_PACKAGE_BUCKET` no Environment `production`.
 
    ```bash
    terraform -chdir=infra/bootstrap output -json github_environment_variables |
