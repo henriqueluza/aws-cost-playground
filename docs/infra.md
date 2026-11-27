@@ -160,4 +160,4 @@ Workflow `export-validate.yml` (#68), job `export-validate` (check `terraform va
 - Arquivos antigos do site não são apagados (regra do módulo `site`).
 - A invalidação `/*` conta como 1 caminho na cota grátis de 1000/mês.
 - O workflow está em `.github/workflows/deploy-staging.yml` e roda a cada merge em `main`. Sem a variável `AWS_APPLY_ROLE_ARN` no Environment `staging`, o job de deploy só avisa e termina verde.
-- Os ajustes de `validate.yml` e `terraform.yml` ficam na #211.
+- O `validate.yml` monta o mesmo zip em todo PR (`scripts/build-functions.sh "$RUNNER_TEMP/functions.zip"`, depois do passo da API): o check falha se o pacote não monta, imprime o tamanho do zip e não publica artefato. O job `static` do `terraform.yml` também roda quando o PR muda só `.github/workflows/deploy-staging.yml` ou `scripts/build-functions.sh`, porque os testes do deploy ficam em `infra/tools/tests` (#211).
