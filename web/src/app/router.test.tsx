@@ -12,8 +12,8 @@ import { fakeAuth } from '../test/authFixtures';
 import { routes } from './router';
 
 const api = createInMemoryApi({
-  maxDesigns: 50,
-  maxDocBytes: 350_000,
+  maxDesigns: 10,
+  maxDocBytes: 100_000,
   userDailyLimit: 5,
   globalDailyLimit: 30,
 });

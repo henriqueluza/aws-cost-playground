@@ -173,12 +173,12 @@ def test_listagem_e_contagem_seguem_a_paginacao_e_projetam_sem_doc(
     assert all(c["ConsistentRead"] for c in calls)
 
 
-def test_listagem_nunca_passa_de_50(app: FastAPI) -> None:
+def test_listagem_nunca_passa_do_limite(app: FastAPI) -> None:
     seed(service.MAX_DESIGNS + 1)  # estado que a API não produz; a resposta segue o contrato
     assert len(call(app, "GET", "/designs")[1]) == service.MAX_DESIGNS
 
 
-def test_limite_de_50_responde_409_sem_gravar(app: FastAPI, table: Any) -> None:
+def test_limite_de_designs_responde_409_sem_gravar(app: FastAPI, table: Any) -> None:
     seed(service.MAX_DESIGNS - 1)
     seed(3, sub=USER_B)  # designs de outro usuário não contam
     create(app)

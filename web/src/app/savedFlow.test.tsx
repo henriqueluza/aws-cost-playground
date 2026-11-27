@@ -17,8 +17,8 @@ import { routes } from './router';
 const doc = adrExampleDesign as unknown as DesignDocument;
 const newApi = () =>
   createInMemoryApi({
-    maxDesigns: 50,
-    maxDocBytes: 350_000,
+    maxDesigns: 10,
+    maxDocBytes: 100_000,
     userDailyLimit: 5,
     globalDailyLimit: 30,
   });
