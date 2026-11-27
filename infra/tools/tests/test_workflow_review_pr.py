@@ -25,7 +25,7 @@ MARKER = "<!-- review-pr -->"
 BOT = {"login": "github-actions[bot]", "type": "Bot"}
 VERDICT_LABELS = {"review:approved", "changes-requested", "needs-human", "re-review"}
 FORBIDDEN_LABELS = ["agent:authorized", "infra:destroy-approved", "skip-review", "size:exception"]
-EXECUTES_CODE = r"\b(npm|npx|node|yarn|pnpm|bun|pytest|uv|pip|make|terraform|tofu|cargo|go|docker|sh|eval|source|curl|wget)\b"
+EXECUTES_CODE = r"(?<![\w./-])(npm|npx|node|yarn|pnpm|bun|pytest|uv|pip|make|terraform|tofu|cargo|go|docker|sh|eval|source|curl|wget)(?![\w./-])"
 
 
 def code() -> str:
@@ -126,7 +126,11 @@ class WorkflowShape(unittest.TestCase):
             self.assertNotIn("${{", line)
             self.assertNotRegex(line, EXECUTES_CODE, line)
         self.assertNotIn("pr-head", commands[2])
-        uses = re.findall(r"uses: (\S+)", code())
+        for name in ["validate.yml", "security.yml", "pr-size.yml"]:  # onde o código do PR roda
+            other = (WORKFLOW.parent / name).read_text(encoding="utf-8")
+            self.assertNotRegex(other, r"secrets\.|:\s*write\b", name)
+            self.assertIn("\npermissions:\n  contents: read\n", other, name)
+        uses = re.findall(r"(?<![a-z])uses: (\S+)", code())
         self.assertEqual(len(uses), 4)
         for ref in uses:
             self.assertRegex(ref, r"^(actions/checkout|anthropics/claude-code-action)@[0-9a-f]{40}$")
