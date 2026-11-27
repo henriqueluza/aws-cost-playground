@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { useSiteConfig } from './support/siteConfig';
+
+test.beforeEach(useSiteConfig);
 
 /** Um design mínimo e válido: uma instância EC2 e a região. */
 const design = {

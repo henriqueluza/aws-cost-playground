@@ -1,17 +1,14 @@
 import type { Page, Route } from '@playwright/test';
+import { API, authorityOf, CLIENT_ID, loginOrigin, serveSiteConfig } from './siteConfig';
 
 /**
  * Login e API simulados para os fluxos de conta. Nada sai da máquina: o `/config.json` aponta para
- * origens `https` fictícias (`*.e2e.test`) e toda requisição a elas é atendida aqui, no contexto do
+ * origens `https` fictícias (`siteConfig.ts`) e toda requisição a elas é atendida aqui, no contexto do
  * navegador. O Cognito simulado faz o Authorization Code + PKCE de verdade do lado do app (o
  * `state` e o `nonce` da URL de autorização voltam no callback e no ID token); a API guarda os
  * designs em memória e imita as respostas do backend (409, 429, 204).
  */
 
-const AUTH = 'https://auth.e2e.test';
-const AUTHORITY = `${AUTH}/pool`;
-const API = 'https://api.e2e.test';
-const CLIENT_ID = 'e2e-client';
 const ACCESS_TOKEN = 'e2e-access-token';
 
 export const E2E_EMAIL = 'pessoa@example.com';
@@ -49,6 +46,8 @@ const base64Url = (value: object) => Buffer.from(JSON.stringify(value)).toString
 
 export async function mockBackend(page: Page, siteUrl: string): Promise<MockBackend> {
   const siteOrigin = new URL(siteUrl).origin;
+  const AUTH = loginOrigin(siteUrl);
+  const AUTHORITY = authorityOf(siteUrl);
   const cors = {
     'Access-Control-Allow-Origin': siteOrigin,
     'Access-Control-Allow-Headers': 'authorization, content-type, accept',
@@ -78,12 +77,7 @@ export async function mockBackend(page: Page, siteUrl: string): Promise<MockBack
     sizeBytes: JSON.stringify(doc).length,
   });
 
-  // O app aceita a configuração só se as URLs forem https (ou localhost): as daqui são fictícias.
-  await page.route('**/config.json', (route) =>
-    route.fulfill({
-      json: { apiBaseUrl: API, cognitoAuthority: AUTHORITY, cognitoClientId: CLIENT_ID },
-    }),
-  );
+  await serveSiteConfig(page, siteUrl);
 
   await page.route(`${AUTH}/**`, async (route) => {
     const request = route.request();

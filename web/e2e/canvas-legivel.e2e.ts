@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { useSiteConfig } from './support/siteConfig';
+
+test.beforeEach(useSiteConfig);
 
 interface Box {
   x: number;

@@ -10,6 +10,8 @@ const MESSAGES: Record<AuthErrorKind, string> = {
   'callback-invalid': 'Este retorno do login não é válido ou já foi usado. Entre de novo.',
   'session-expired': 'Sua sessão terminou. Entre de novo.',
   'invalid-response': 'O serviço de login respondeu de um jeito inesperado. Tente de novo.',
+  'login-origin':
+    'O endereço do login não é o deste site, e por segurança ele não foi aberto. Tente mais tarde.',
   network: 'O serviço de login não respondeu. Verifique a conexão e tente de novo.',
 };
 

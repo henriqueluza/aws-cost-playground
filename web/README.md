@@ -28,7 +28,10 @@ npx playwright test   # arquivos web/e2e/*.e2e.ts (o Vitest não os pega)
 
 Roda contra o build de produção servido pelo `vite preview` (cliente HTTP real, sem o fake de desenvolvimento) na porta `E2E_PORT` (padrão 4173). Fora do CI o build é refeito antes de subir o servidor; se já houver um respondendo na porta, ele é reaproveitado como está (sem novo build); no job `validate` os e2e rodam depois do build, com o Chromium da versão travada no lockfile, e em falha o relatório e os traces sobem como artefato (3 dias). `PLAYWRIGHT_CHROMIUM_PATH` aponta para um Chromium já instalado (opcional).
 
+Como o build recusa `http://`, nenhum teste usa o `public/config.json`: `e2e/support/siteConfig.ts` serve um `/config.json` fictício em `https` (`test.beforeEach(useSiteConfig)`, ou o `mockBackend` nos fluxos de conta). O login simulado fica em `https://auth.localhost`, a mesma regra de produção (`auth.` + o host do site), sem exceção de teste no bundle.
+
 - `anonymous-flow.e2e.ts`: o fluxo anônimo da apresentação. Abre o template e confere o total, adiciona um bloco pela paleta, conecta por "Conectar a…", edita um valor de uso, baixa o JSON, cria um novo design e abre o arquivo baixado, conferindo o mesmo total. Falha se qualquer requisição sair da origem do site (a API e o Cognito do `/config.json` ficam em outra origem; um segundo teste prova que a guarda acusa uma chamada à API) e roda o `axe-core` no editor, no inspetor e no diálogo de confirmação, nos temas claro e escuro, sem violações sérias ou críticas.
+- `runtime-config.e2e.ts`: prova no build de produção que `http://` na configuração (inclusive o `public/config.json` de desenvolvimento) dá a tela de erro, e que a configuração `https` abre o editor.
 - `export.e2e.ts`: abre um design e baixa o `main.tf` pela aba **Exportar** do trilho do editor.
 - `canvas-legivel.e2e.ts`: confere que o diagrama de referência cabe inteiro no canvas, sem ficar sob a legenda nem os controles.
 
@@ -52,13 +55,15 @@ O build é o mesmo em todos os ambientes. O que muda por ambiente é o arquivo `
 }
 ```
 
-| Campo              | Regra                                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------------------------ |
-| `apiBaseUrl`       | URL da API; `https`, ou `http` apenas em `localhost`/`127.0.0.1`; sem credenciais, query nem fragmento |
-| `cognitoAuthority` | URL do emissor OIDC do Cognito; mesma regra de URL                                                     |
-| `cognitoClientId`  | 1 a 128 caracteres: letras, números, `_` e `-`                                                         |
+| Campo              | Regra                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `apiBaseUrl`       | URL da API; `https` (no `npm run dev`, também `http` em `localhost`/`127.0.0.1`); sem credenciais, query nem fragmento |
+| `cognitoAuthority` | URL do emissor OIDC do Cognito; mesma regra de URL                                                                     |
+| `cognitoClientId`  | 1 a 128 caracteres: letras, números, `_` e `-`                                                                         |
 
 Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de erro e não carrega. Não coloque segredos nele: é público.
+
+`http://` só é aceito pelo servidor de desenvolvimento (`import.meta.env.DEV`). O build (`npm run build`) recusa qualquer `http`, inclusive `localhost`: servir o `dist/` com o `public/config.json` de desenvolvimento (por exemplo `npx vite preview`) mostra a tela de erro, de propósito. Para olhar o build localmente, sirva um `/config.json` com URLs `https`.
 
 ## SEO e arquivos públicos
 
@@ -134,7 +139,7 @@ Existem o serviço de sessão, em TypeScript puro (sem React, React Flow nem `fe
 - **`signOut`** limpa a sessão local (e o que estava em voo) antes de navegar para o encerramento no provedor, e nunca rejeita; se o provedor falhar, navega para `/`.
 - `crypto.getRandomValues` e SHA-256 do PKCE ficam em `infrastructure/webCrypto.ts`.
 - **Provedor do Cognito** (`infrastructure/cognitoProvider.ts`, `createCognitoProvider`): Authorization Code + PKCE S256 com `fetch` e Web Crypto. `beginSignIn` descobre os endpoints, gera `state`, `nonce` e `code_verifier`, guarda a tentativa e devolve a URL da tela pedida (`sign-in`, `sign-up` ou `forgot-password`); não navega. `completeSignIn` consome a tentativa (uso único), confere `error`, `code` e `state` da `callbackUrl` (parâmetro repetido, formato ou `state` divergente/expirado são recusados) e troca o código com `code_verifier` no endpoint de token; o ID token precisa ter `iss`, `aud`, `nonce` e `exp` válidos (a assinatura não é verificada no cliente; quem autoriza é o API Gateway) e dele saem só `sub` e o e-mail verificado. `refresh` usa o refresh token (recusa 4xx vira `session-expired`; resposta inesperada, `invalid-response`; 5xx/429, `network`) e mantém o refresh token anterior se o Cognito não enviar outro. `endSession` revoga o refresh token em melhor esforço e devolve a URL de logout (ou `/` se a descoberta falhar). Cada chamada sai sem cookie, sem seguir redirecionamento, sem cache e com tempo limite (10 s); falha vira `AuthError('network')`.
-- **Descoberta OIDC** (`model/endpoints.ts`): parte só do `cognitoAuthority` do `/config.json` (`<authority>/.well-known/openid-configuration`), nunca de query. O documento é validado com zod: `issuer` igual ao emissor configurado, S256 suportado quando listado, e todo endpoint `https` e da mesma origem do de autorização; qualquer desvio é `AuthError('invalid-response')`. Sem revogação ou logout no documento, usam-se `/oauth2/revoke` e `/logout` da origem validada; `/signup` e `/forgotPassword` saem dela também. O resultado fica em cache na promise e uma falha não é cacheada.
+- **Descoberta OIDC** (`model/endpoints.ts`): parte só do `cognitoAuthority` do `/config.json` (`<authority>/.well-known/openid-configuration`), nunca de query. O documento é validado com zod: `issuer` igual ao emissor configurado, S256 suportado quando listado, e todo endpoint `https` e da mesma origem do de autorização; qualquer desvio é `AuthError('invalid-response')`. O endpoint de autorização tem de ser o login gerenciado do próprio site (`isLoginOfSite`): `https`, porta padrão e host exatamente igual a `auth.` + o host da página (`auth.<domínio>` em produção, `auth.staging.<domínio>` em staging), comparado depois de normalizado pelo `URL`. A origem da página entra por parâmetro (`createBrowserAuth` passa `location.origin`). Outro host é `AuthError('login-origin')`, com frase própria na tela, e o login não é aberto. Só no servidor de desenvolvimento, com o site em `localhost`, o login também pode estar em `localhost`/`127.0.0.1`. Sem revogação ou logout no documento, usam-se `/oauth2/revoke` e `/logout` da origem validada; `/signup` e `/forgotPassword` saem dela também. O resultado fica em cache na promise e uma falha não é cacheada.
 - **Tentativa de login** (`infrastructure/sessionAttemptStore.ts`): é, com o rascunho do design acima, o que se guarda no `sessionStorage` (chave `aws-cost-playground:login-attempt`), e nunca um token: só `state`, `code_verifier`, `nonce`, destino e hora. Uma por aba (um novo pedido substitui a anterior), de uso único (`take` apaga) e validada por schema; armazenamento bloqueado ou corrompido não lança, e `beginSignIn` rejeita se não consegue guardar.
 
 ## Designs salvos (`features/designs`)
