@@ -37,8 +37,8 @@ describe('estado do salvamento', () => {
 });
 
 describe('textos', () => {
-  it('cada código tem frase própria e o limite diz 50', () => {
-    expect(designErrorMessage('design-limit')).toBe('Você atingiu o limite de 50 designs.');
+  it('cada código tem frase própria e o limite diz 10', () => {
+    expect(designErrorMessage('design-limit')).toBe('Você atingiu o limite de 10 designs.');
     expect(designErrorMessage('unauthenticated')).toMatch(/Entre/);
     expect(isRetryable('network')).toBe(true);
     expect(isRetryable('too-large')).toBe(false);

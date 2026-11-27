@@ -40,7 +40,7 @@ describe('DesignsPage', () => {
     expect(within(rows[0]!).getByText('2 blocos')).toBeInTheDocument();
     expect(within(rows[0]!).getByText('us-east-1')).toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
-    expect(screen.getByText('2 de 50 designs')).toBeInTheDocument();
+    expect(screen.getByText('2 de 10 designs')).toBeInTheDocument();
     expect(rows[0]!.querySelector('time')).toHaveAttribute(
       'datetime',
       (await api.designs.list())[0]!.updatedAt,
@@ -189,7 +189,7 @@ describe('DesignsPage', () => {
       await user.click(
         within(screen.getByRole('dialog')).getByRole('button', { name: 'Duplicar' }),
       );
-      expect(await screen.findByRole('alert')).toHaveTextContent('limite de 50 designs');
+      expect(await screen.findByRole('alert')).toHaveTextContent('limite de 10 designs');
       expect(await api.designs.list()).toHaveLength(2);
     });
 

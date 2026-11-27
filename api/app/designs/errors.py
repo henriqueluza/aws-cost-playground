@@ -19,6 +19,13 @@ class DesignLimitReached(DesignError):
     detail = "Design limit reached"
 
 
+class DesignTooLarge(DesignError):
+    """Documento gravado acima do teto atual: não é copiado (o teto já foi maior)."""
+
+    status = 413
+    detail = "Design document too large"
+
+
 class VersionConflict(DesignError):
     """A `version` gravada não é a esperada: outra aba ou outro dispositivo gravou antes."""
 

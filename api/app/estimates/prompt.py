@@ -51,6 +51,11 @@ class EstimatePlan:
     edges: tuple[Slot, ...]
     expected_output_tokens: int
 
+    @property
+    def nothing_to_estimate(self) -> bool:
+        """Nenhum bloco ou aresta tem chave de uso: a resposta são só padrões, sem chamada à LLM."""
+        return self.expected_output_tokens == 0
+
 
 def output_schema(contracts: Contracts) -> dict[str, object]:
     """JSON Schema de `output_config.format`: inteiros, números e chaves de um conjunto fechado."""

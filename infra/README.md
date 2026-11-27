@@ -50,7 +50,7 @@ Nenhuma variável tem default: sem o valor, o `plan` falha fechado.
 | `environment`, `self_signup_enabled`, `point_in_time_recovery_enabled`, `llm_enabled`, `default_throttle`, `estimates_throttle` | `terraform.tfvars` do ambiente (versionado, sem segredo). `llm_enabled` fica `false` nos dois ambientes; os limites de taxa são os sugeridos no passo 2 de [`docs/runbooks/guardrails-de-custo.md`](../docs/runbooks/guardrails-de-custo.md). Todos mudam por PR |
 | `zone_name` | `TF_VAR_zone_name`, que o pipeline lê da variável de repositório `TF_VAR_ZONE_NAME` (a mesma do job `plan`): domínio da zona do Route 53 |
 | `alarm_email` | `TF_VAR_alarm_email`, que o pipeline lê do secret de repositório `TF_VAR_ALARM_EMAIL` (o mesmo do job `plan`; variável sensível no Terraform) |
-| `package_bucket` | `TF_VAR_package_bucket`, variável do GitHub Environment: bucket de artefatos com o zip das funções. Um por ambiente, criado no bootstrap pela #209 e lido pelo pipeline em `TF_VAR_PACKAGE_BUCKET` |
+| `package_bucket` | `TF_VAR_package_bucket`, variável do GitHub Environment: bucket de artefatos com o zip das funções. Um por ambiente (`acp-artifacts-<stg\|prod>-<id da conta>`), criado no bootstrap (#209) e lido pelo pipeline em `TF_VAR_PACKAGE_BUCKET` |
 | `package_key` | `TF_VAR_package_key`, montada pelo pipeline com o SHA no formato `functions/<sha>.zip` (nada a cadastrar) |
 
 Esses são os valores do deploy (#22; ver [`docs/infra.md`](../docs/infra.md)). O job `plan` do `terraform.yml` não lê GitHub Environment: ver a seção seguinte.
@@ -124,7 +124,7 @@ No CI, o papel de leitura vem de `AWS_PLAN_ROLE_ARN` (workflow `terraform.yml`).
 
 ## plan-guard
 
-Reprova planos que apagam, substituem ou esquecem recursos.
+Reprova planos que apagam, substituem, esquecem ou importam recursos.
 
 ```bash
 terraform show -json plano > plan.json && python3 infra/tools/plan_guard.py plan.json
@@ -133,10 +133,10 @@ terraform show -json plano > plan.json && python3 infra/tools/plan_guard.py plan
 | Saída | Significado |
 |---|---|
 | 0 | Nenhuma ação destrutiva |
-| 1 | Há `delete`, `replace` ou `forget`; uma linha por recurso na stdout |
-| 2 | Entrada inválida, inclusive ação que o guard não conhece (falha fechada); mensagem na stderr |
+| 1 | Há `delete`, `replace`, `forget` ou `import`; uma linha por recurso na stdout |
+| 2 | Entrada inválida, inclusive ação que o guard não conhece e plano com `errored: true` (falha fechada); mensagem na stderr |
 
-Formato da linha: `<kind>\t<address>\t<ação1,ação2>`, só endereço e ações, nunca valores do plano. `forget` (bloco `removed` com `destroy = false`) também bloqueia, pois equivale a um `state rm`.
+Formato da linha: `<kind>\t<address>\t<ação1,ação2>`, só endereço e ações, nunca valores do plano. `forget` (bloco `removed` com `destroy = false`) também bloqueia, pois equivale a um `state rm`. `import` é o recurso com `change.importing` (bloco `import`), qualquer que seja a ação: importar sem mudar nada sai como `no-op`. Agentes não importam recursos; em PR, só o autor libera, com a mesma label `infra:destroy-approved`. Um plano com `errored: true` é parcial (as mudanças listadas não são o plano inteiro) e por isso não é avaliado.
 
 Liberação só pela label `infra:destroy-approved`, aplicada pelo autor.
 
