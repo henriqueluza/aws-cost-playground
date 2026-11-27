@@ -92,6 +92,13 @@ run "lista_inteira_de_statements" {
         Condition = { StringEquals = { "aws:ResourceTag/environment" = env } }
       },
       {
+        Sid       = "UserPoolDomainDistribution"
+        Effect    = "Allow"
+        Action    = "cloudfront:UpdateDistribution"
+        Resource  = "*"
+        Condition = { StringEqualsIfExists = { "aws:ResourceTag/environment" = env } }
+      },
+      {
         Sid    = "EdgePolicies"
         Effect = "Allow"
         Action = [
@@ -172,7 +179,7 @@ run "lista_inteira_de_statements" {
         )
       },
     ]])
-    error_message = "A política dá exatamente estes 14 Allow, com o ambiente na tag ou no nome do registro. Ação, recurso ou condição a mais ou a menos quebra o assert."
+    error_message = "A política dá exatamente estes 15 Allow, com o ambiente na tag ou no nome do registro. Ação, recurso ou condição a mais ou a menos quebra o assert."
   }
 }
 
@@ -221,14 +228,15 @@ run "forma_e_escopo_por_ambiente" {
           anytrue([
             try(s.Condition.StringEquals["aws:ResourceTag/environment"], "") == env,
             try(s.Condition.StringEquals["aws:RequestTag/environment"], "") == env,
+            s.Sid == "UserPoolDomainDistribution" && s.Action == "cloudfront:UpdateDistribution" && try(s.Condition == { StringEqualsIfExists = { "aws:ResourceTag/environment" = env } }, false),
             contains(["EdgePolicies", "UserPoolDomainRead", "ZoneRead", "ZoneList", "Records"], s.Sid),
           ]),
           can(s.Condition) || alltrue([for action in flatten([s.Action]) : can(regex(":(Get|List|Describe)", action)) || (s.Sid == "EdgePolicies" && can(regex("^cloudfront:Create(CachePolicy|OriginAccessControl|ResponseHeadersPolicy)$", action)))]),
-          s.Resource != "*" || contains(["CreateTagged", "CertificateRequest", "EdgePolicies", "UserPoolDomainRead", "ZoneList"], s.Sid),
+          s.Resource != "*" || contains(["CreateTagged", "CertificateRequest", "UserPoolDomainDistribution", "EdgePolicies", "UserPoolDomainRead", "ZoneList"], s.Sid),
         ]
       ]
     ]))
-    error_message = "Toda escrita exige a tag environment do próprio ambiente (no recurso ou no pedido). Sem condição só há leitura e criação de política ou OAC do CloudFront; Resource \"*\" só nos cinco Sids conhecidos; nada cita o outro ambiente."
+    error_message = "Toda escrita exige a tag environment do próprio ambiente (no recurso ou no pedido); UpdateDistribution em \"*\" (#338) só passa recurso sem a tag ou com a do próprio ambiente. Sem condição só há leitura e criação de política ou OAC do CloudFront; Resource \"*\" só nos seis Sids conhecidos; nada cita o outro ambiente."
   }
 
   assert {
@@ -260,6 +268,50 @@ run "forma_e_escopo_por_ambiente" {
       ]
     ]))
     error_message = "Nenhuma ação da política casa com um Deny sem condição de deny-guardrails ou deny-data (DeleteUserPool, Admin*, ListUsers*, DeleteHostedZone)."
+  }
+}
+
+# #338: o Cognito exige cloudfront:UpdateDistribution em "*". Avalia Allow e Deny como o IAM, com
+# a tag environment do recurso em cada caso; `null` é o recurso sem a tag (a distribuição da AWS).
+run "distribuicao_do_outro_ambiente" {
+  command = apply
+
+  assert {
+    condition = alltrue(flatten([
+      for env, other in { staging = "production", production = "staging" } : [
+        for probe in [
+          { tag = null, expected = true }, { tag = env, expected = true }, { tag = other, expected = false },
+          { tag = "shared", expected = false }, { tag = title(env), expected = false }, { tag = "", expected = false },
+          ] : [
+          for verdict in [{
+            for effect in ["Allow", "Deny"] : effect => [
+              for s in concat(jsondecode(aws_iam_policy.apply_id[env].policy).Statement, jsondecode(aws_iam_policy.apply_named[env].policy).Statement, jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement, jsondecode(aws_iam_role_policy.apply_deny_data[env].policy).Statement) : s.Sid
+              if s.Effect == effect && contains(flatten([try(s.Action, [])]), "cloudfront:UpdateDistribution") && alltrue(flatten([
+                for operator, keys in try(s.Condition, {}) : [
+                  for key, value in keys : key != "aws:ResourceTag/environment" ? false : {
+                    StringEquals         = probe.tag != null && probe.tag == value
+                    StringEqualsIfExists = probe.tag == null || probe.tag == value
+                    StringNotEquals      = probe.tag == null || probe.tag != value
+                    Null                 = (probe.tag == null) == (value == "true")
+                  }[operator]
+                ]
+              ]))
+            ]
+          }] : (length(verdict.Allow) > 0 && length(verdict.Deny) == 0) == probe.expected && (probe.tag != other || verdict.Deny == ["DenyOtherEnvironmentDistribution"])
+        ]
+      ]
+    ]))
+    error_message = "cloudfront:UpdateDistribution só passa em distribuição sem a tag environment (a do domínio do Cognito, que é da AWS) ou com a do próprio ambiente. Com a tag do outro ambiente, ou qualquer outro valor (inclusive vazio), nenhum Allow casa; a do outro ambiente ainda cai em DenyOtherEnvironmentDistribution."
+  }
+
+  # O Allow amplo e a negação andam juntos: tirar um dos dois reprova.
+  assert {
+    condition = alltrue([
+      for env in ["staging", "production"] :
+      one([for s in jsondecode(aws_iam_policy.apply_id[env].policy).Statement : s.Sid if s.Resource == "*" && contains(flatten([s.Action]), "cloudfront:UpdateDistribution")]) == "UserPoolDomainDistribution"
+      && one([for s in jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement : s.Resource if s.Effect == "Deny" && try(s.Action, "") == "cloudfront:UpdateDistribution"]) == "*"
+    ])
+    error_message = "UpdateDistribution em \"*\" existe uma vez, no Sid UserPoolDomainDistribution, e tem o par DenyOtherEnvironmentDistribution em \"*\" na política deny-guardrails."
   }
 }
 
