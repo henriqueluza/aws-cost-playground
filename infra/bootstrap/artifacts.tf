@@ -22,9 +22,9 @@ resource "aws_s3_bucket" "artifacts" {
 }
 
 resource "aws_s3_bucket_versioning" "artifacts" {
-  for_each = aws_s3_bucket.artifacts
+  for_each = local.environments
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.artifacts[each.key].id
 
   versioning_configuration {
     status = "Enabled"
@@ -34,9 +34,9 @@ resource "aws_s3_bucket_versioning" "artifacts" {
 # SSE-S3 (AES-256), sem custo, como no bucket de estado: chave própria do KMS é custo fixo.
 #trivy:ignore:AVD-AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
-  for_each = aws_s3_bucket.artifacts
+  for_each = local.environments
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.artifacts[each.key].id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -46,9 +46,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
 }
 
 resource "aws_s3_bucket_public_access_block" "artifacts" {
-  for_each = aws_s3_bucket.artifacts
+  for_each = local.environments
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.artifacts[each.key].id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -57,9 +57,9 @@ resource "aws_s3_bucket_public_access_block" "artifacts" {
 }
 
 resource "aws_s3_bucket_policy" "artifacts" {
-  for_each = aws_s3_bucket.artifacts
+  for_each = local.environments
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.artifacts[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -68,7 +68,7 @@ resource "aws_s3_bucket_policy" "artifacts" {
       Effect    = "Deny"
       Principal = "*"
       Action    = "s3:*"
-      Resource  = [each.value.arn, "${each.value.arn}/*"]
+      Resource  = [aws_s3_bucket.artifacts[each.key].arn, "${aws_s3_bucket.artifacts[each.key].arn}/*"]
       Condition = { Bool = { "aws:SecureTransport" = "false" } }
     }]
   })
