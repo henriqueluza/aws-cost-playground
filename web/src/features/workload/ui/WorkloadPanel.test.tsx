@@ -26,8 +26,8 @@ function setup(
   const base = createInMemoryApi({
     maxDesigns: 5,
     maxDocBytes: 350_000,
-    userDailyLimit: 20,
-    globalDailyLimit: 300,
+    userDailyLimit: 5,
+    globalDailyLimit: 30,
     estimate: () => LLM,
   });
   const api: Api = {
@@ -120,10 +120,10 @@ describe('WorkloadPanel: estimar', () => {
     const { container } = setup({
       estimate: async () => (
         await gate,
-        { ...LLM, quota: { limit: 20, remaining: 18, resetsAt: '2026-11-27T00:00:00.000Z' } }
+        { ...LLM, quota: { limit: 5, remaining: 3, resetsAt: '2026-11-27T00:00:00.000Z' } }
       ),
     });
-    expect(await screen.findByText('Restam 20 de 20 hoje')).toBeInTheDocument();
+    expect(await screen.findByText('Restam 5 de 5 hoje')).toBeInTheDocument();
     await userEvent.click(button());
     expect(button()).toHaveTextContent('Estimando…');
     expect(button()).toHaveAttribute('aria-disabled', 'true');
@@ -131,7 +131,7 @@ describe('WorkloadPanel: estimar', () => {
     expect(
       await screen.findByText('Estimativa aplicada: 1 bloco e 0 conexões.'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Restam 18 de 20 hoje')).toBeInTheDocument();
+    expect(screen.getByText('Restam 3 de 5 hoje')).toBeInTheDocument();
     expect(assets()?.usage).toMatchObject({ source: 'llm', values: { storageGb: 80 } });
     expect(designStore.getState().document.blocks[0]?.overrides).toEqual({ avgDurationMs: 80 });
     expect(designStore.getState().history.past).toHaveLength(1); // um passo desfazível
@@ -149,7 +149,7 @@ describe('WorkloadPanel: estimar', () => {
     const { api } = setup({
       estimate: async () => (
         await gate,
-        { ...LLM, quota: { limit: 20, remaining: 1, resetsAt: '2026-11-27T00:00:00.000Z' } }
+        { ...LLM, quota: { limit: 5, remaining: 1, resetsAt: '2026-11-27T00:00:00.000Z' } }
       ),
     });
     await userEvent.dblClick(button());
@@ -183,7 +183,7 @@ describe('WorkloadPanel: estimar', () => {
     const { unmount, api } = setup({
       estimate: async () => (
         await gate,
-        { ...LLM, quota: { limit: 20, remaining: 1, resetsAt: '2026-11-27T00:00:00.000Z' } }
+        { ...LLM, quota: { limit: 5, remaining: 1, resetsAt: '2026-11-27T00:00:00.000Z' } }
       ),
     });
     await userEvent.click(button());
@@ -198,21 +198,21 @@ describe('WorkloadPanel: estimar', () => {
 describe('WorkloadPanel: quota zerada e resposta vazia', () => {
   it('remaining 0 com resetsAt futuro trava o botão com a frase; vencido libera', async () => {
     const { unmount } = setup({
-      quota: { limit: 20, remaining: 0, resetsAt: '2999-01-01T00:00:00.000Z' },
+      quota: { limit: 5, remaining: 0, resetsAt: '2999-01-01T00:00:00.000Z' },
     });
-    expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
+    expect(await screen.findByText('Restam 0 de 5 hoje')).toBeInTheDocument();
     expect(screen.getByText(/Você usou as estimativas de hoje/)).toBeInTheDocument();
     expect(button()).toHaveAttribute('aria-disabled', 'true');
     unmount();
-    setup({ quota: { limit: 20, remaining: 0, resetsAt: '2020-01-01T00:00:00.000Z' } });
-    expect(await screen.findByText('Restam 0 de 20 hoje')).toBeInTheDocument();
+    setup({ quota: { limit: 5, remaining: 0, resetsAt: '2020-01-01T00:00:00.000Z' } });
+    expect(await screen.findByText('Restam 0 de 5 hoje')).toBeInTheDocument();
     expect(screen.queryByText(/Você usou as estimativas de hoje/)).toBeNull();
     expect(button()).toHaveAttribute('aria-disabled', 'false');
   });
 
   it('resposta sem valor aproveitável diz isso e não limpa a marca de desatualizada', async () => {
     let calls = 0;
-    const quota = { limit: 20, remaining: 5, resetsAt: '2999-01-01T00:00:00.000Z' };
+    const quota = { limit: 5, remaining: 5, resetsAt: '2999-01-01T00:00:00.000Z' };
     setup({
       estimate: () =>
         Promise.resolve({ ...(calls++ === 0 ? LLM : { blocks: [], edges: [] }), quota }),
@@ -228,7 +228,8 @@ describe('WorkloadPanel: quota zerada e resposta vazia', () => {
 });
 
 describe('WorkloadPanel: erros', () => {
-  const reset = '2026-11-27T00:00:00.000Z';
+  // Sempre no futuro: com uma data fixa de 2026, a trava soltava sozinha depois desse dia.
+  const reset = '2999-01-01T00:00:00.000Z';
   it.each([
     [
       { kind: 'quota-exhausted', scope: 'user', resetsAt: reset } as const,

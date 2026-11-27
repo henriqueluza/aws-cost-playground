@@ -444,8 +444,8 @@ Cada valor de uso no inspetor (e na aresta) diz de onde veio, por forma e não s
 | Vazio | O quadro e o título ficam; uma frase e a próxima ação dentro de um contorno tracejado de 1px em `--control`. Canvas vazio: "Arraste um bloco da paleta ou abra o template". |
 | Erro | Dentro do bloco que falhou, nunca em banner de tela cheia: uma frase com o que falhou, a última vez que deu certo e `Tentar de novo`. O vermelho fica só no ícone ou na pílula. Catálogo de preços que não carregou para a região: o carimbo e o painel mostram `—` no lugar dos valores, a frase "Sem preços de sa-east-1 neste momento" e `Tentar de novo`. |
 | Desatualizado | Pílula de aviso `Estimativa desatualizada` ao lado de `Re-estimar carga`. |
-| Quota do usuário | Linha de capacidade `Restam 12 de 20 hoje` com barra de 4px na proporção real (`--text` sobre `--rule`). Em zero, o botão fica desabilitado e diz quando a quota volta. |
-| Limite global | Quando as 300 estimativas do dia acabam para todos, o botão fica desabilitado com a frase "O limite diário do serviço acabou; volta amanhã" e a linha de capacidade do usuário continua mostrando o que ele ainda teria. |
+| Quota do usuário | Linha de capacidade `Restam 3 de 5 hoje` com barra de 4px na proporção real (`--text` sobre `--rule`). Em zero, o botão fica desabilitado e diz quando a quota volta. |
+| Limite global | Quando as 30 estimativas do dia acabam para todos, o botão fica desabilitado com a frase "O limite diário do serviço acabou; volta amanhã" e a linha de capacidade do usuário continua mostrando o que ele ainda teria. |
 | Salvo | Carimbo de tempo discreto `Salvo há 2 min` em 12px `--muted` na barra superior. |
 
 ### Movimento

@@ -7,6 +7,7 @@ import { AuthProvider, createBrowserAuth, type AuthService } from '../features/a
 import { loadRuntimeConfig, type RuntimeConfig } from '../shared/config';
 import type { Api } from '../shared/lib/api';
 import { ApiProvider } from '../shared/lib/api/ApiProvider';
+import { QUOTA_LIMITS } from '../shared/lib/api/quotaLimits';
 import { createHttpApi, createHttpTransport, type HttpTransportOptions } from '../shared/lib/http';
 import { ConfigErrorScreen } from '../shared/ui';
 import { routes as appRoutes } from './router';
@@ -41,8 +42,7 @@ export async function createApi(
     return createInMemoryApi({
       maxDesigns: 50,
       maxDocBytes: 350_000,
-      userDailyLimit: 20,
-      globalDailyLimit: 300,
+      ...QUOTA_LIMITS,
     });
   }
   return createHttpApi(createHttpTransport({ baseUrl: config.apiBaseUrl, getAccessToken }));

@@ -10,6 +10,14 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_QUOTA_USER_DAILY_LIMIT = 5
+DEFAULT_QUOTA_GLOBAL_DAILY_LIMIT = 30
+"""Quotas diárias de estimativa (ADR-0001, "Modelo da LLM e custo por chamada"). São o ponto de
+verdade da API: a infra não passa estas variáveis, então o que vale em execução é o que está aqui.
+
+O teto de custo é dado pela global. Se 5 por usuário for pouco, o autor previu subir só a do
+usuário para 10, mantendo a global em 30 (decisão de 26/11/2026): é trocar a primeira constante.
+"""
 MAX_QUOTA_USER_DAILY_LIMIT = 100
 MAX_QUOTA_GLOBAL_DAILY_LIMIT = 1_000
 """Tetos das quotas no código: um erro de configuração não libera gasto sem limite com a LLM."""
@@ -31,8 +39,12 @@ class Settings(BaseSettings):
         default=None, pattern=r"^/[A-Za-z0-9/_.-]{1,255}$"
     )
     # Padrões do ADR-0001. Mudar o valor é decisão de custo do autor; nunca vem de requisição.
-    quota_user_daily_limit: int = Field(default=20, ge=1, le=MAX_QUOTA_USER_DAILY_LIMIT)
-    quota_global_daily_limit: int = Field(default=300, ge=1, le=MAX_QUOTA_GLOBAL_DAILY_LIMIT)
+    quota_user_daily_limit: int = Field(
+        default=DEFAULT_QUOTA_USER_DAILY_LIMIT, ge=1, le=MAX_QUOTA_USER_DAILY_LIMIT
+    )
+    quota_global_daily_limit: int = Field(
+        default=DEFAULT_QUOTA_GLOBAL_DAILY_LIMIT, ge=1, le=MAX_QUOTA_GLOBAL_DAILY_LIMIT
+    )
 
 
 @lru_cache(maxsize=1)

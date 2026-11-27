@@ -130,8 +130,8 @@ def test_sucesso_segue_a_ordem_e_devolve_so_ids_numeros_e_quota(harness: Harness
     assert [edge["id"] for edge in body["edges"]] == [edge["id"] for edge in BODY["edges"]]
     assert body["blocks"][0]["values"]["requestsPerMonth"] == 5000
     assert [block["source"] for block in body["blocks"]] == ["llm", "default", "default", "default"]
-    assert body["quota"] == {"limit": 20, "remaining": 19, "resetsAt": body["quota"]["resetsAt"]}
-    assert remaining() == 19
+    assert body["quota"] == {"limit": 5, "remaining": 4, "resetsAt": body["quota"]["resetsAt"]}
+    assert remaining() == 4
 
 
 def test_texto_devolvido_pela_llm_nao_chega_a_resposta(harness: Harness) -> None:
@@ -154,14 +154,14 @@ def test_diagrama_sem_nada_a_estimar_consome_quota_e_nao_chama_a_llm(harness: Ha
     status, _, body = harness.post(BODY | {"blocks": [], "edges": []})
     assert (status, body["blocks"], body["edges"]) == (200, [], [])
     assert harness.calls == ["prepare", f"consume:{SUB}", "estimate"]
-    assert (harness.paid_calls(), body["quota"]["remaining"]) == (0, 19)
+    assert (harness.paid_calls(), body["quota"]["remaining"]) == (0, 4)
 
 
 def test_identidade_vem_so_do_sub_do_jwt(harness: Harness) -> None:
     forged = BODY | {"sub": OTHER, "userId": OTHER, "user_id": OTHER}
     assert harness.post(forged)[0] == 200
     assert harness.calls[1] == f"consume:{SUB}"
-    assert (remaining(SUB), remaining(OTHER)) == (19, 20)
+    assert (remaining(SUB), remaining(OTHER)) == (4, 5)
 
 
 # --- o que não consome quota -----------------------------------------------------------------
@@ -190,7 +190,7 @@ def test_entrada_invalida_nao_consome_quota_nem_chama_a_llm(
         status = harness.post(request_.get("body"), raw=request_.get("raw"))[0]
     assert status == expected
     assert harness.calls == []  # nem `prepare`: a `ProtectedRoute` e o Pydantic vêm antes
-    assert (harness.paid_calls(), harness.fakes.ssm_reads, remaining()) == (0, 0, 20)
+    assert (harness.paid_calls(), harness.fakes.ssm_reads, remaining()) == (0, 0, 5)
 
 
 def test_diagrama_grande_demais_responde_413_sem_consumir_quota(harness: Harness) -> None:
@@ -198,7 +198,7 @@ def test_diagrama_grande_demais_responde_413_sem_consumir_quota(harness: Harness
     assert (status, headers["content-type"]) == (413, PROBLEM)
     assert problem["detail"] == "The diagram is too large to estimate."
     assert harness.calls == ["prepare"]
-    assert (harness.paid_calls(), remaining()) == (0, 20)
+    assert (harness.paid_calls(), remaining()) == (0, 5)
 
 
 def test_interruptor_desligado_responde_503_sem_quota_e_sem_llm(
@@ -217,7 +217,7 @@ def test_interruptor_desligado_responde_503_sem_quota_e_sem_llm(
         "requestId": "req-test-1",
     }
     assert harness.calls == ["prepare"]  # `consume` não é chamado
-    assert (harness.paid_calls(), harness.fakes.ssm_reads, remaining()) == (0, 0, 20)
+    assert (harness.paid_calls(), harness.fakes.ssm_reads, remaining()) == (0, 0, 5)
     (event,) = events(capsys)
     assert (event["message"], event["level"], event["result"]) == (
         "estimate rejected",
@@ -235,7 +235,7 @@ def test_sem_a_variavel_llm_enabled_a_rota_nasce_desligada(
     event = make_event("/estimates", method="POST", claims={"sub": SUB}, body=json.dumps(BODY))
     event["headers"]["content-type"] = "application/json"
     assert invoke(app, event)[0] == 503
-    assert remaining() == 20
+    assert remaining() == 5
     get_claude_client.cache_clear()
 
 
@@ -358,7 +358,11 @@ def test_falha_da_llm_depois_do_consumo_e_logada_e_a_quota_nao_volta(
     assert harness.paid_calls() <= 1  # nenhuma nova tentativa na rota
     # A quota fica consumida: uma única escrita (o incremento) e nenhum decremento depois.
     assert len(table.transactions) == 1
-    assert (table.count(f"USER#{SUB}"), table.count("GLOBAL")) == (1, 1)
+    # Pela partição, em qualquer dia: a rota usa o relógio real, e `count()` só olha o dia fixo.
+    assert {pk: item["count"] for (pk, _), item in table.items.items()} == {
+        f"USER#{SUB}": 1,
+        "GLOBAL": 1,
+    }
     (event,) = events(capsys)
     assert (event["message"], event["level"]) == ("estimate failed after quota consumed", "ERROR")
     assert (event["result"], event["input_tokens"], event["output_tokens"]) == (code, *tokens)
@@ -371,7 +375,7 @@ def test_erro_inesperado_depois_do_consumo_responde_500_e_fica_no_log(
     harness.use(Fakes(RuntimeError(SENTINEL)))
     status, _, problem = harness.post()
     assert (status, SENTINEL in json.dumps(problem)) == (500, False)
-    assert remaining() == 19
+    assert remaining() == 4
     out = capsys.readouterr().out
     assert SENTINEL not in out
     (event,) = [e for e in map(json.loads, out.splitlines()) if e["logger"] == "app.estimate"]

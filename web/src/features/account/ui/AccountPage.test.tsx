@@ -29,8 +29,8 @@ const newApi = (): Api =>
   createInMemoryApi({
     maxDesigns: 5,
     maxDocBytes: 350_000,
-    userDailyLimit: 20,
-    globalDailyLimit: 300,
+    userDailyLimit: 5,
+    globalDailyLimit: 30,
   });
 
 const reject = (kind: ApiErrorKind) => () => Promise.reject(new ApiError({ kind } as never));
@@ -78,7 +78,7 @@ describe('AccountPage', () => {
   it('mostra carregando e depois o e-mail e a quota restante com o período', async () => {
     const { container } = mount();
     expect(screen.getByRole('status')).toHaveTextContent('Carregando suas estimativas');
-    expect(await screen.findByText('Restam 20 de 20 estimativas por dia.')).toBeInTheDocument();
+    expect(await screen.findByText('Restam 5 de 5 estimativas por dia.')).toBeInTheDocument();
     expect(screen.getByText(EMAIL)).toBeInTheDocument();
     expect(screen.getByText(/Renova em/)).toBeInTheDocument();
     await expectNoAxeViolations(container);
@@ -97,7 +97,7 @@ describe('AccountPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão com o serviço');
     fail = false;
     await userEvent.setup().click(screen.getByRole('button', { name: 'Tentar de novo' }));
-    expect(await screen.findByText(/Restam 20 de 20/)).toBeInTheDocument();
+    expect(await screen.findByText(/Restam 5 de 5/)).toBeInTheDocument();
   });
 
   describe('exclusão', () => {

@@ -56,7 +56,7 @@ Lista fechada. O que não está aqui está fora.
 - F18. Marcação de origem de cada valor: estimado pela LLM, padrão ou alterado à mão.
 - F19. Override manual de qualquer valor de uso, que vence a LLM e sobrevive a novas estimativas.
 - F20. Indicador de estimativa desatualizada quando o diagrama muda depois da última estimativa.
-- F21. Quota de 20 estimativas por dia por usuário e 300 por dia no total, com mensagem clara quando esgota e contador do que resta.
+- F21. Quota de 5 estimativas por dia por usuário e 30 por dia no total (eram 20 e 300; decisão do autor de 26/11/2026, #384), com mensagem clara quando esgota e contador do que resta.
 
 ### Conta e designs (só logado)
 
