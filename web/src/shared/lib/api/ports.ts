@@ -20,6 +20,9 @@ export const designIdSchema = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/);
 /** Nome do design: 1 a 80 caracteres sem espaço nas pontas. */
 export const designNameSchema = z.string().trim().min(1).max(DESIGN_LIMITS.maxLabelLength);
 
+/** Designs por conta: o `MAX_DESIGNS` da API (ADR-0001, #277). Ponto de verdade do `web/`. */
+export const MAX_DESIGNS = 10;
+
 /** Item da listagem: a projeção do ADR, sem `doc`. */
 export const designSummarySchema = z.object({
   id: designIdSchema,
