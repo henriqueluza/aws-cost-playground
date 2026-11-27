@@ -1,5 +1,12 @@
 /* DESIGN.md, "A casca do editor" (Paleta) e "Categorias dos blocos". Só tokens. */
 
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .search {
   margin-block: var(--space-1) 0;
 }
