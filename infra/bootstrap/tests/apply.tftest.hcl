@@ -42,7 +42,7 @@ run "trust_dos_papeis_apply" {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
             "token.actions.githubusercontent.com:ref" = "refs/heads/main"
-            "token.actions.githubusercontent.com:sub" = "repo:henriqueluza/aws-cost-playground:environment:${env}"
+            "token.actions.githubusercontent.com:sub" = "repo:henriqueluza@60079862/aws-cost-playground@1463554125:environment:${env}"
           }
         }
     }]]
