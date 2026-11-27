@@ -25,7 +25,7 @@ function setup(
 ) {
   const base = createInMemoryApi({
     maxDesigns: 5,
-    maxDocBytes: 350_000,
+    maxDocBytes: 100_000,
     userDailyLimit: 20,
     globalDailyLimit: 300,
     estimate: () => LLM,
