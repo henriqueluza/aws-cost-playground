@@ -18,10 +18,10 @@ ENVS = {
         "self_signup_enabled": "false",
         "point_in_time_recovery_enabled": "false",
     },
-    # Cadastro aberto em produção: critério da #21, com o risco aceito pelo autor na #139.
+    # Cadastro fechado nos dois ambientes: decisão do autor de 26/11/2026 (#383), no lugar da #139.
     "production": {
         "environment": "production",
-        "self_signup_enabled": "true",
+        "self_signup_enabled": "false",
         "point_in_time_recovery_enabled": "true",
     },
 }
@@ -107,7 +107,7 @@ class EnvsTest(unittest.TestCase):
 
     def test_outputs_and_site_config_follow_the_runtime_schema(self) -> None:
         keys = schema_keys()
-        self.assertEqual(keys, {"apiBaseUrl", "cognitoAuthority", "cognitoClientId"})
+        self.assertEqual(keys, {"apiBaseUrl", "cognitoAuthority", "cognitoClientId", "selfSignupEnabled"})
         for env in ENVS:
             text = read(env, "outputs.tf")
             self.assertEqual(set(re.findall(r'^output "(\w+)"', text, re.M)), DEPLOY_OUTPUTS | RUNBOOK_OUTPUTS)
@@ -135,12 +135,19 @@ class EnvsTest(unittest.TestCase):
             self.assertEqual(generic["production"], generic["staging"], name)
             self.assertNotEqual(read("production", name), read("staging", name), name)
 
-    def test_tfvars_differ_only_in_environment_signup_and_pitr(self) -> None:
-        """Só variáveis mudam entre os ambientes: nome, cadastro aberto e PITR."""
+    def test_tfvars_differ_only_in_environment_and_pitr(self) -> None:
+        """Só variáveis mudam entre os ambientes: nome e PITR. O cadastro é fechado nos dois (#383)."""
         staging, production = tfvars("staging"), tfvars("production")
         self.assertEqual(set(production), set(staging))
         changed = {key for key in staging if staging[key] != production[key]}
-        self.assertEqual(changed, {"environment", "self_signup_enabled", "point_in_time_recovery_enabled"})
+        self.assertEqual(changed, {"environment", "point_in_time_recovery_enabled"})
+
+    def test_site_config_signup_comes_from_the_variable_that_closes_the_pool(self) -> None:
+        """Uma fonte de verdade: o que o site mostra e o que o pool aceita saem da mesma variável."""
+        for env in ENVS:
+            self.assertRegex(read(env, "main.tf"), r"self_signup_enabled\s*=\s*var\.self_signup_enabled")
+            site_config = block(read(env, "outputs.tf"), "output", "site_config")
+            self.assertRegex(site_config, r"selfSignupEnabled\s*=\s*var\.self_signup_enabled\n")
 
 
 if __name__ == "__main__":

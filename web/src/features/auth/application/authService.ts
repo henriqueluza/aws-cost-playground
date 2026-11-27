@@ -9,6 +9,7 @@ const ANONYMOUS: AuthSnapshot = { status: 'anonymous' };
 export function createAuthService(deps: AuthServiceDeps): AuthService {
   const { provider, store, navigate } = deps;
   const now = deps.now ?? Date.now;
+  const signUpAvailable = deps.signUpAvailable ?? false;
   const listeners = new Set<() => void>();
   const completions = new Map<string, Promise<string>>();
   let session = store.read();
@@ -54,6 +55,7 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
   }
 
   return {
+    signUpAvailable,
     getSnapshot: () => snapshot,
     subscribe(listener) {
       listeners.add(listener);
@@ -63,10 +65,9 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     },
 
     async signIn(options: SignInOptions = {}) {
-      const url = await provider.beginSignIn(
-        options.screen ?? 'sign-in',
-        safeReturnTo(options.returnTo),
-      );
+      const asked = options.screen ?? 'sign-in';
+      const screen = asked === 'sign-up' && !signUpAvailable ? 'sign-in' : asked;
+      const url = await provider.beginSignIn(screen, safeReturnTo(options.returnTo));
       navigate(url);
     },
 

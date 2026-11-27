@@ -24,6 +24,7 @@ export function createBrowserAuth(config: RuntimeConfig, location: Location): Au
       attempts: createSessionAttemptStore(),
     }),
     store: createMemorySessionStore(),
+    signUpAvailable: config.selfSignupEnabled,
     navigate(url) {
       const target = new URL(url, origin);
       if (target.protocol === 'https:' || target.origin === origin) location.assign(target.href);

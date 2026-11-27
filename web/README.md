@@ -51,15 +51,17 @@ O build é o mesmo em todos os ambientes. O que muda por ambiente é o arquivo `
 {
   "apiBaseUrl": "https://api.example.com",
   "cognitoAuthority": "https://cognito-idp.us-east-1.amazonaws.com/<pool-id>",
-  "cognitoClientId": "<client-id>"
+  "cognitoClientId": "<client-id>",
+  "selfSignupEnabled": false
 }
 ```
 
-| Campo              | Regra                                                                                                                  |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `apiBaseUrl`       | URL da API; `https` (no `npm run dev`, também `http` em `localhost`/`127.0.0.1`); sem credenciais, query nem fragmento |
-| `cognitoAuthority` | URL do emissor OIDC do Cognito; mesma regra de URL                                                                     |
-| `cognitoClientId`  | 1 a 128 caracteres: letras, números, `_` e `-`                                                                         |
+| Campo               | Regra                                                                                                                   |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `apiBaseUrl`        | URL da API; `https` (no `npm run dev`, também `http` em `localhost`/`127.0.0.1`); sem credenciais, query nem fragmento  |
+| `cognitoAuthority`  | URL do emissor OIDC do Cognito; mesma regra de URL                                                                      |
+| `cognitoClientId`   | 1 a 128 caracteres: letras, números, `_` e `-`                                                                          |
+| `selfSignupEnabled` | Booleano, opcional. `true` mostra "Criar conta"; ausente vale `false` (cadastro fechado). Outro tipo invalida o arquivo |
 
 Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de erro e não carrega. Não coloque segredos nele: é público.
 
@@ -128,7 +130,7 @@ Se o arquivo faltar, não for JSON ou violar o schema, o app mostra uma tela de 
 Existem o serviço de sessão, em TypeScript puro (sem React, React Flow nem `fetch` na camada `application`), e o provedor do Cognito completo (#262 e #286): descoberta OIDC, início do login, retorno, renovação e logout. A ligação ao app (#263 e #299) tem provedor React, rota de retorno, proteção de rotas e os controles de entrar e sair na barra do editor.
 
 - **Ligação ao app**: o bootstrap cria o serviço (`createBrowserAuth`) e o injeta em `AuthProvider`; as telas leem o estado com `useAuth()`. O `getAccessToken` do transporte HTTP vem do serviço de sessão. `/auth/callback` (`AuthCallbackPage`) conclui o login e mostra os estados carregando e erro. `RequireAuth` protege `/designs` e `/conta`: anônimo é enviado ao login e volta ao destino original (via `safeReturnTo`).
-- **Controles na barra do editor** (`ui/AuthActions.tsx`, com o `SignInButton`, compostos em `app/router.tsx` junto de `SaveControls`): anônimo vê Entrar e Criar conta (o botão mostra "Abrindo…" enquanto o login é preparado); autenticado vê o e-mail, com link para `/conta`, e Sair.
+- **Controles na barra do editor** (`ui/AuthActions.tsx`, com o `SignInButton`, compostos em `app/router.tsx` junto de `SaveControls`): anônimo vê Entrar e, só quando o `/config.json` traz `selfSignupEnabled: true`, Criar conta (o botão mostra "Abrindo…" enquanto o login é preparado). Campo ausente vale cadastro fechado (#383): o serviço expõe `signUpAvailable` e, fechado, um pedido da tela `sign-up` vira `sign-in`, de modo que o site nunca monta o caminho de cadastro; autenticado vê o e-mail, com link para `/conta`, e Sair.
 - **Design em edição durante o login** (`editor/model/designDraft.ts`, `editor/hooks/designDraftSync.ts`): como a ida ao login recarrega a página, `keepDesignForLogin` guarda o design no `sessionStorage` (chave `aws-cost-playground:design-draft`) antes de sair, se ele tem conteúdo. `useRestoreDesignDraft` o devolve na volta: uso único, vale 30 minutos e só entra num editor vazio, nunca por cima do que já está na tela.
 - **Cache por usuário** (`app/sessionCache.ts`): o cache do TanStack Query é limpo ao entrar, sair ou trocar de usuário, para que dados de uma conta nunca apareçam em outra.
 

@@ -48,8 +48,19 @@ describe('runtimeConfig', () => {
     await expect(loadRuntimeConfig(reply(json()))).resolves.toEqual(valid);
   });
 
+  it('sem `selfSignupEnabled` o cadastro vale fechado; `true` abre', async () => {
+    const { loadRuntimeConfig } = await load();
+    const absent = await loadRuntimeConfig(reply(json({ selfSignupEnabled: undefined })));
+    expect(absent.selfSignupEnabled).toBe(false);
+    const open = await loadRuntimeConfig(reply(json({ selfSignupEnabled: true })));
+    expect(open.selfSignupEnabled).toBe(true);
+  });
+
   it.each([
     ['404', json(), 404],
+    ['cadastro como texto', json({ selfSignupEnabled: 'true' }), 200],
+    ['cadastro como número', json({ selfSignupEnabled: 1 }), 200],
+    ['cadastro nulo', json({ selfSignupEnabled: null }), 200],
     ['campo ausente', json({ cognitoClientId: undefined }), 200],
     ['http fora de localhost', json({ apiBaseUrl: 'http://api.example.com' }), 200],
     ['http em host parecido com localhost', json({ apiBaseUrl: 'http://localhost.evil.com' }), 200],

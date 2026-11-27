@@ -5,6 +5,7 @@ const CONFIG = {
   apiBaseUrl: 'https://api.example.com',
   cognitoAuthority: 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_Teste',
   cognitoClientId: 'cliente',
+  selfSignupEnabled: false,
 };
 
 function fakeLocation(origin = 'https://app.example.com') {
@@ -19,6 +20,12 @@ describe('createBrowserAuth', () => {
     await expect(auth.getAccessToken()).resolves.toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+
+  it('o cadastro segue o `selfSignupEnabled` do /config.json', () => {
+    expect(createBrowserAuth(CONFIG, fakeLocation()).signUpAvailable).toBe(false);
+    const open = { ...CONFIG, selfSignupEnabled: true };
+    expect(createBrowserAuth(open, fakeLocation()).signUpAvailable).toBe(true);
   });
 
   it('o retorno inválido é recusado com erro próprio, sem rede', async () => {

@@ -67,6 +67,13 @@ run "compoe_sem_ciclo_com_nomes_de_production" {
     condition     = output.site_config.apiBaseUrl == "https://api.exemplo.com"
     error_message = "O /config.json de production deve apontar para api.<domínio>, sem subdomínio de ambiente."
   }
+
+  # #383: cadastro fechado nos dois ambientes. O valor vem do terraform.tfvars e chega ao pool
+  # (módulo auth: allow_admin_create_user_only = !self_signup_enabled) e ao /config.json do site.
+  assert {
+    condition     = var.self_signup_enabled == false && output.site_config.selfSignupEnabled == false
+    error_message = "O cadastro fica fechado: self_signup_enabled = false no tfvars e selfSignupEnabled = false no /config.json."
+  }
 }
 
 run "rotas_de_designs_atras_do_jwt_e_patch_no_cors" {
