@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { expectNoSeriousA11yViolations } from './support/axe';
 
 interface Box {
   x: number;
@@ -105,6 +106,21 @@ for (const [width, height, minimum] of [
     await boxes(page);
     const { bodies } = await nameBodies(page);
     expect(Math.min(...bodies)).toBeGreaterThanOrEqual(minimum);
+  });
+}
+
+for (const [width, height] of [
+  [1024, 768],
+  [1440, 900],
+] as const) {
+  test(`o modo compacto do bloco passa no axe (contraste incluso), claro e escuro, em ${width}x${height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/');
+    await boxes(page);
+    await expect(page.locator('[data-detail]').first()).toHaveAttribute('data-detail', 'compact');
+    await expectNoSeriousA11yViolations(page, `editor ${width}x${height}`);
   });
 }
 
