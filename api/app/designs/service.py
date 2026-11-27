@@ -27,8 +27,8 @@ from app.designs.schemas import (
     DesignUpdate,
 )
 
-MAX_DESIGNS = 50
-"""Limite de designs por usuário (ADR-0001)."""
+MAX_DESIGNS = 10
+"""Limite de designs por usuário (ADR-0001, #277): com `MAX_DOC_BYTES`, partição de até 1 MB."""
 _ID_ATTEMPTS = 2
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _logger = logging.getLogger("app.designs")

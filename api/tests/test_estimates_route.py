@@ -358,7 +358,11 @@ def test_falha_da_llm_depois_do_consumo_e_logada_e_a_quota_nao_volta(
     assert harness.paid_calls() <= 1  # nenhuma nova tentativa na rota
     # A quota fica consumida: uma única escrita (o incremento) e nenhum decremento depois.
     assert len(table.transactions) == 1
-    assert (table.count(f"USER#{SUB}"), table.count("GLOBAL")) == (1, 1)
+    # Pela partição, em qualquer dia: a rota usa o relógio real, e `count()` só olha o dia fixo.
+    assert {pk: item["count"] for (pk, _), item in table.items.items()} == {
+        f"USER#{SUB}": 1,
+        "GLOBAL": 1,
+    }
     (event,) = events(capsys)
     assert (event["message"], event["level"]) == ("estimate failed after quota consumed", "ERROR")
     assert (event["result"], event["input_tokens"], event["output_tokens"]) == (code, *tokens)
