@@ -1,6 +1,7 @@
 import { CLIENT_NODE_ID, type DesignDocument, type EdgeKind } from '../../../shared/lib/design';
 import { toFixed, type Money } from '../../../shared/lib/money';
 import { blockDefinition, type BlockCategory } from '../../pricing';
+import { defaultLayout } from './defaultLayout';
 import { allowedKinds, endpointType, inferKind } from './edgeKinds';
 import type { Layout, Selection } from './editorState';
 
@@ -77,35 +78,7 @@ export type CanvasEdge = {
 };
 
 const ARROW = { type: 'arrowclosed', width: 16, height: 16 } as const;
-const CELL = { x: 248, y: 144 };
-
-/** Posição de quem não tem entrada no layout: coluna = maior caminho desde um bloco sem entrada; o `client` fica na última. */
-export function defaultLayout(doc: DesignDocument): Record<string, { x: number; y: number }> {
-  const depth = new Map<string, number>();
-  const visiting = new Set<string>();
-  // Aresta que fecha um ciclo é ignorada: o bloco já está na pilha.
-  const depthOf = (id: string): number => {
-    const known = depth.get(id);
-    if (known !== undefined) return known;
-    visiting.add(id);
-    const sources = doc.edges.filter((edge) => edge.target === id && !visiting.has(edge.source));
-    const value = Math.max(-1, ...sources.map((edge) => depthOf(edge.source))) + 1;
-    visiting.delete(id);
-    depth.set(id, value);
-    return value;
-  };
-  const rows = new Map<number, number>();
-  const place = (id: string, column: number) => {
-    const row = rows.get(column) ?? 0;
-    rows.set(column, row + 1);
-    return [id, { x: CELL.x * column, y: CELL.y * row }] as const;
-  };
-  const blocks = doc.blocks.map((block) => place(block.id, depthOf(block.id)));
-  return Object.fromEntries([
-    ...blocks,
-    place(CLIENT_NODE_ID, Math.max(0, ...doc.blocks.map((block) => depthOf(block.id))) + 1),
-  ]);
-}
+export { defaultLayout };
 
 const KIND_LABELS: Record<EdgeKind, string> = {
   data: 'Dados',

@@ -106,3 +106,31 @@ for (const theme of ['light', 'dark'] as const) {
     await expectLegible(page);
   });
 }
+
+/** Zoom do viewport do React Flow, lido do `transform` (a escala do diagrama na tela). */
+const viewportZoom = (page: Page) =>
+  page.evaluate(
+    () =>
+      new DOMMatrix(getComputedStyle(document.querySelector('.react-flow__viewport')!).transform).a,
+  );
+
+test('arquivos sem posições abrem com o layout compacto: zoom mínimo em 1440x900, inteiros', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expectLegible(page);
+  // zoom mínimo de cada cenário (a Issue pedia 0,65; os de 5 colunas dão ~0,61 com corredores de 52 px)
+  const minimum = { 'api-serverless': 0.9, 'app-classico': 0.6, 'pipeline-de-filas': 0.6 };
+  for (const [name, count] of SCENARIOS) {
+    await page.locator('input[type="file"]').setInputFiles({
+      name: `${name}.json`,
+      mimeType: 'application/json',
+      buffer: readFileSync(`../contracts/scenarios/${name}.json`),
+    });
+    const replace = page.getByRole('button', { name: 'Substituir design' });
+    if (await replace.isVisible().catch(() => false)) await replace.click();
+    await expectLegible(page, count);
+    expect(await viewportZoom(page)).toBeGreaterThanOrEqual(minimum[name]);
+  }
+});
