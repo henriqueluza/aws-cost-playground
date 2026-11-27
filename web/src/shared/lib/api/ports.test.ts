@@ -17,6 +17,7 @@ import {
   estimateResponseSchema,
   quotaSchema,
 } from './index';
+import { MAX_DESIGN_VERSION, updateDesignInputSchema } from './ports';
 
 const ULID = '01JDQX3Z8V6Q2K9M4N7P5R1S0T';
 const summary = {
@@ -130,6 +131,21 @@ describe('quotaSchema', () => {
   ])('recusa %s', (_n, patch) => {
     expect(quotaSchema.safeParse({ ...quota, ...patch }).success).toBe(false);
   });
+});
+
+describe('updateDesignInputSchema', () => {
+  const input = (expectedVersion: number) => ({ expectedVersion, name: 'n' });
+  it('aceita expectedVersion até o maior inteiro exato do JS, o teto da API', () => {
+    expect(MAX_DESIGN_VERSION).toBe(2 ** 53 - 1);
+    expect(updateDesignInputSchema.safeParse(input(1)).success).toBe(true);
+    expect(updateDesignInputSchema.safeParse(input(MAX_DESIGN_VERSION)).success).toBe(true);
+  });
+  it.each([0, 1.5, MAX_DESIGN_VERSION + 1, 1e38, Number.POSITIVE_INFINITY])(
+    'recusa expectedVersion %s',
+    (expectedVersion) => {
+      expect(updateDesignInputSchema.safeParse(input(expectedVersion)).success).toBe(false);
+    },
+  );
 });
 
 describe('portas', () => {

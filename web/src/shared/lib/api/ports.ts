@@ -86,9 +86,11 @@ export const createDesignInputSchema = z.object({
   name: designNameSchema,
   doc: designDocumentSchema,
 });
+/** Teto de `expectedVersion`, o mesmo de `MAX_VERSION` na API: o maior inteiro exato do JS. */
+export const MAX_DESIGN_VERSION = Number.MAX_SAFE_INTEGER;
 export const updateDesignInputSchema = z
   .object({
-    expectedVersion: z.number().int().min(1),
+    expectedVersion: z.number().int().min(1).max(MAX_DESIGN_VERSION),
     name: designNameSchema.optional(),
     doc: designDocumentSchema.optional(),
   })
