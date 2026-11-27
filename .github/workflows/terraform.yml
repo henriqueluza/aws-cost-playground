@@ -12,6 +12,8 @@ on:
       - ".github/workflows/terraform.yml"
       - ".github/workflows/prices.yml" # os testes dele ficam em infra/tools/tests
       - ".github/workflows/export-validate.yml" # idem
+      - ".github/workflows/deploy-staging.yml" # idem
+      - "scripts/build-functions.sh" # idem (test_workflow_deploy_staging.py)
 
 permissions:
   contents: read

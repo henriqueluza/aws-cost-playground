@@ -9,7 +9,7 @@ from fastapi.routing import APIRoute
 from app.auth import current_user_id
 
 MAX_BODY_BYTES = 1_048_576
-"""Teto do corpo cru (1 MiB): cabe o `doc` de 350.000 bytes com folga; acima disso, 413."""
+"""Teto do corpo cru (1 MiB): cabe o `doc` de 100.000 bytes com folga; acima disso, 413."""
 
 
 class ProtectedRoute(APIRoute):

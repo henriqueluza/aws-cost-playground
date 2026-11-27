@@ -187,7 +187,7 @@ run "tamanho_por_politica_e_por_papel" {
   assert {
     condition = alltrue([
       for env in ["staging", "production"] :
-      length(aws_iam_role_policy.apply_state[env].policy) + length(aws_iam_role_policy.apply_deny[env].policy) + length(aws_iam_role_policy.apply_deny_data[env].policy) <= 10240
+      length(aws_iam_role_policy.apply_state[env].policy) + length(aws_iam_role_policy.apply_deny[env].policy) + length(aws_iam_role_policy.apply_deny_data[env].policy) + length(aws_iam_role_policy.apply_artifacts[env].policy) <= 10240
       && length([for a in concat(values(aws_iam_role_policy_attachment.apply_named), values(aws_iam_role_policy_attachment.apply_id)) : a if a.role == "acp-ci-apply-${env}"]) == 2
     ])
     error_message = "Cada papel apply fica dentro dos limites da AWS: 10240 caracteres de políticas inline e, das 10 gerenciadas possíveis, exatamente as duas do bootstrap."

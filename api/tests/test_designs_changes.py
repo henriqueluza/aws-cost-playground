@@ -6,6 +6,7 @@ idempotente.
 """
 
 import copy
+import json
 import re
 from typing import Any
 
@@ -14,6 +15,7 @@ from fastapi import FastAPI
 
 from app.designs import repository
 from app.designs.schemas import DESIGN_ID_PATTERN, MAX_DOC_BYTES
+from app.designs.service import MAX_DESIGNS
 from tests.test_design_document import ADR, js_size
 from tests.test_designs import (
     MISSING,
@@ -163,24 +165,36 @@ def test_duplicar_design_de_outro_usuario_e_404_sem_criar(app: FastAPI, table: A
     assert call(app, "GET", "/designs", sub=USER_B) == (200, [])
 
 
-def test_duplicar_respeita_o_limite_de_50(app: FastAPI, table: Any) -> None:
-    (source, *_) = seed(50)
-    status, problem = call(app, "POST", f"/designs/{source}/duplicate", {"name": "51"})
+def test_duplicar_respeita_o_limite_de_designs(app: FastAPI, table: Any) -> None:
+    assert MAX_DESIGNS == 10
+    (source, *_) = seed(MAX_DESIGNS)
+    status, problem = call(app, "POST", f"/designs/{source}/duplicate", {"name": "11"})
     assert (status, problem["detail"]) == (409, "Design limit reached")
-    assert len(stored(table)) == 50
+    assert len(stored(table)) == MAX_DESIGNS
     # Como no fake: design que não existe é 404 mesmo no limite.
     assert call(app, "POST", f"/designs/{MISSING}/duplicate", {"name": "x"}) == (404, NOT_FOUND)
 
 
-def test_duplicar_abaixo_do_limite_chega_a_50_e_para(app: FastAPI, table: Any) -> None:
-    (source, *_) = seed(49)
-    assert call(app, "POST", f"/designs/{source}/duplicate", {"name": "50"})[0] == 201
-    assert call(app, "POST", f"/designs/{source}/duplicate", {"name": "51"})[0] == 409
-    assert len(stored(table)) == 50
+def test_duplicar_abaixo_do_limite_chega_ao_limite_e_para(app: FastAPI, table: Any) -> None:
+    (source, *_) = seed(MAX_DESIGNS - 1)
+    assert call(app, "POST", f"/designs/{source}/duplicate", {"name": "10"})[0] == 201
+    assert call(app, "POST", f"/designs/{source}/duplicate", {"name": "11"})[0] == 409
+    assert len(stored(table)) == MAX_DESIGNS
+
+
+def test_duplicar_design_gravado_acima_do_teto_atual_e_413_sem_criar(
+    app: FastAPI, table: Any
+) -> None:
+    """O teto já foi 350.000 bytes: um item antigo maior segue legível, mas não é copiado."""
+    (source,) = seed(1, doc=json.dumps(doc_of_size(MAX_DOC_BYTES + 1)))
+    assert call(app, "GET", f"/designs/{source}")[0] == 200
+    status, problem = call(app, "POST", f"/designs/{source}/duplicate", {"name": "cópia"})
+    assert (status, problem["detail"]) == (413, "Design document too large")
+    assert len(stored(table)) == 1
 
 
 def test_limite_de_um_usuario_nao_conta_designs_de_outro(app: FastAPI) -> None:
-    seed(50, sub=USER_B)
+    seed(MAX_DESIGNS, sub=USER_B)
     source = create(app)
     assert call(app, "POST", f"/designs/{source['id']}/duplicate", {"name": "c"})[0] == 201
 

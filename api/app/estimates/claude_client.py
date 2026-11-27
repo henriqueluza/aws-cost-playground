@@ -122,7 +122,7 @@ class ClaudeClient:
 
     def estimate(self, plan: EstimatePlan) -> UsageEstimate:
         """Uma chamada à Claude API, sem nova tentativa. Resposta parcial nunca é usada."""
-        if plan.expected_output_tokens == 0:  # nada a estimar: só padrões, sem chamada nem custo
+        if plan.nothing_to_estimate:  # só padrões, sem chamada nem custo
             return UsageEstimate(
                 *revalidate({"blocks": [], "edges": []}, plan.blocks, plan.edges), 0, 0
             )

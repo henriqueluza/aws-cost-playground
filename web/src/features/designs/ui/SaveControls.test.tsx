@@ -71,7 +71,7 @@ describe('SaveControls', () => {
   });
 
   it.each([
-    ['design-limit', 'Você atingiu o limite de 50 designs.'],
+    ['design-limit', 'Você atingiu o limite de 10 designs.'],
     ['too-large', /grande demais/],
     ['unauthenticated', /Entre na sua conta/],
     ['version-conflict', /Nada foi sobrescrito/],
