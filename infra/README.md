@@ -50,7 +50,7 @@ Nenhuma variável tem default: sem o valor, o `plan` falha fechado.
 | `environment`, `self_signup_enabled`, `point_in_time_recovery_enabled`, `llm_enabled`, `default_throttle`, `estimates_throttle` | `terraform.tfvars` do ambiente (versionado, sem segredo). `llm_enabled` fica `false` nos dois ambientes; os limites de taxa são os sugeridos no passo 2 de [`docs/runbooks/guardrails-de-custo.md`](../docs/runbooks/guardrails-de-custo.md). Todos mudam por PR |
 | `zone_name` | `TF_VAR_zone_name`, que o pipeline lê da variável de repositório `TF_VAR_ZONE_NAME` (a mesma do job `plan`): domínio da zona do Route 53 |
 | `alarm_email` | `TF_VAR_alarm_email`, que o pipeline lê do secret de repositório `TF_VAR_ALARM_EMAIL` (o mesmo do job `plan`; variável sensível no Terraform) |
-| `package_bucket` | `TF_VAR_package_bucket`, variável do GitHub Environment: bucket de artefatos com o zip das funções. Um por ambiente, criado no bootstrap pela #209 e lido pelo pipeline em `TF_VAR_PACKAGE_BUCKET` |
+| `package_bucket` | `TF_VAR_package_bucket`, variável do GitHub Environment: bucket de artefatos com o zip das funções. Um por ambiente (`acp-artifacts-<stg\|prod>-<id da conta>`), criado no bootstrap (#209) e lido pelo pipeline em `TF_VAR_PACKAGE_BUCKET` |
 | `package_key` | `TF_VAR_package_key`, montada pelo pipeline com o SHA no formato `functions/<sha>.zip` (nada a cadastrar) |
 
 Esses são os valores do deploy (#22; ver [`docs/infra.md`](../docs/infra.md)). O job `plan` do `terraform.yml` não lê GitHub Environment: ver a seção seguinte.

@@ -208,6 +208,8 @@ Confira também o grupo do log de acesso do API Gateway (módulo `http-api`, #19
 
 Nos buckets do site e de artefatos de cada ambiente. **Não** aplique no bucket de estado do Terraform: ele é do `infra/bootstrap/`, e as versões antigas são a proteção do estado.
 
+Os buckets de artefatos são `acp-artifacts-stg-<id da conta>` e `acp-artifacts-prod-<id da conta>`, criados pelo `infra/bootstrap/` (#209) sem regra de lifecycle: aplique esta regra neles depois de criá-los. Reaplicar o bootstrap não a desfaz, e o papel de CI não consegue alterá-la.
+
 Nenhum módulo declara lifecycle hoje (o do site, #14, não declara). Se um passar a declarar, ele vence, e esta configuração manual sai.
 
 `put-bucket-lifecycle-configuration` substitui a configuração inteira. Veja antes se já existe alguma regra e, se existir, junte as duas no mesmo arquivo:
