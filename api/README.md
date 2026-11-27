@@ -33,10 +33,12 @@ Os testes usam `moto` para o DynamoDB; não precisam de credenciais AWS. Os do C
 | `LLM_ENABLED` | não | Booleano, padrão `false`. Falha fechada: sem ela nenhuma estimativa é autorizada. Valor fora de booleano impede a função de subir. |
 | `LLM_MODEL` | não | Id do modelo da Claude API: `claude-` seguido de 1 a 60 caracteres entre `a-z`, `0-9` e `-` (padrão `claude-haiku-5-5`). Trocar o modelo muda o custo por chamada: é decisão de custo do autor (ADR). |
 | `ANTHROPIC_API_KEY_PARAMETER` | não | NOME do parâmetro do SSM que guarda a chave da Anthropic, nunca o valor: começa com `/` e tem até 255 caracteres entre letras, dígitos, `/`, `_`, `.` e `-`. Sem ele, a estimativa falha com `unavailable`. |
-| `QUOTA_USER_DAILY_LIMIT` | não | Estimativas por usuário por dia: inteiro de 1 a 100 (padrão 20). |
-| `QUOTA_GLOBAL_DAILY_LIMIT` | não | Estimativas por dia somando todos os usuários: inteiro de 1 a 1.000 (padrão 300). |
+| `QUOTA_USER_DAILY_LIMIT` | não | Estimativas por usuário por dia: inteiro de 1 a 100 (padrão 5, `DEFAULT_QUOTA_USER_DAILY_LIMIT`). |
+| `QUOTA_GLOBAL_DAILY_LIMIT` | não | Estimativas por dia somando todos os usuários: inteiro de 1 a 1.000 (padrão 30, `DEFAULT_QUOTA_GLOBAL_DAILY_LIMIT`). |
 
-Os tetos 100 e 1.000 estão no código (`MAX_QUOTA_USER_DAILY_LIMIT`, `MAX_QUOTA_GLOBAL_DAILY_LIMIT`): valor fora da faixa impede a função de subir. Mudar o valor de uma quota é decisão de custo do autor (ADR). O Terraform ainda não define as variáveis de quota, então valem os padrões.
+Os tetos 100 e 1.000 estão no código (`MAX_QUOTA_USER_DAILY_LIMIT`, `MAX_QUOTA_GLOBAL_DAILY_LIMIT`): valor fora da faixa impede a função de subir. Mudar o valor de uma quota é decisão de custo do autor (ADR). O Terraform ainda não define as variáveis de quota, então valem os padrões: as duas constantes `DEFAULT_QUOTA_*` de `app/config.py` são o ponto de verdade da API (o `web/` espelha em `src/shared/lib/api/quotaLimits.ts`).
+
+O teto de custo é dado pela quota global: 30 por dia são no máximo 930 chamadas por mês, cerca de US$ 3,30 no pior caso (conta no ADR-0001, "Modelo da LLM e custo por chamada"). Se 5 por usuário for pouco, a decisão do autor de 26/11/2026 prevê subir só a do usuário para 10, mantendo a global em 30: troque `DEFAULT_QUOTA_USER_DAILY_LIMIT` (e `QUOTA_LIMITS.userDailyLimit` no `web/`) e publique.
 
 Nenhum segredo vai em código nem em variável commitada.
 
@@ -147,7 +149,7 @@ Toda falha é um `EstimateError` com `code` e mensagem fixos; os tokens vêm pre
 ```json
 {"blocks": [{"id": "blk_fn", "values": {"requestsPerMonth": 1200000}, "source": "llm"}],
  "edges":  [{"id": "edg_out", "values": {"gbPerMonth": 10}, "source": "default"}],
- "quota":  {"limit": 20, "remaining": 19, "resetsAt": "2026-11-27T00:00:00Z"}}
+ "quota":  {"limit": 5, "remaining": 4, "resetsAt": "2026-11-27T00:00:00Z"}}
 ```
 
 **Erros.** `detail` é fixo por status; nada da LLM, da Anthropic ou da AWS chega ao cliente. O cliente do `web/` lê só o status: 413 vira `too-large`, 502 e 503 viram `unavailable`, 429 vira `quota-exhausted`.

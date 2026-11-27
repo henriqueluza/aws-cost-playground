@@ -19,8 +19,8 @@ const newApi = () =>
   createInMemoryApi({
     maxDesigns: 10,
     maxDocBytes: 100_000,
-    userDailyLimit: 20,
-    globalDailyLimit: 300,
+    userDailyLimit: 5,
+    globalDailyLimit: 30,
   });
 
 function mount(api = newApi(), path = '/') {

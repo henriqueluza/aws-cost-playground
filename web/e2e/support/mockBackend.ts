@@ -15,7 +15,8 @@ const CLIENT_ID = 'e2e-client';
 const ACCESS_TOKEN = 'e2e-access-token';
 
 export const E2E_EMAIL = 'pessoa@example.com';
-export const DAILY_LIMIT = 20;
+/** Igual a `QUOTA_LIMITS.userDailyLimit` (`src/shared/lib/api/quotaLimits.ts`) e ao padrão da API. */
+export const DAILY_LIMIT = 5;
 
 type DesignDoc = { region: string; blocks: unknown[] } & Record<string, unknown>;
 type StoredDesign = {

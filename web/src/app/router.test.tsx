@@ -14,8 +14,8 @@ import { routes } from './router';
 const api = createInMemoryApi({
   maxDesigns: 10,
   maxDocBytes: 100_000,
-  userDailyLimit: 20,
-  globalDailyLimit: 300,
+  userDailyLimit: 5,
+  globalDailyLimit: 30,
 });
 
 describe('routes', () => {

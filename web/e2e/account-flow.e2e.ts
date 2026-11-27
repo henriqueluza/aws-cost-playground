@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { E2E_EMAIL, mockBackend, type MockBackend } from './support/mockBackend';
+import { DAILY_LIMIT, E2E_EMAIL, mockBackend, type MockBackend } from './support/mockBackend';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -89,7 +89,7 @@ test('re-estimar a carga preenche o uso e preserva o override feito antes', asyn
   await expect(page.getByRole('status').filter({ hasText: 'Estimativa aplicada' })).toContainText(
     '2 blocos e 0 conexões',
   );
-  await expect(page.getByText(`Restam 19 de 20 hoje`)).toBeVisible();
+  await expect(page.getByText(`Restam ${DAILY_LIMIT - 1} de ${DAILY_LIMIT} hoje`)).toBeVisible();
   expect(backend.estimateBodies).toHaveLength(1);
 
   // O S3 mantém o override; a estimativa só trocou o `usage` por baixo dele.

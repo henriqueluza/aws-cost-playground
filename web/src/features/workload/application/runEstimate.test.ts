@@ -10,7 +10,7 @@ const contract: UsageContract = {
   block: () => [{ key: 'storageGb', min: 0, max: 1e6, integer: false }],
   edge: () => undefined,
 };
-const quota = { limit: 20, remaining: 11, resetsAt: '2026-11-27T00:00:00.000Z' };
+const quota = { limit: 5, remaining: 2, resetsAt: '2026-11-27T00:00:00.000Z' };
 const answer = (blocks: unknown[]) => ({ blocks, edges: [], quota });
 
 function setup(estimateUsage: () => Promise<unknown>, alive = () => true) {
