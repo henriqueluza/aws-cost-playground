@@ -174,6 +174,7 @@ Exceções de scanner em `infra/` (todas com o motivo na linha de cima; a lista 
 | `infra/modules/site/s3.tf:35` | AVD-AWS-0132 (chave própria) | Chave do KMS custa US$ 1/mês fixo |
 | `infra/modules/alarms/main.tf:27` | AVD-AWS-0095 (SNS cifrado) | Mesmo custo; a chave padrão não serve ao CloudWatch |
 | `infra/bootstrap/state.tf:37` | AVD-AWS-0132 | Mesmo custo |
+| `infra/bootstrap/artifacts.tf:35` | AVD-AWS-0132 | Mesmo custo (bucket de artefatos das funções, #209) |
 | `infra/bootstrap/prices.tf:35` | AVD-AWS-0057 (curinga) | A Price List não aceita ARN nem condição |
 | `infra/bootstrap/boundary.tf:20` | AVD-AWS-0057 | Sufixo de log stream, prefixo do ambiente, ID do pool |
 | `infra/bootstrap/named.tf:30` | AVD-AWS-0057 | Prefixo `acp-<ambiente>-*`, objetos do site, listagem de log groups |

@@ -507,6 +507,17 @@ describe('createInMemoryApi: estimateUsage', () => {
     expect(await quota.get()).toMatchObject({ limit: 0, remaining: 0 });
   });
 
+  it('sem blocos não há o que estimar: responde a quota atual sem consumir, mesmo esgotada', async () => {
+    const EMPTY = { ...REQUEST, blocks: [], edges: [] };
+    const { estimates, quota } = setup({ userDailyLimit: 1 });
+    const state = { limit: 1, remaining: 1, resetsAt: DAY_END };
+    expect(await estimates.estimateUsage(EMPTY)).toEqual({ blocks: [], edges: [], quota: state });
+    expect(await quota.get()).toEqual(state);
+    await estimates.estimateUsage(REQUEST);
+    expect((await estimates.estimateUsage(EMPTY)).quota).toEqual({ ...state, remaining: 0 });
+    await rejectsExhausted(estimates.estimateUsage(REQUEST), 'user');
+  });
+
   it.each([
     ['região fora da lista', { ...REQUEST, region: 'xx-nowhere-1' }],
     ['descrição acima do limite', { ...REQUEST, description: 'a'.repeat(2001) }],
