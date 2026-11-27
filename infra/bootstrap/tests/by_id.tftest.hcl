@@ -39,14 +39,14 @@ run "identidade_anexo_e_papel_de_servico" {
     error_message = "O papel vinculado a serviço do API Gateway nasce no bootstrap, para o serviço ops.apigateway.amazonaws.com."
   }
 
-  # `one` reprova lista vazia: renomear o Sid não deixa o assert passar sem conferir nada.
+  # `one` de lista vazia é `null`, que não é `true`: renomear o Sid reprova, com a mensagem abaixo.
   assert {
     condition = alltrue([
       for env in ["staging", "production"] : one([
         for s in jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement :
         s.Effect == "Deny" && s.Action == "iam:*" && !can(s.Condition) && s.NotResource == "arn:aws:iam::123456789012:role/acp-${env == "staging" ? "stg" : "prod"}-*"
         if s.Sid == "DenyIamOutsideEnvironment"
-      ])
+      ]) == true
     ])
     error_message = "A negação DenyIamOutsideEnvironment continua fechada: iam:CreateServiceLinkedRole não foi aberta para os papéis apply."
   }
