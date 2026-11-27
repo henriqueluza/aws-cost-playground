@@ -131,8 +131,8 @@ type Target = { api: Api; advance: () => void; seen: Seen[] };
 function fakeTarget(overrides: Partial<InMemoryApiOptions> = {}): Target {
   let t = T0;
   const api = createInMemoryApi({
-    userDailyLimit: 20,
-    globalDailyLimit: 300,
+    userDailyLimit: 5,
+    globalDailyLimit: 30,
     maxDesigns: 10,
     maxDocBytes: 100_000,
     now: () => new Date(t),
@@ -229,13 +229,13 @@ describe.each([
 
   it('estimateUsage consome a quota; quota.get lê sem consumir', async () => {
     const { api } = target();
-    const quota = { limit: 20, remaining: 20, resetsAt: RESETS_AT };
+    const quota = { limit: 5, remaining: 5, resetsAt: RESETS_AT };
     expect(await api.quota.get()).toEqual(quota);
     const response = await api.estimates.estimateUsage(ESTIMATE);
     expect(estimateResponseSchema.parse(response)).toEqual(response);
     expect(response.blocks.map(({ id }) => id)).toEqual(DOC.blocks.map(({ id }) => id));
-    expect(response.quota).toEqual({ ...quota, remaining: 19 });
-    expect(await api.quota.get()).toEqual({ ...quota, remaining: 19 });
+    expect(response.quota).toEqual({ ...quota, remaining: 4 });
+    expect(await api.quota.get()).toEqual({ ...quota, remaining: 4 });
     const invalid = api.estimates.estimateUsage(bad({ ...ESTIMATE, region: 'xx-nowhere-9' }));
     expect(await kindOf(invalid)).toBe('invalid-request');
   });
@@ -251,7 +251,7 @@ describe.each([
   it('estimateUsage com a LLM desligada dá unavailable sem consumir quota', async () => {
     const { api } = target({ llmEnabled: false });
     expect(await kindOf(api.estimates.estimateUsage(ESTIMATE))).toBe('unavailable');
-    expect((await api.quota.get()).remaining).toBe(20);
+    expect((await api.quota.get()).remaining).toBe(5);
   });
 
   it('deleteAccount apaga os designs e zera a quota do usuário', async () => {
@@ -261,7 +261,7 @@ describe.each([
     await expect(api.account.deleteAccount()).resolves.toBeUndefined();
     expect(await api.designs.list()).toEqual([]);
     expect(await kindOf(api.designs.get(design.id))).toBe('not-found');
-    expect((await api.quota.get()).remaining).toBe(20);
+    expect((await api.quota.get()).remaining).toBe(5);
   });
 });
 

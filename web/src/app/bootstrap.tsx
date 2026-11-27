@@ -8,6 +8,7 @@ import { loadRuntimeConfig, type RuntimeConfig } from '../shared/config';
 import { MAX_DESIGNS, type Api } from '../shared/lib/api';
 import { DESIGN_LIMITS } from '../shared/lib/design';
 import { ApiProvider } from '../shared/lib/api/ApiProvider';
+import { QUOTA_LIMITS } from '../shared/lib/api/quotaLimits';
 import { createHttpApi, createHttpTransport, type HttpTransportOptions } from '../shared/lib/http';
 import { ConfigErrorScreen } from '../shared/ui';
 import { routes as appRoutes } from './router';
@@ -42,8 +43,7 @@ export async function createApi(
     return createInMemoryApi({
       maxDesigns: MAX_DESIGNS,
       maxDocBytes: DESIGN_LIMITS.maxDocBytes,
-      userDailyLimit: 20,
-      globalDailyLimit: 300,
+      ...QUOTA_LIMITS,
     });
   }
   return createHttpApi(createHttpTransport({ baseUrl: config.apiBaseUrl, getAccessToken }));

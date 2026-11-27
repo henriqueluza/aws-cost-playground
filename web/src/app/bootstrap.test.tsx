@@ -79,7 +79,7 @@ describe('bootstrap: portas da API', () => {
   it('em desenvolvimento entrega o fake em memória, sem rede', async () => {
     const fetchSpy = spyFetch();
     const api = await start({ getAccessToken: () => 'tok' });
-    await expect(api?.quota.get()).resolves.toMatchObject({ limit: 20, remaining: 20 });
+    await expect(api?.quota.get()).resolves.toMatchObject({ limit: 5, remaining: 5 });
     await expect(api?.designs.list()).resolves.toEqual([]);
     expect(fetchSpy).not.toHaveBeenCalled();
   });

@@ -34,7 +34,7 @@ O cálculo é determinístico e roda no navegador a partir de um catálogo está
 - Editor só em desktop; em tela pequena ele avisa que precisa de tela maior. Páginas de texto (privacidade, termos) funcionam no celular.
 - Aviso permanente de que o valor é estimativa, não cotação oficial, com a data do catálogo.
 - Nenhum texto livre da LLM é exibido; só números validados.
-- Quota de estimativas por LLM: 20 por dia por usuário, com contador do que resta.
+- Quota de estimativas por LLM: 5 por dia por usuário, com contador do que resta.
 - Hospedagem estática (S3 + CloudFront) com CSP; nenhum custo fixo novo.
 
 ## Brand Commitments

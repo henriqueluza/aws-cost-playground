@@ -58,7 +58,7 @@ Concorrência reservada não tem custo; a **provisionada** é cobrada e seria cu
 
 O limite é variável do módulo `http-api` (#19): `default_throttle` (obrigatório) vale para as demais rotas e `throttle` em cada entrada de `routes` troca o de uma rota, com valor por ambiente em `infra/envs/<env>`. Mude por PR: o que for mudado só no console volta no próximo `apply`.
 
-Valores sugeridos, iguais nos dois ambientes: `POST /estimates` com 1 req/s e rajada 5; demais rotas com 10 req/s e rajada 20. A quota global é de 300 estimativas por dia. Com 1 req/s sobra folga para o uso legítimo, e as invocações do proxy ficam limitadas sob abuso. Requisição acima do limite recebe 429 sem invocar a Lambda.
+Valores sugeridos, iguais nos dois ambientes: `POST /estimates` com 1 req/s e rajada 5; demais rotas com 10 req/s e rajada 20. A quota global é de 30 estimativas por dia (5 por usuário). Com 1 req/s sobra folga para o uso legítimo, e as invocações do proxy ficam limitadas sob abuso. Requisição acima do limite recebe 429 sem invocar a Lambda.
 
 O limite é da rota, não de cada usuário: um usuário insistente pode fazer os outros receberem 429. Com um usuário no lançamento, isso é aceitável; reveja se aparecer reclamação.
 
@@ -249,7 +249,7 @@ Consequência: o versionamento é uma das travas contra destruição do ADR, e c
 É o único teto real do gasto com a LLM. Cada ambiente tem o seu workspace e a sua chave (ADR, "Hospedagem e ambientes").
 
 1. Console da Anthropic (`platform.claude.com`) → Settings → Workspaces → crie `acp-staging` e `acp-production`, se ainda não existirem. Não use o Default Workspace: o limite dele pode não contar parte do uso.
-2. Settings → Spend limits → em **Workspace limits**, escolha o workspace na lista → Set limit. Valores: **production US$ 20/mês** (o pior caso com a quota global cheia é cerca de US$ 13 com `claude-haiku-5-5`) e **staging US$ 5/mês**.
+2. Settings → Spend limits → em **Workspace limits**, escolha o workspace na lista → Set limit. Valores: **production US$ 20/mês** (o pior caso com a quota global cheia, de 30 por dia, é cerca de US$ 3,30 com `claude-haiku-5-5`; conta no ADR-0001. Na decisão de 26/11/2026 o autor citou um limite de cerca de US$ 5 como complemento: o valor é dele) e **staging US$ 5/mês**.
 3. Confira que a chave de cada ambiente tem escopo do workspace certo (ver [rotação de segredos](rotacao-de-segredos.md)). Uma chave sem escopo de workspace não fica sob o limite.
 
 Ao atingir o limite, a Claude API recusa as chamadas daquele workspace até o mês virar ou o limite subir; o proxy devolve erro tratado. Trocar de modelo muda o custo em até 40 vezes: antes de qualquer troca, refaça a conta e reveja este limite.
