@@ -28,11 +28,32 @@ O módulo `functions` declara o limite de permissões (#165); sem ele, a negaç�
 
 Nada aqui tem custo fixo: sem chave própria do KMS e sem tabela de lock (o lock é o nativo do S3). O ID da conta vem da credencial de quem aplica, nunca do código.
 
+## Formato do `sub`
+
+Os trusts comparam o claim `sub` do token OIDC por igualdade exata. Este repositório emite o **formato imutável** do GitHub, com os IDs numéricos do dono e do repositório no prefixo: `repo:<dono>@<id do dono>/<repo>@<id do repo>:<contexto>`. Conferido em 27/11/2026 com um token real (#366): um job de `pull_request` recebeu `sub` = `repo:henriqueluza@60079862/aws-cost-playground@1463554125:pull_request`, com `repository_owner_id` = `60079862` e `repository_id` = `1463554125`.
+
+| Papel | Gatilho real | `sub` esperado | Confirmado com token real |
+|---|---|---|---|
+| `acp-ci-plan` | `terraform.yml`, job `plan`, em `pull_request`, sem `environment:` | `repo:henriqueluza@60079862/aws-cost-playground@1463554125:pull_request` | Sim |
+| `acp-ci-apply-staging` | `deploy-staging.yml`, `environment: staging`, em `main` | `repo:henriqueluza@60079862/aws-cost-playground@1463554125:environment:staging` (e `ref` = `refs/heads/main`) | Prefixo sim; o sufixo vem da documentação |
+| `acp-ci-apply-production` | `deploy-production.yml`, `environment: production`, em `main` | `repo:henriqueluza@60079862/aws-cost-playground@1463554125:environment:production` (e `ref` = `refs/heads/main`) | Prefixo sim; o sufixo vem da documentação |
+| `acp-ci-prices` | `prices.yml`, `schedule` e `workflow_dispatch` em `main`, sem `environment:` | `repo:henriqueluza@60079862/aws-cost-playground@1463554125:ref:refs/heads/main` | Prefixo sim; o sufixo vem da documentação |
+
+O prefixo fica em `local.github_sub_prefix` (`oidc.tf`), montado de quatro literais; `tests/oidc_sub.tftest.hcl` trava o valor e os `sub` que não podem casar (formato antigo, outro dono com o mesmo nome, outro repositório, outro branch, `pull_request` fora do papel `plan`).
+
+**O que os trusts pressupõem na configuração do repositório**, e como conferir:
+
+```bash
+gh api repos/henriqueluza/aws-cost-playground/actions/oidc/customization/sub
+```
+
+A resposta precisa ter `use_default: true` (sem modelo próprio de claims), `use_immutable_subject: true` e `sub_claim_prefix` igual a `repo:henriqueluza@60079862/aws-cost-playground@1463554125`. Se alguém personalizar o `sub` (no repositório ou por modelo da organização) ou desligar o formato imutável, o token passa a sair com outro `sub` e **nenhum papel de CI é assumido** (falha fechada, erro `Not authorized to perform sts:AssumeRoleWithWebIdentity`). Renomear ou transferir o repositório muda os nomes no prefixo (os IDs não): ajuste `github_owner`/`github_repo` em `oidc.tf` e os testes, e reaplique o bootstrap. Fonte do formato: [OpenID Connect reference](https://docs.github.com/en/actions/reference/security/oidc), do GitHub.
+
 ## Papel `plan`
 
 | Pergunta | Resposta |
 |---|---|
-| Quem assume | Só um job do GitHub Actions deste repositório no evento `pull_request`: `sub` igual a `repo:henriqueluza/aws-cost-playground:pull_request` e `aud` igual a `sts.amazonaws.com`, por igualdade exata. PR de fork não recebe token OIDC |
+| Quem assume | Só um job do GitHub Actions deste repositório no evento `pull_request`: `sub` igual a `repo:henriqueluza@60079862/aws-cost-playground@1463554125:pull_request` (formato imutável, ver "Formato do `sub`") e `aud` igual a `sts.amazonaws.com`, por igualdade exata. PR de fork não recebe token OIDC |
 | O que pode | `ReadOnlyAccess` (política gerenciada da AWS), o que o `terraform plan` precisa para ler a configuração dos recursos e o estado |
 | O que não pode | Escrever qualquer coisa. Ler dado: itens do DynamoDB, usuários do Cognito, eventos de log, segredos (Secrets Manager e parâmetros do SSM) e objetos do S3 fora dos buckets de estado |
 
@@ -47,7 +68,7 @@ O job `plan` roda código do próprio PR, então o papel parte do princípio de 
 
 | Pergunta | Resposta |
 |---|---|
-| Quem assume | Só um job do GitHub Actions deste repositório que declare o GitHub Environment do papel e rode em `main`: `aud` igual a `sts.amazonaws.com`, `sub` igual a `repo:henriqueluza/aws-cost-playground:environment:<env>` e `ref` igual a `refs/heads/main`, tudo por `StringEquals` |
+| Quem assume | Só um job do GitHub Actions deste repositório que declare o GitHub Environment do papel e rode em `main`: `aud` igual a `sts.amazonaws.com`, `sub` igual a `repo:henriqueluza@60079862/aws-cost-playground@1463554125:environment:<env>` e `ref` igual a `refs/heads/main`, tudo por `StringEquals` |
 | O que pode | O estado do próprio ambiente (política inline `state`): `s3:ListBucket` no bucket, `GetObject` e `PutObject` em `acp-<stg\|prod>/terraform.tfstate`, e `GetObject`, `PutObject` e `DeleteObject` no `.tflock`. E, pela política gerenciada `acp-ci-apply-named-<env>`, criar, ler, atualizar e etiquetar os recursos com nome do ambiente (tabela abaixo). E, pela `acp-ci-apply-id-<env>`, os recursos com ARN por ID que levam a tag do ambiente e os registros DNS do ambiente (seção "Recursos com ARN por ID") |
 | O que não pode | O que as políticas inline `deny-guardrails` e `deny-data` negam, nas tabelas abaixo. Negação explícita vence qualquer `Allow` futuro |
 
@@ -232,7 +253,7 @@ Limites conhecidos:
 
 | Pergunta | Resposta |
 |---|---|
-| Quem assume | Só um job do GitHub Actions deste repositório rodando no branch `main` sem `environment:`: `sub` igual a `repo:henriqueluza/aws-cost-playground:ref:refs/heads/main` e `aud` igual a `sts.amazonaws.com`, ambos por `StringEquals`. O workflow de preços (#222) roda por `schedule` semanal e `workflow_dispatch`. Um job de `pull_request` (`sub` `...:pull_request`), de outro branch, com `environment:` (`sub` `...:environment:<env>`) ou de outro repositório não casa |
+| Quem assume | Só um job do GitHub Actions deste repositório rodando no branch `main` sem `environment:`: `sub` igual a `repo:henriqueluza@60079862/aws-cost-playground@1463554125:ref:refs/heads/main` e `aud` igual a `sts.amazonaws.com`, ambos por `StringEquals`. O workflow de preços (#222) roda por `schedule` semanal e `workflow_dispatch`. Um job de `pull_request` (`sub` `...:pull_request`), de outro branch, com `environment:` (`sub` `...:environment:<env>`) ou de outro repositório não casa |
 | O que pode | Só `pricing:GetProducts` (política inline `get-products`), a única chamada do gerador (`pricing/app/client.py`, paginador `get_products`, endpoint `us-east-1`). Sem política gerenciada |
 | O que não pode | Todo o resto: não lê nem escreve nada da conta. O PR do catálogo é aberto com o `GITHUB_TOKEN`, não com o papel |
 

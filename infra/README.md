@@ -57,7 +57,7 @@ Esses são os valores do deploy (#22; ver [`docs/infra.md`](../docs/infra.md)). 
 
 ## Variáveis do job plan
 
-O job `plan` roda em `pull_request` e sem `environment:` (o trust do papel `plan` exige `sub = repo:<dono>/<repo>:pull_request`, ver `bootstrap/README.md`). Por isso ele lê os valores no nível do **repositório**, e o autor os cadastra uma vez para os dois ambientes:
+O job `plan` roda em `pull_request` e sem `environment:` (o trust do papel `plan` exige `sub = repo:<dono>@<id>/<repo>@<id>:pull_request`, ver `bootstrap/README.md`). Por isso ele lê os valores no nível do **repositório**, e o autor os cadastra uma vez para os dois ambientes:
 
 | Nome no GitHub | Tipo | Vira | Para quê |
 |---|---|---|---|

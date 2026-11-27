@@ -38,7 +38,7 @@ resource "aws_iam_role" "apply" {
         StringEquals = {
           "${local.oidc_host}:aud" = "sts.amazonaws.com"
           "${local.oidc_host}:ref" = "refs/heads/main"
-          "${local.oidc_host}:sub" = "repo:${local.github_repository}:environment:${each.key}"
+          "${local.oidc_host}:sub" = "${local.github_sub_prefix}:environment:${each.key}"
         }
       }
     }]
