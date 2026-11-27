@@ -186,6 +186,8 @@ def test_diagrama_sem_nada_a_estimar_nao_gasta_quota_nem_chama_a_llm(
     assert harness.calls == ["prepare", f"read:{SUB}", "estimate"]
     assert (harness.paid_calls(), harness.fakes.ssm_reads) == (0, 0)
     assert len(table.transactions) == 1  # só o consumo de antes: nenhuma escrita desta chamada
+    counts = {pk: item["count"] for (pk, _), item in table.items.items()}
+    assert counts == {f"USER#{SUB}": 1, "GLOBAL": 1}  # nem a do usuário nem a global subiram
     limit = answer["quota"]["limit"]
     assert (answer["quota"]["remaining"], remaining()) == (limit - 1, limit - 1)
     (event,) = events(capsys)
