@@ -90,7 +90,7 @@ describe('defaultLayout', () => {
   });
 
   it('um design vazio só tem o client, na origem', () => {
-    const [, empty] = [0, { ...designDocumentSchema.parse(scenarioApi), blocks: [], edges: [] }];
+    const empty = { ...designDocumentSchema.parse(scenarioApi), blocks: [], edges: [] };
     expect(defaultLayout(empty)).toEqual({ client: { x: 0, y: 0 } });
   });
 });
