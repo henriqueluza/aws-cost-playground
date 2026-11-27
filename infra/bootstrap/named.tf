@@ -27,6 +27,7 @@ locals {
 # Curinga só onde o nome não é fixo no bootstrap: o prefixo `acp-<prefixo>-*` de tabela, log
 # group, tópico e alarme, os objetos do bucket do site e `logs:DescribeLogGroups`, que a AWS
 # não deixa restringir por recurso. Nenhuma ação tem curinga e nenhum prefixo alcança S3 ou IAM.
+# `ApiAccessLogDelivery` também vale em `*`, por risco aceito pelo autor (#338).
 #trivy:ignore:AVD-AWS-0057
 resource "aws_iam_policy" "apply_named" {
   for_each = local.environments
@@ -105,6 +106,20 @@ resource "aws_iam_policy" "apply_named" {
         Sid      = "LogGroupList"
         Effect   = "Allow"
         Action   = "logs:DescribeLogGroups"
+        Resource = "*"
+      },
+      {
+        # Entrega do log de acesso do stage do HTTP API: o API Gateway a cria com a permissão de
+        # quem chama. As sete ações não aceitam recurso nem chave de condição, então valem na
+        # conta toda, inclusive nas entregas do outro ambiente: risco aceito pelo autor (#338).
+        # Não lê evento (`deny-data`); pela documentação, a política de recurso do Logs só dá
+        # escrita a serviço da AWS (não verificado contra a AWS).
+        Sid    = "ApiAccessLogDelivery"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogDelivery", "logs:DeleteLogDelivery", "logs:DescribeResourcePolicies", "logs:GetLogDelivery",
+          "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:UpdateLogDelivery",
+        ]
         Resource = "*"
       },
       {

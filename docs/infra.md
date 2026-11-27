@@ -26,7 +26,7 @@ Workflow `deploy-staging.yml`, disparado por `push` em `main`.
 | `verify` | `sha256sum -c SHA256SUMS` |
 | `aws` | OIDC no papel `acp-ci-apply-staging`, sem chave estática |
 | `package` | Sobe o zip para `functions/<sha>.zip` no bucket de artefatos, sem sobrescrever (`--if-none-match`). Se a chave já existe com outro conteúdo, o deploy falha fechado: a função só roda o zip conferido pelo `SHA256SUMS`. Para repetir um deploy, use "Re-run failed jobs", que reaproveita o artefato. Depois de um "Re-run all jobs" com zip diferente, a saída é um commit novo (outra chave) ou o autor apagar `functions/<sha>.zip` à mão com credencial de administrador, porque o papel apply não tem `s3:DeleteObject` |
-| `terraform` | `init`, `plan`, plan-guard e `apply` do plano salvo. O plan-guard aqui não tem liberação por label: `delete`, `replace` ou `forget` param o deploy |
+| `terraform` | `init`, `plan`, plan-guard e `apply` do plano salvo. O plan-guard aqui não tem liberação por label: `delete`, `replace`, `forget` ou `import` (recurso de um bloco `import`) param o deploy, e um plano com `errored: true` também |
 | `functions` | Espera as funções atualizarem e confere o `CodeSha256` |
 | `site` | Sobe `assets/` antes, sem apagar o que é antigo e sem o `config.json` do bundle |
 | `config` | Publica `/config.json` a partir da saída `site_config` |
@@ -77,7 +77,7 @@ Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 
 O runtime `python3.14` das Lambdas já está resolvido (#307): o módulo `functions` acompanha `api/.python-version` e um teste reprova a divergência. Sem isso o zip não carregaria, e o smoke não perceberia.
 
-1. #166, #167 e #169 (em `main`) e #338 (decisão do autor, aberta): permissões de escrita do apply. Além do Terraform, o deploy precisa de `s3:PutObject`/`s3:GetObject` no bucket de artefatos, de objetos do bucket do site, de `lambda:GetFunctionConfiguration` e de `cloudfront:CreateInvalidation`/`cloudfront:GetInvalidation`.
+1. #166, #167, #169 e #338 (em `main`; a #338 traz o risco aceito pelo autor e o que ficou manual, em `infra/bootstrap/README.md`): permissões de escrita do apply. Além do Terraform, o deploy precisa de `s3:PutObject`/`s3:GetObject` no bucket de artefatos, de objetos do bucket do site, de `lambda:GetFunctionConfiguration` e de `cloudfront:CreateInvalidation`/`cloudfront:GetInvalidation`.
 2. #209 (em `main`): bucket de artefatos, um por ambiente, criado no bootstrap com `s3:PutObject`/`s3:GetObject` do papel apply só em `functions/*` (`infra/bootstrap/README.md`, "Bucket de artefatos"). O autor reaplica o bootstrap para criá-lo.
 3. #77: bootstrap aplicado, Environment `staging` restrito a `main` e primeiro apply manual.
 4. As variáveis da seção anterior.
@@ -130,7 +130,7 @@ gh variable set AWS_APPLY_ROLE_ARN --env production --body "<arn>" --repo henriq
 gh variable set TF_VAR_PACKAGE_BUCKET --env production --body "<bucket>" --repo henriqueluza/aws-cost-playground
 ```
 
-O Environment `production` tem de aceitar só o branch `main` (Settings → Environments → Deployment branches). O trust do papel exige `environment:production`, `ref` igual a `refs/heads/main` e `aud` `sts.amazonaws.com`; o release-gate recusa qualquer outro `ref` antes disso. As permissões de escrita do papel estão em `main` (#167 e #169), menos as que esperam a decisão do autor na #338; o bucket de artefatos vem do bootstrap (#209), como em staging.
+O Environment `production` tem de aceitar só o branch `main` (Settings → Environments → Deployment branches). O trust do papel exige `environment:production`, `ref` igual a `refs/heads/main` e `aud` `sts.amazonaws.com`; o release-gate recusa qualquer outro `ref` antes disso. As permissões de escrita do papel estão em `main` (#167, #169 e #338; o que a #338 deixou como tarefa manual do autor está em `infra/bootstrap/README.md`); o bucket de artefatos vem do bootstrap (#209), como em staging.
 
 ## Limites de produção
 
@@ -160,4 +160,4 @@ Workflow `export-validate.yml` (#68), job `export-validate` (check `terraform va
 - Arquivos antigos do site não são apagados (regra do módulo `site`).
 - A invalidação `/*` conta como 1 caminho na cota grátis de 1000/mês.
 - O workflow está em `.github/workflows/deploy-staging.yml` e roda a cada merge em `main`. Sem a variável `AWS_APPLY_ROLE_ARN` no Environment `staging`, o job de deploy só avisa e termina verde.
-- Os ajustes de `validate.yml` e `terraform.yml` ficam na #211.
+- O `validate.yml` monta o mesmo zip em todo PR (`scripts/build-functions.sh "$RUNNER_TEMP/functions.zip"`, depois do passo da API): o check falha se o pacote não monta, imprime o tamanho do zip e não publica artefato. O job `static` do `terraform.yml` também roda quando o PR muda só `.github/workflows/deploy-staging.yml` ou `scripts/build-functions.sh`, porque os testes do deploy ficam em `infra/tools/tests` (#211).
