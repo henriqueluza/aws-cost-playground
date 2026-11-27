@@ -124,7 +124,7 @@ No CI, o papel de leitura vem de `AWS_PLAN_ROLE_ARN` (workflow `terraform.yml`).
 
 ## plan-guard
 
-Reprova planos que apagam, substituem ou esquecem recursos.
+Reprova planos que apagam, substituem, esquecem ou importam recursos.
 
 ```bash
 terraform show -json plano > plan.json && python3 infra/tools/plan_guard.py plan.json
@@ -133,10 +133,10 @@ terraform show -json plano > plan.json && python3 infra/tools/plan_guard.py plan
 | Saída | Significado |
 |---|---|
 | 0 | Nenhuma ação destrutiva |
-| 1 | Há `delete`, `replace` ou `forget`; uma linha por recurso na stdout |
-| 2 | Entrada inválida, inclusive ação que o guard não conhece (falha fechada); mensagem na stderr |
+| 1 | Há `delete`, `replace`, `forget` ou `import`; uma linha por recurso na stdout |
+| 2 | Entrada inválida, inclusive ação que o guard não conhece e plano com `errored: true` (falha fechada); mensagem na stderr |
 
-Formato da linha: `<kind>\t<address>\t<ação1,ação2>`, só endereço e ações, nunca valores do plano. `forget` (bloco `removed` com `destroy = false`) também bloqueia, pois equivale a um `state rm`.
+Formato da linha: `<kind>\t<address>\t<ação1,ação2>`, só endereço e ações, nunca valores do plano. `forget` (bloco `removed` com `destroy = false`) também bloqueia, pois equivale a um `state rm`. `import` é o recurso com `change.importing` (bloco `import`), qualquer que seja a ação: importar sem mudar nada sai como `no-op`. Agentes não importam recursos; em PR, só o autor libera, com a mesma label `infra:destroy-approved`. Um plano com `errored: true` é parcial (as mudanças listadas não são o plano inteiro) e por isso não é avaliado.
 
 Liberação só pela label `infra:destroy-approved`, aplicada pelo autor.
 
