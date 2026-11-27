@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { adrExampleDesign, designWithBlocks } from '../../../test/designFixtures';
 import {
+  MAX_DESIGNS,
   designSchema,
   designSummarySchema,
   estimateResponseSchema,
@@ -15,7 +16,7 @@ import {
 } from '../api';
 import { createInMemoryApi, type InMemoryApiOptions } from '../api/inMemoryApi';
 import { designDocumentSchema } from '../design';
-import { createHttpApi, MAX_DESIGNS } from './httpApi';
+import { createHttpApi } from './httpApi';
 import { createHttpTransport, type HttpTransport } from './transport';
 
 const BASE = 'https://api.example.com/v1';
@@ -132,8 +133,8 @@ function fakeTarget(overrides: Partial<InMemoryApiOptions> = {}): Target {
   const api = createInMemoryApi({
     userDailyLimit: 20,
     globalDailyLimit: 300,
-    maxDesigns: 50,
-    maxDocBytes: 350_000,
+    maxDesigns: 10,
+    maxDocBytes: 100_000,
     now: () => new Date(t),
     ...overrides,
   });

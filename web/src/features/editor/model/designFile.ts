@@ -20,7 +20,7 @@ export type DesignFileSource = { readonly size: number; text(): Promise<string> 
 
 /** Texto fixo da interface por categoria de erro. */
 const MESSAGES: Record<DesignFileError, string> = {
-  'too-large': `O arquivo passa de ${DESIGN_LIMITS.maxDocBytes / 1024} KB, o tamanho máximo de um design. Escolha outro arquivo.`,
+  'too-large': `O arquivo passa de ${DESIGN_LIMITS.maxDocBytes / 1000} KB, o tamanho máximo de um design. Escolha outro arquivo.`,
   unreadable: 'Não foi possível ler o arquivo.',
   'not-json': 'O arquivo não é um JSON válido. Escolha um arquivo baixado deste editor.',
   'not-design': 'O arquivo não é um design deste produto. Escolha um arquivo baixado deste editor.',

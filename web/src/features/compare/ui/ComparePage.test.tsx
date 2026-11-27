@@ -43,7 +43,7 @@ function seedOf(region: Region): PriceCatalog {
 const newApi = (): Api =>
   createInMemoryApi({
     maxDesigns: 5,
-    maxDocBytes: 350_000,
+    maxDocBytes: 100_000,
     userDailyLimit: 5,
     globalDailyLimit: 5,
   });
@@ -162,9 +162,9 @@ describe('ComparePage (anônimo: design em edição × arquivo, sem API)', () =>
     await pickB(file({ foo: 1 }));
     expect(await screen.findByRole('alert')).toHaveTextContent('não é um design deste produto');
     expect(screen.queryByRole('table')).toBeNull();
-    const big = file(JSON.stringify({ pad: 'x'.repeat(360 * 1024) }));
+    const big = file(JSON.stringify({ pad: 'x'.repeat(110_000) }));
     await pickB(big);
-    expect(await screen.findByRole('alert')).toHaveTextContent('passa de 350 KB');
+    expect(await screen.findByRole('alert')).toHaveTextContent('passa de 100 KB');
   });
 
   it('rótulos do arquivo entram só como texto, nunca como HTML', async () => {
