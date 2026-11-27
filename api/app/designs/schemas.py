@@ -15,8 +15,8 @@ from app.design_document import (
 from app.errors import TOO_LARGE_ERROR
 
 DESIGN_ID_PATTERN = r"^[0-9A-HJKMNP-TV-Z]{26}$"
-MAX_DOC_BYTES = 350_000
-"""Teto do documento (ADR-0001): o item do DynamoDB aceita 400 KB."""
+MAX_DOC_BYTES = 100_000
+"""Teto do `doc` em bytes UTF-8 (ADR-0001, #277): com `MAX_DESIGNS`, partição de até 1 MB."""
 
 DesignId = Annotated[str, StringConstraints(pattern=DESIGN_ID_PATTERN)]
 DesignName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]

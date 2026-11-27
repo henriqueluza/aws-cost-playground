@@ -148,10 +148,10 @@ describe('Abrir arquivo', () => {
   it('arquivo grande demais é recusado sem ser lido', async () => {
     renderBar();
     const big = json('x');
-    Object.defineProperty(big, 'size', { value: 350 * 1024 + 1 });
+    Object.defineProperty(big, 'size', { value: 100_000 + 1 });
     const text = vi.spyOn(big, 'text');
     await upload(big);
-    expect(await screen.findByRole('alert')).toHaveTextContent('passa de 350 KB');
+    expect(await screen.findByRole('alert')).toHaveTextContent('passa de 100 KB');
     expect(text).not.toHaveBeenCalled();
   });
 
