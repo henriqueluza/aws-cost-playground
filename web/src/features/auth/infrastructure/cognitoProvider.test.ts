@@ -32,6 +32,7 @@ afterAll(() => server.close());
 const ATTEMPT_KEY = 'aws-cost-playground:login-attempt';
 const TOKEN_URL = `${AUTH_ORIGIN}/oauth2/token`;
 const DISCOVERY_URL = `${ISSUER}/.well-known/openid-configuration`;
+const SITE = { siteOrigin: APP };
 
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -63,6 +64,7 @@ function setup(options: FakeCognitoOptions = {}) {
     clientId: CLIENT_ID,
     redirectUri: REDIRECT_URI,
     logoutUri: LOGOUT_URI,
+    site: SITE,
     attempts,
     fetch: spyFetch,
     now: () => clock.now,
@@ -152,6 +154,7 @@ describe('beginSignIn', () => {
       clientId: CLIENT_ID,
       redirectUri: REDIRECT_URI,
       logoutUri: LOGOUT_URI,
+      site: SITE,
       attempts: blocked,
     });
     await expectKind(provider.beginSignIn('sign-in', '/'), 'invalid-response');
@@ -194,14 +197,10 @@ describe('descoberta OIDC', () => {
 
   it.each([
     ['emissor diferente', { ...base, issuer: 'https://outro.example.com/pool' }],
-    [
-      'autorização em outra origem',
-      { ...base, authorization_endpoint: 'https://evil.example.net/a' },
-    ],
     ['token em outra origem', { ...base, token_endpoint: 'https://evil.example.net/t' }],
     ['revogação fora da origem', { ...base, revocation_endpoint: 'https://evil.example.net/r' }],
     ['URL inválida', { ...base, token_endpoint: 'https://a b' }],
-    ['endpoint http', { ...base, token_endpoint: 'http://auth.example.com/oauth2/token' }],
+    ['endpoint http', { ...base, token_endpoint: TOKEN_URL.replace('https:', 'http:') }],
     ['endpoint com query', { ...base, token_endpoint: `${TOKEN_URL}?x=1` }],
     ['sem S256', { ...base, code_challenge_methods_supported: ['plain'] }],
     ['logout fora da origem', { ...base, end_session_endpoint: 'https://evil.example.net/l' }],
@@ -209,6 +208,37 @@ describe('descoberta OIDC', () => {
   ])('recusa: %s', async (_name, doc) => {
     const s = setup({ discovery: doc as Record<string, unknown> });
     await expectKind(s.provider.beginSignIn('sign-in', '/'), 'invalid-response');
+    expect(s.storage.length).toBe(0);
+  });
+
+  it('todos os endpoints em outro domínio, coerentes entre si: recusa sem guardar tentativa', async () => {
+    const other = 'https://auth.atacante.example.net';
+    const doc = {
+      issuer: ISSUER,
+      authorization_endpoint: `${other}/oauth2/authorize`,
+      token_endpoint: `${other}/oauth2/token`,
+      revocation_endpoint: `${other}/oauth2/revoke`,
+      end_session_endpoint: `${other}/logout`,
+      code_challenge_methods_supported: ['S256'],
+    };
+    const s = setup({ discovery: doc });
+    for (const screen of ['sign-in', 'sign-up', 'forgot-password'] as const) {
+      await expectKind(s.provider.beginSignIn(screen, '/'), 'login-origin');
+    }
+    expect(s.storage.length).toBe(0);
+    // Sem origem validada não há para onde revogar nem sair: o logout volta ao próprio site.
+    await expect(s.provider.endSession(fakeSession())).resolves.toBe(LOGOUT_URI);
+    expect(s.calls.every(({ url }) => url === DISCOVERY_URL)).toBe(true);
+  });
+
+  it.each([
+    ['só a autorização em outra origem', 'https://evil.example.net/oauth2/authorize'],
+    ['o próprio site no lugar do login', `${APP}/oauth2/authorize`],
+    ['domínio irmão do site', 'https://auth.example.com/oauth2/authorize'],
+    ['porta fora do padrão', `${AUTH_ORIGIN}:8443/oauth2/authorize`],
+  ])('recusa o login que não é o deste site: %s', async (_name, authorization) => {
+    const s = setup({ discovery: { ...base, authorization_endpoint: authorization } });
+    await expectKind(s.provider.beginSignIn('sign-in', '/'), 'login-origin');
     expect(s.storage.length).toBe(0);
   });
 
@@ -375,6 +405,7 @@ describe('completeSignIn', () => {
     const slow = createCognitoProvider({
       ...config,
       logoutUri: LOGOUT_URI,
+      site: SITE,
       attempts: s.attempts,
       now: () => NOW,
       timeoutMs: 100,

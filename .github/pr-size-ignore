@@ -22,10 +22,8 @@
 **/__snapshots__/**
 **/*.snap
 
-# Documentação e kit de agentes (revisados de outra forma)
+# Documentação. O kit de agentes (.claude/, .agents/) conta: só os .md dele ficam fora.
 **/*.md
-.claude/**
-.agents/**
 
 # Assets
 **/*.svg

@@ -10,12 +10,16 @@ function isBareUrl(value: string): boolean {
   }
 }
 
-/** https em qualquer host; http só em localhost (desenvolvimento). Sem credenciais, query nem fragmento. */
+const httpsUrl = z.url({ protocol: /^https$/ });
+const localHttpUrl = z.url({ protocol: /^http$/, hostname: /^(localhost|127\.0\.0\.1)$/ });
+
+/**
+ * https em qualquer host. `http` em localhost só existe no servidor de desenvolvimento
+ * (`import.meta.env.DEV`): o build de produção recusa qualquer `http`. Sem credenciais, query nem
+ * fragmento.
+ */
 const webUrl = z
-  .union([
-    z.url({ protocol: /^https$/ }),
-    z.url({ protocol: /^http$/, hostname: /^(localhost|127\.0\.0\.1)$/ }),
-  ])
+  .union(import.meta.env.DEV ? [httpsUrl, localHttpUrl] : [httpsUrl])
   .refine(isBareUrl);
 
 /** Configuração de runtime servida em `/config.json`; é o único arquivo que muda por ambiente. */

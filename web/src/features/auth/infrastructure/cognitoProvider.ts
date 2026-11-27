@@ -1,6 +1,6 @@
 import type { AuthScreen, IdentityProvider, LoginAttemptStore } from '../application/ports';
 import { AuthError } from '../model/authError';
-import { discoveryUrl, parseEndpoints, type Endpoints } from '../model/endpoints';
+import { discoveryUrl, parseEndpoints, type Endpoints, type LoginSite } from '../model/endpoints';
 import { buildSession, readIdentity, tokenResponseSchema } from '../model/tokens';
 import { constantTimeEqual, pkceChallenge, randomToken } from './webCrypto';
 
@@ -12,6 +12,8 @@ export type CognitoProviderConfig = {
   readonly redirectUri: string;
   /** `<origem>/`, idêntico ao registrado no cliente do Cognito. */
   readonly logoutUri: string;
+  /** Origem do site e exceção de desenvolvimento: o login tem de ser `auth.` + o host do site. */
+  readonly site: LoginSite;
   readonly attempts: LoginAttemptStore;
   readonly fetch?: typeof fetch;
   readonly now?: () => number;
@@ -28,7 +30,7 @@ type Reply = { readonly status: number; readonly body: unknown };
 
 /** Login gerenciado do Cognito: Authorization Code + PKCE S256, só com `fetch` e Web Crypto. */
 export function createCognitoProvider(config: CognitoProviderConfig): IdentityProvider {
-  const { authority, clientId, redirectUri, logoutUri, attempts } = config;
+  const { authority, clientId, redirectUri, logoutUri, site, attempts } = config;
   const now = config.now ?? Date.now;
   const timeoutMs = config.timeoutMs ?? 10_000;
   let endpoints: Promise<Endpoints> | undefined;
@@ -54,7 +56,7 @@ export function createCognitoProvider(config: CognitoProviderConfig): IdentityPr
     endpoints ??= call(discoveryUrl(authority), { method: 'GET' })
       .then((reply) => {
         if (reply.status !== 200) throw new AuthError('network');
-        return parseEndpoints(reply.body, authority);
+        return parseEndpoints(reply.body, authority, site);
       })
       .catch((error: unknown) => {
         endpoints = undefined;
