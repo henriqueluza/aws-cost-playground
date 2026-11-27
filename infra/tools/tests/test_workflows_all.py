@@ -162,5 +162,40 @@ class EveryWorkflow(unittest.TestCase):
         self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", plan)
 
 
+class FunctionsPackageInPullRequests(unittest.TestCase):
+    """#211: o zip das funções é montado em todo PR e os testes do deploy rodam quando ele muda."""
+
+    def setUp(self) -> None:
+        self.files = workflows()
+
+    def test_validate_monta_o_zip_depois_da_api_e_falha_com_o_script(self) -> None:
+        raw = self.files["validate.yml"]
+        builds = [block for block in run_blocks(raw) if "build-functions.sh" in block]
+        self.assertEqual(len(builds), 1)
+        lines = [ln.strip() for ln in builds[0].splitlines() if ln.strip()]
+        self.assertEqual(lines[0], 'scripts/build-functions.sh "$RUNNER_TEMP/functions.zip" > /dev/null')
+        self.assertRegex(lines[1], r'^echo "functions\.zip: \$\(stat -c %s "\$RUNNER_TEMP/functions\.zip"\) bytes"$')
+        self.assertEqual(len(lines), 2, "nada entre o script e a medida: o passo falha com o script")
+        self.assertNotRegex(builds[0], r"\|\||set \+e|;\s*true")
+        self.assertLess(raw.index("uv sync --locked"), raw.index("build-functions.sh"), "depois do passo da API (uv instalado)")
+        self.assertLess(raw.index("astral-sh/setup-uv@"), raw.index("build-functions.sh"))
+
+    def test_validate_nao_publica_o_zip_nem_pula_o_passo(self) -> None:
+        raw = self.files["validate.yml"]
+        step = raw.split("      - name: Funções", 1)[1].split("\n      - ", 1)[0]
+        self.assertNotRegex(step, r"(?m)^\s+(if|continue-on-error|uses):")
+        uploads = [block for block in raw.split("\n      - ") if "upload-artifact@" in block]
+        self.assertEqual(len(uploads), 1)
+        self.assertNotIn("functions", uploads[0])
+
+    def test_mudanca_no_deploy_de_staging_ou_no_script_roda_os_testes_dele(self) -> None:
+        terraform = self.files["terraform.yml"]
+        paths = terraform.split("    paths:\n", 1)[1].split("\n\n", 1)[0]
+        self.assertIn('- ".github/workflows/deploy-staging.yml"', paths)
+        self.assertIn('- "scripts/build-functions.sh"', paths)
+        static = terraform.split("\n  static:\n", 1)[1].split("\n  plan:\n", 1)[0]
+        self.assertIn("python3 -m unittest discover -s infra/tools/tests", static)
+
+
 if __name__ == "__main__":
     unittest.main()

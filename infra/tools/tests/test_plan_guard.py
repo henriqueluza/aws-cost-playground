@@ -99,6 +99,82 @@ class DestructivePlans(unittest.TestCase):
         self.assertNotIn("valor-do-plano", "".join(run_guard(json.dumps(plan))[1:]))
 
 
+def importing(address: str, actions: list[str], value: Any = None) -> dict[str, Any]:
+    """Um plano com um recurso em importação, no formato do `terraform show -json` 1.16."""
+    plan = plan_with((address, actions))
+    plan["resource_changes"][0]["change"]["importing"] = {"id": "abc-123"} if value is None else value
+    return plan
+
+
+class ImportPlans(unittest.TestCase):
+    def test_import_is_blocked_even_when_nothing_else_changes(self) -> None:
+        code, out, err = run_guard(json.dumps(importing("aws_s3_bucket.site", ["no-op"])))
+        self.assertEqual((code, out, err), (1, "import\taws_s3_bucket.site\tno-op\n", ""))
+
+    def test_import_with_update_or_create_is_blocked(self) -> None:
+        for actions in (["update"], ["create"]):
+            with self.subTest(actions=actions):
+                code, out, _ = run_guard(json.dumps(importing("a.b", actions)))
+                self.assertEqual((code, out), (1, f"import\ta.b\t{actions[0]}\n"))
+
+    def test_import_by_identity_or_unknown_id_is_blocked(self) -> None:
+        for value in ({"identity": {"account_id": "1", "bucket": "b"}}, {"unknown": True}, {}):
+            with self.subTest(value=value):
+                self.assertEqual(run_guard(json.dumps(importing("a.b", ["no-op"], value)))[0], 1)
+
+    def test_destructive_kind_wins_over_import(self) -> None:
+        code, out, _ = run_guard(json.dumps(importing("a.b", ["delete", "create"])))
+        self.assertEqual((code, out), (1, "replace\ta.b\tdelete,create\n"))
+
+    def test_null_or_absent_importing_is_not_an_import(self) -> None:
+        plan = plan_with(("a.null", ["update"]), ("a.absent", ["no-op"]))
+        plan["resource_changes"][0]["change"]["importing"] = None
+        self.assertEqual(run_guard(json.dumps(plan))[0], 0)
+
+    def test_import_is_reported_with_the_other_blocked_resources_in_plan_order(self) -> None:
+        plan = plan_with(("a.gone", ["delete"]), ("a.keep", ["update"]), ("a.in", ["update"]))
+        plan["resource_changes"][2]["change"]["importing"] = {"id": "valor-do-plano"}
+        code, out, _ = run_guard(json.dumps(plan))
+        self.assertEqual((code, out), (1, "delete\ta.gone\tdelete\nimport\ta.in\tupdate\n"))
+        self.assertEqual(
+            plan_guard.find_destructive(plan),
+            [
+                plan_guard.DestructiveChange("a.gone", ("delete",)),
+                plan_guard.DestructiveChange("a.in", ("update",), importing=True),
+            ],
+        )
+
+    def test_importing_that_is_not_an_object_fails_closed(self) -> None:
+        for value in (True, False, "abc-123", 0, ["id"]):
+            with self.subTest(value=value):
+                plan = plan_with(("a.b", ["no-op"]))
+                plan["resource_changes"][0]["change"]["importing"] = value
+                code, out, err = run_guard(json.dumps(plan))
+                self.assertEqual((code, out), (2, ""))
+                self.assertIn("`importing` inválido", err)
+
+
+class ErroredPlans(unittest.TestCase):
+    def test_errored_plan_is_invalid_input_even_without_destructive_actions(self) -> None:
+        for plan in (plan_with(("a.b", ["create"])), plan_with(("a.b", ["delete"])), plan_with()):
+            with self.subTest(plan=plan):
+                code, out, err = run_guard(json.dumps({**plan, "errored": True}))
+                self.assertEqual((code, out), (2, ""))
+                self.assertEqual(err, "plan-guard: entrada inválida (o plano terminou com erro (`errored: true`))\n")
+
+    def test_plan_without_errored_or_with_errored_false_is_read_normally(self) -> None:
+        safe, destructive = plan_with(("a.b", ["update"])), plan_with(("a.b", ["delete"]))
+        self.assertEqual(run_guard(json.dumps(safe))[0], 0)
+        self.assertEqual(run_guard(json.dumps({**safe, "errored": False}))[0], 0)
+        self.assertEqual(run_guard(json.dumps({**destructive, "errored": False}))[0], 1)
+
+    def test_errored_that_is_not_a_boolean_fails_closed(self) -> None:
+        for value in (None, "true", 1, 0, []):
+            with self.subTest(value=value):
+                code, out, _ = run_guard(json.dumps({**plan_with(("a.b", ["update"])), "errored": value}))
+                self.assertEqual((code, out), (2, ""))
+
+
 class InvalidInput(unittest.TestCase):
     def assert_fails_closed(self, result: tuple[int, str, str]) -> None:
         code, out, err = result

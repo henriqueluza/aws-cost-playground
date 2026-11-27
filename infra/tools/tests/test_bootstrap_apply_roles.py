@@ -15,6 +15,7 @@ IAM_RESOURCES = {
     "aws_iam_role.apply",
     "aws_iam_role.plan",
     "aws_iam_role.prices",
+    "aws_iam_role_policy.apply_artifacts",
     "aws_iam_role_policy.apply_deny",
     "aws_iam_role_policy.apply_deny_data",
     "aws_iam_role_policy.apply_state",
@@ -91,6 +92,12 @@ def bucket_suffix_mismatches(named_tf: str, env_tfs: dict[str, str]) -> list[str
     return found
 
 
+def buckets_without_prevent_destroy(tf: str) -> list[str]:
+    """Buckets do bootstrap (estado e artefatos) sem `prevent_destroy = true` (falha fechada)."""
+    blocks = re.findall(r'^resource "aws_s3_bucket" "(\w+)"(.*?)^\}', tf, re.M | re.S)
+    return [name for name, body in blocks if not PREVENT_DESTROY.search(body)] or ([] if blocks else ["nenhum bucket"])
+
+
 STATEMENT = re.compile(r'Sid\s*=\s*"(\w+)"(.*?)(?=\bSid\s*=|\Z)', re.S)
 ACTION = re.compile(r'"([a-z0-9-]+:[A-Za-z0-9*]+)"')
 README_ACTION = re.compile(r"`(?:([a-z0-9-]+):)?([A-Za-z0-9*]+)`")
@@ -143,6 +150,16 @@ class BootstrapApplyRolesTest(unittest.TestCase):
             "o papel vinculado a serviço do API Gateway precisa de prevent_destroy = true",
         ]
         self.assertEqual(violations(HOSTILE), expected)
+
+    def test_todo_bucket_do_bootstrap_tem_prevent_destroy(self) -> None:
+        tf = "\n".join(path.read_text() for path in sorted(BOOTSTRAP.glob("*.tf")))
+        self.assertEqual(buckets_without_prevent_destroy(tf), [])
+        self.assertEqual(len(re.findall(r'^resource "aws_s3_bucket" "(?:state|artifacts)"', tf, re.M)), 2)
+        hostile = 'resource "aws_s3_bucket" "artifacts" {\n  lifecycle {\n    # prevent_destroy = true\n  }\n}\n'
+        self.assertEqual(buckets_without_prevent_destroy(hostile), ["artifacts"])
+        # O `prevent_destroy` de um bloco vizinho não vale para o bucket.
+        self.assertEqual(buckets_without_prevent_destroy(hostile + "locals {\n  prevent_destroy = true\n}\n"), ["artifacts"])
+        self.assertEqual(buckets_without_prevent_destroy(""), ["nenhum bucket"])
 
     def test_nome_do_bucket_do_site_confere_com_os_ambientes(self) -> None:
         env_tfs = {path.parent.name: path.read_text() for path in sorted(ENVS.glob("*/main.tf"))}

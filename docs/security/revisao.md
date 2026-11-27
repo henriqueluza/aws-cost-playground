@@ -38,7 +38,7 @@ Caminhos relativos à raiz do repositório. "Teste" traz o arquivo e o nome do t
 | Erro ou dúvida do DynamoDB responde 503 sem chamar a LLM | `api/app/quotas/repository.py:65-76` | `test_estimates_route.py::test_quota_indisponivel_responde_503_e_a_llm_nao_e_chamada` |
 | Falha da LLM não devolve quota; sem nova tentativa | `api/app/estimates/service.py:71-73,85-86` | `test_estimates_route.py::test_falha_da_llm_depois_do_consumo_e_logada_e_a_quota_nao_volta`, `::test_o_codigo_da_rota_nao_tem_devolucao_de_quota_nem_nova_tentativa` |
 | Descrição até 2.000, 100 blocos, 400 arestas | `api/app/design_document.py:33-35,120`, `api/app/estimates/prompt.py:95-100` | `test_estimates_route.py::test_entrada_invalida_nao_consome_quota_nem_chama_a_llm`, `api/tests/test_estimate_revalidation.py::test_limites_do_adr_sao_conferidos_de_novo_antes_da_chamada` |
-| Corpo até 1 MiB; `doc` até 350.000 bytes; 50 designs | `api/app/routing.py:11,28-30`, `api/app/designs/schemas.py:18,30-33`, `api/app/designs/service.py:53,73-79` | `api/tests/test_routes.py::test_corpo_acima_do_teto_responde_413_antes_de_validar`, `::test_limite_de_350000_bytes_do_doc`, `api/tests/test_designs.py::test_criacoes_simultaneas_nao_passam_do_limite` |
+| Corpo até 1 MiB; `doc` até 100.000 bytes; 10 designs (#386; eram 350.000 e 50) | `api/app/routing.py:11,28-30`, `api/app/designs/schemas.py:18,30-33`, `api/app/designs/service.py:53,73-79` | `api/tests/test_routes.py::test_corpo_acima_do_teto_responde_413_antes_de_validar`, `::test_limite_de_bytes_do_doc`, `api/tests/test_designs.py::test_criacoes_simultaneas_nao_passam_do_limite` |
 | `max_tokens` fixo (4096) | `api/app/estimates/prompt.py:16`, `api/app/estimates/claude_client.py:134` | `api/tests/test_claude_client.py::test_chamada_tem_system_fixo_dado_na_mensagem_do_usuario_e_nenhuma_ferramenta` |
 | Timeout de 20 s e `max_retries=0` no SDK | `api/app/estimates/claude_client.py:42,45,76` | `test_claude_client.py::test_cliente_do_processo_le_modelo_e_chave_da_configuracao` |
 | `LLM_ENABLED` nasce desligada; desligada responde 503 sem quota, sem SSM e sem LLM | `api/app/config.py:26`, `api/app/estimates/claude_client.py:113-114` | `test_estimates_route.py::test_interruptor_desligado_responde_503_sem_quota_e_sem_llm`, `::test_sem_a_variavel_llm_enabled_a_rota_nasce_desligada` |
@@ -174,6 +174,7 @@ Exceções de scanner em `infra/` (todas com o motivo na linha de cima; a lista 
 | `infra/modules/site/s3.tf:35` | AVD-AWS-0132 (chave própria) | Chave do KMS custa US$ 1/mês fixo |
 | `infra/modules/alarms/main.tf:27` | AVD-AWS-0095 (SNS cifrado) | Mesmo custo; a chave padrão não serve ao CloudWatch |
 | `infra/bootstrap/state.tf:37` | AVD-AWS-0132 | Mesmo custo |
+| `infra/bootstrap/artifacts.tf:35` | AVD-AWS-0132 | Mesmo custo (bucket de artefatos das funções, #209) |
 | `infra/bootstrap/prices.tf:35` | AVD-AWS-0057 (curinga) | A Price List não aceita ARN nem condição |
 | `infra/bootstrap/boundary.tf:20` | AVD-AWS-0057 | Sufixo de log stream, prefixo do ambiente, ID do pool |
 | `infra/bootstrap/named.tf:30` | AVD-AWS-0057 | Prefixo `acp-<ambiente>-*`, objetos do site, listagem de log groups |
@@ -271,8 +272,8 @@ Mesmo método da primeira rodada:
 | Mitigação | Onde | Teste |
 |---|---|---|
 | Designs e conta nunca vão para o `llm-proxy`, a única função que lê a chave e grava a quota | `infra/modules/http-api/main.tf:5-7`, `infra/envs/*/main.tf:86-97` | `infra/tools/tests/test_security_review.py::ApiEdge::test_rotas_do_gateway_sao_as_revistas_e_cada_uma_vai_para_a_funcao_esperada` (novo); `http_api.tftest.hcl` (`estimates_e_quota_vao_para_o_llm_proxy`) |
-| Limite de 50 designs também em `duplicate`, por usuário | `api/app/designs/service.py:75-108,127-130` | `api/tests/test_designs_changes.py::test_duplicar_respeita_o_limite_de_50`, `::test_duplicar_abaixo_do_limite_chega_a_50_e_para`, `::test_limite_de_um_usuario_nao_conta_designs_de_outro` |
-| `doc` até 350.000 bytes e corpo até 1 MiB também no `PATCH` | `api/app/designs/schemas.py:36,48`, `api/app/routing.py:28-30` | `test_designs_changes.py::test_atualizar_doc_no_teto_grava_e_acima_e_413` |
+| Limite de 10 designs (#386; eram 50) também em `duplicate`, por usuário | `api/app/designs/service.py:75-108,127-130` | `api/tests/test_designs_changes.py::test_duplicar_respeita_o_limite_de_designs`, `::test_duplicar_abaixo_do_limite_chega_ao_limite_e_para`, `::test_limite_de_um_usuario_nao_conta_designs_de_outro` |
+| `doc` até 100.000 bytes (#386) e corpo até 1 MiB também no `PATCH` | `api/app/designs/schemas.py:36,48`, `api/app/routing.py:28-30` | `test_designs_changes.py::test_atualizar_doc_no_teto_grava_e_acima_e_413` |
 | Atualizar é uma só escrita condicional, sem leitura antes | `api/app/designs/repository.py:134-167` | `test_designs_changes.py::test_atualizar_e_uma_escrita_condicional_sem_ler_antes` |
 | Limite de taxa nas rotas novas | Só o padrão do stage (10 rps, burst 20), sem limite próprio | **Sem mitigação própria.** Ver DSN-1 |
 
@@ -381,7 +382,7 @@ Riscos que só aparecem com a conta real. Junta `docs/runbooks/setup-aws.md` (ta
 - Trust e negações dos papéis `apply` e `plan`: os testes usam provider simulado (`infra/bootstrap/README.md:175`, `docs/runbooks/setup-aws.md:251`).
 - Listas de ações de `acp-ci-apply-named-<env>` e `acp-ci-apply-id-<env>` não testadas contra a AWS; primeiro suspeito, `cloudwatch:DescribeAlarms` (`docs/handoff/167.md:56,72`, `docs/handoff/169.md:83`).
 - Tags no API Gateway v2, no CloudFront e no Cognito: herança pelos recursos filhos, `PUT` em `/tags/*`, `aws:ResourceTag` na invalidação, tags preservadas no `UpdateUserPool` (`docs/handoff/169.md:70`).
-- Sem a decisão da #338, o deploy para no stage da API e no domínio do Cognito (`docs/handoff/169.md:12`).
+- A #338 foi decidida pelo autor em 26/11/2026 (log de acesso e distribuição do Cognito aceitos; CSP, cache, OAC e tags da API manuais). Enquanto o bootstrap não for reaplicado com ela, o deploy para no stage da API e no domínio do Cognito (`docs/handoff/338.md`).
 - `lambda:SourceFunctionArn` dentro do limite de permissões: se não valer, `AccessDenied` no dado (`docs/runbooks/setup-aws.md:482`).
 - **Leitura do SecureString pelo proxy (novo).** O limite de permissões não cita `kms:Decrypt`; a confirmar que a chave gerenciada `aws/ssm` basta. Se não bastar, a estimativa responde 503.
 - Leitura do zip das funções com a permissão de quem chama: depende do bucket de artefatos (#209; `docs/handoff/167.md:58`).
@@ -427,9 +428,9 @@ Nenhuma foi tomada nesta revisão. O risco de cada opção:
 | Issue | Decisão | Opções e risco |
 |---|---|---|
 | #284 | Janela do token depois da exclusão; `sub` no log de acesso | (a) Aceitar com a mitigação do cliente: a janela continua aberta para quem guardou o token, e API-1 continua valendo. (b) Marcador de conta excluída nas rotas de escrita: fecha a janela e API-1; custa uma leitura por requisição. (c) Reduzir a validade do token: encurta, não fecha. Log: manter o `sub` por 7 dias como pseudônimo, ou tirar o campo e perder a correlação por usuário |
-| #338 | Escritas do `apply` que não se delimitam por ambiente | Aceitar: o papel de staging alcança política de logs, distribuição, cabeçalhos (CSP) e tags da API de produção. Recusar: esses itens viram tarefa manual e o primeiro deploy para no stage da API e no domínio do Cognito |
+| #338 | Escritas do `apply` que não se delimitam por ambiente | Aceitar: o papel de staging alcança política de logs, distribuição, cabeçalhos (CSP) e tags da API de produção. Recusar: esses itens viram tarefa manual e o primeiro deploy para no stage da API e no domínio do Cognito. **Decidido em 26/11/2026:** aceitos o log de acesso do HTTP API e o `cloudfront:UpdateDistribution` do Cognito (com mitigação por tag); cabeçalhos, cache, OAC e tags da API ficam manuais |
 | #327 | Fixar o arquivo do workflow no trust do `prices` | Fixar: fecha o uso por outro workflow em `main`; valor errado tranca o workflow até reaplicar o bootstrap. Manter: qualquer job em `main` sem environment assume o papel, cujo alcance é só leitura de preço público. A mesma pergunta vale para os `apply` (#367), com alcance de escrita |
-| #277 | Custo de leitura e escrita da partição de designs (DSN-1) | As rotas já estão em `main` (#252). Decidir antes do `apply` de produção. Só o limite de taxa por rota cobre leitura, escrita e saída; separar o `doc` não resolve o `PATCH` com `doc` |
+| #277 | Custo de leitura e escrita da partição de designs (DSN-1) | **Decidido pelo autor em 26/11/2026: limites menores (#386: 10 designs de 100.000 bytes; o `PATCH` no teto cai de cerca de 342 para cerca de 98 WRU) e limite de taxa por rota (manual) agora; separar o `doc` depois do prazo, antes de reabrir o cadastro (ADR-0001, "Custo da listagem de designs").** Registro original: As rotas já estão em `main` (#252). Decidir antes do `apply` de produção. Só o limite de taxa por rota cobre leitura, escrita e saída; separar o `doc` não resolve o `PATCH` com `doc` |
 | #364 | Agente revisor (CI-1) | Enquanto aberto: a label de aprovação e outras labels de autorização dependem de o revisor não ser induzido. Mitigação imediata, do autor: a automação de merge conferir quem aplicou a label |
 | #366 | Formato do `sub` | Sem corrigir antes do bootstrap, o primeiro deploy falha (fechado) |
 | #367, #368, #369 | Environment de produção, code owner, papel `plan`; preços na revisão seletiva; quota na exclusão | Nas Issues |

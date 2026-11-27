@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   ApiError,
+  MAX_DESIGNS,
   createDesignInputSchema,
   designIdSchema,
   designSchema,
@@ -21,9 +22,7 @@ import type { HttpTransport } from './transport';
  * rota. Os erros são os `ApiError` do transporte, só com o `kind`.
  */
 
-/** Limite de designs por conta (ADR-0001): teto da listagem aceita. */
-export const MAX_DESIGNS = 50;
-
+/** O limite de designs por conta (`MAX_DESIGNS`) é o teto da listagem aceita. */
 const designListSchema = z.array(designSummarySchema).max(MAX_DESIGNS);
 const noContent = z.void();
 
