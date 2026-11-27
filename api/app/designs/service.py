@@ -17,14 +17,17 @@ from app.designs.errors import (
     DesignError,
     DesignLimitReached,
     DesignNotFound,
+    DesignTooLarge,
     StoreFailure,
 )
 from app.designs.schemas import (
+    MAX_DOC_BYTES,
     DesignCreate,
     DesignDuplicate,
     DesignOut,
     DesignSummaryOut,
     DesignUpdate,
+    doc_size_bytes,
 )
 
 MAX_DESIGNS = 10
@@ -125,8 +128,14 @@ def update_design(user_id: str, design_id: str, body: DesignUpdate) -> DesignOut
 
 
 def duplicate_design(user_id: str, design_id: str, body: DesignDuplicate) -> DesignOut:
-    """Cópia com outro nome, id novo e `version` 1; 404 antes do limite, como no fake."""
+    """Cópia com outro nome, id novo e `version` 1; 404 antes do limite, como no fake.
+
+    Origem gravada acima do teto atual do documento não é copiada (413): o teto vale para todo
+    item novo, também o que não passa pela validação do corpo.
+    """
     source = get_design(user_id, design_id)
+    if doc_size_bytes(source.doc) > MAX_DOC_BYTES:
+        raise DesignTooLarge
     return _insert(user_id, body.name, source.doc)
 
 

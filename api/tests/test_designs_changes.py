@@ -6,6 +6,7 @@ idempotente.
 """
 
 import copy
+import json
 import re
 from typing import Any
 
@@ -179,6 +180,17 @@ def test_duplicar_abaixo_do_limite_chega_ao_limite_e_para(app: FastAPI, table: A
     assert call(app, "POST", f"/designs/{source}/duplicate", {"name": "10"})[0] == 201
     assert call(app, "POST", f"/designs/{source}/duplicate", {"name": "11"})[0] == 409
     assert len(stored(table)) == MAX_DESIGNS
+
+
+def test_duplicar_design_gravado_acima_do_teto_atual_e_413_sem_criar(
+    app: FastAPI, table: Any
+) -> None:
+    """O teto já foi 350.000 bytes: um item antigo maior segue legível, mas não é copiado."""
+    (source,) = seed(1, doc=json.dumps(doc_of_size(MAX_DOC_BYTES + 1)))
+    assert call(app, "GET", f"/designs/{source}")[0] == 200
+    status, problem = call(app, "POST", f"/designs/{source}/duplicate", {"name": "cópia"})
+    assert (status, problem["detail"]) == (413, "Design document too large")
+    assert len(stored(table)) == 1
 
 
 def test_limite_de_um_usuario_nao_conta_designs_de_outro(app: FastAPI) -> None:

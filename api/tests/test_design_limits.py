@@ -12,7 +12,6 @@ from typing import Any
 
 import pytest
 
-from app.contracts import get_contracts
 from app.design_document import (
     MAX_DESCRIPTION_LENGTH,
     MAX_LABEL_LENGTH,
@@ -20,9 +19,10 @@ from app.design_document import (
 )
 from app.designs.schemas import MAX_DOC_BYTES, doc_size_bytes
 from app.designs.service import MAX_DESIGNS
-from app.estimates.prompt import MAX_TOKENS, build_plan
+from app.estimates.prompt import MAX_TOKENS
 from app.estimates.schemas import EstimateIn
 from app.routing import MAX_BODY_BYTES
+from tests.test_claude_client import Fakes
 
 CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
 TEMPLATE = "templates/reference.json"
@@ -100,7 +100,8 @@ def test_estimativa_do_template_passa_no_limite_com_o_dobro_de_folga(text: str) 
     document = load(TEMPLATE)
     assert document["workload"]["description"]  # o template já traz descrição de carga
     request = estimate_request(worst_text(document) if text == "pior-texto" else document)
-    plan = build_plan(EstimateIn.model_validate(request), get_contracts())
+    # `prepare` é quem responde `too_large` (413) na rota: levantaria `EstimateError` aqui.
+    plan = Fakes().client().prepare(EstimateIn.model_validate(request))
     assert plan.expected_output_tokens == 1_404  # 20 blocos e 21 arestas do template
     assert plan.expected_output_tokens * MARGIN <= MAX_TOKENS
     body = len(json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode())

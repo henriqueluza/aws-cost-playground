@@ -179,7 +179,7 @@ Pior caso de uma listagem, com leitura consistente (1 unidade de leitura a cada 
 | Antes | 50 designs × 350.000 bytes = 17,5 MB | 17.500.000 ÷ 4.000 | ≈ 4.400 | 18 |
 | Depois | 10 designs × 100.000 bytes = 1 MB | 1.000.000 ÷ 4.000 | ≈ 250 | 1 |
 
-Com 4 KB = 4.096 bytes os valores exatos são 4.273 e 245; a ordem de grandeza é a mesma. A redução é de cerca de 17 vezes. Na escrita, o `PATCH` num item no teto cai de cerca de 342 para cerca de 98 unidades de escrita (1 a cada 1 KB).
+Com 4 KB = 4.096 bytes, e arredondando para cima como o DynamoDB faz, são 4.273 e 245; a ordem de grandeza é a mesma. A redução é de cerca de 17 vezes. Na escrita, o `PATCH` num item no teto cai de cerca de 342 para cerca de 98 unidades de escrita (1 a cada 1 KB).
 
 Por que c não basta sozinha, nem b: com a partição cheia, 1 requisição por segundo sustentada ainda lê 250 × 86.400 ≈ 21,6 milhões de unidades por dia (eram cerca de 380 milhões). Ao preço on-demand de us-east-1 usado na #277 (US$ 0,125 por milhão; conferir o preço atual), são cerca de US$ 2,70 por dia, contra cerca de US$ 47 antes. A ação do Budgets só desliga o proxy da LLM, não as rotas de designs. O que torna b + c suficiente agora é o cadastro fechado: o único usuário logado é o autor.
 
