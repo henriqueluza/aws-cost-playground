@@ -48,6 +48,7 @@ import { Icon } from './CategoryIcon';
 import { EdgeLegend } from './EdgeLegend';
 import { FLOW_ARIA_LABELS } from './flowA11y';
 import { TypedEdge } from './TypedEdge';
+import { useSemanticZoom } from './useSemanticZoom';
 
 type AppNode = BlockFlowNode | ClientFlowNode;
 
@@ -81,6 +82,7 @@ function Canvas(): ReactElement {
   const baseline = useDesignStore((s) => s.baseline);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [fitted, setFitted] = useState(false);
+  const semantic = useSemanticZoom();
   const pendingFit = useRef(true);
   const movedByUser = useRef(false);
   const lastLoaded = useRef({ document, baseline });
@@ -246,6 +248,8 @@ function Canvas(): ReactElement {
       className={styles.canvas}
       data-dropping={dropping || undefined}
       data-fitting={(!fitted && document.blocks.length > 0) || undefined}
+      data-detail={semantic.detail}
+      style={semantic.style}
     >
       <h2 className={styles.hidden}>Canvas</h2>
       <ReactFlow

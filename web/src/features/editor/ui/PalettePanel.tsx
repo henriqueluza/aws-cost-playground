@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
-import { Button, EmptyState, TextField } from '../../../shared/ui';
+import { Button, EmptyState, IconButton, TextField } from '../../../shared/ui';
 import { designStore } from '../hooks/designStore';
 import {
   BLOCK_DRAG_MIME,
@@ -11,6 +11,7 @@ import {
 } from '../model/palette';
 import styles from './EditorPage.module.css';
 import palette from './PalettePanel.module.css';
+import { Icon } from './CategoryIcon';
 import { GripIcon, GroupIcon } from './PaletteIcons';
 
 const GROUPS = buildPalette();
@@ -25,7 +26,7 @@ function plural(n: number): string {
  * e o arrasto (HTML5, `BLOCK_DRAG_MIME`) o solta numa posição. Um só ponto de Tab (tabindex
  * móvel); setas, Home e End percorrem os itens visíveis.
  */
-export function PalettePanel() {
+export function PalettePanel({ onCollapse }: { onCollapse?: () => void } = {}) {
   const [query, setQuery] = useState('');
   const [current, setCurrent] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -81,7 +82,20 @@ export function PalettePanel() {
 
   return (
     <>
-      <h2 className={styles.panelTitle}>Paleta</h2>
+      <div className={palette.header}>
+        <h2 className={styles.panelTitle}>Paleta</h2>
+        {onCollapse && (
+          <IconButton
+            variant="secondary"
+            aria-label="Recolher a paleta"
+            aria-expanded={true}
+            data-palette-toggle
+            onClick={onCollapse}
+          >
+            <Icon name="panel-collapse" />
+          </IconButton>
+        )}
+      </div>
       <div ref={searchRef} className={palette.search}>
         <TextField
           label="Buscar bloco"

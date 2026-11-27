@@ -103,6 +103,7 @@
   /* casca do editor (1440 × 900 é a tela de referência) */
   --topbar-height: 48px;
   --sidebar-width: 232px;     /* paleta; 200px entre 1024 e 1279px */
+  --sidebar-collapsed: 48px;  /* paleta recolhida: só o botão que a mostra */
   --rail-width: 360px;        /* coluna direita: custo, bloco, carga; 320px entre 1024 e 1279px */
   --sheet-inset: 8px;         /* folha recuada da borda de baixo (e da direita quando não há coluna) */
   --panel-gap: 12px;          /* entre paleta, folha e coluna direita */
@@ -122,6 +123,9 @@
 
   /* peças de tamanho fixo */
   --node-width: 216px;        /* todos os blocos têm a mesma largura */
+  --node-height: 94px;        /* e a mesma altura, nos dois modos (completo e compacto) */
+  --lh-node: 1.15;             /* entrelinha do texto do bloco compacto (corpo ampliado) */
+  --node-pad-compact: 6px;    /* padding do bloco compacto: o texto ampliado ocupa a altura toda */
   --tile-node: 24px;          /* ladrilho de categoria no bloco e na paleta */
   --icon: 16px;               /* ícone de interface e de lista */
   --icon-inline: 14px;        /* ícone dentro de linha de texto */
