@@ -181,6 +181,7 @@ Mesmo mapa do adaptador do cliente (`web/src/shared/lib/http/httpApi.ts`). Corpo
 
 - `PATCH` exige ao menos um entre `name` e `doc` e recusa `null` explícito nos dois: omita a chave para não alterar.
 - 409 `Design limit reached` (`design-limit` no cliente) em `POST /designs` e em duplicate; 409 `Version conflict` (`version-conflict`) no `PATCH`. Nos dois casos, nada fica gravado.
+- `expectedVersion` é um inteiro de 1 a 2^53 − 1 (`MAX_VERSION`, o maior inteiro exato do JS; o `web/` usa o mesmo teto em `updateDesignInputSchema`). Fora disso, 422 antes de qualquer chamada ao DynamoDB.
 - `PATCH`: 404 se o design não existe na partição do usuário (também quando é de outro usuário), sem criar item; 409 se `expectedVersion` não é a `version` gravada. Renomear é mandar só `name`. Na resposta, `version` avança 1 e `updatedAt` muda; `createdAt` fica.
 - Duplicate: 404 se a origem não existe na partição do usuário, conferido antes do limite de 10. Origem gravada acima do teto atual do `doc` (o teto já foi 350.000 bytes) responde 413 e não é copiada. A cópia tem id novo, `version` 1, datas novas e o `doc` da origem.
 - `DELETE /designs/{design_id}`: 204 sem corpo e idempotente, também para id inexistente ou de outro usuário (nada é apagado fora da partição do `sub`).

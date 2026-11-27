@@ -9,6 +9,17 @@
   color: var(--text);
 }
 
+/* Paleta recolhida: só o botão que a mostra. O canvas ganha a diferença (ver "Larguras", DESIGN.md). */
+.shell[data-palette='closed'] {
+  --sidebar-width: var(--sidebar-collapsed);
+}
+
+.shell[data-palette='closed'] .palette {
+  padding-inline: var(--space-2);
+  padding-block-start: var(--space-2);
+  overflow: hidden;
+}
+
 @media (max-width: 1279px) {
   .shell {
     --sidebar-width: 200px;

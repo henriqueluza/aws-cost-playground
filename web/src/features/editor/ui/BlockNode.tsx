@@ -38,7 +38,7 @@ export const ClientNode = memo(function ClientNode({
   data,
 }: NodeProps<ClientFlowNode>): ReactElement {
   return (
-    <div className={`${styles.block}`}>
+    <div className={`${styles.block} ${styles.blockClient}`}>
       <Handle type="target" position={Position.Left} className={styles.handle} />
       <div className={styles.head}>
         <span className={`${styles.tile} ${styles.tileClient}`}>

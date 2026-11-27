@@ -44,6 +44,11 @@ describe('toCanvasNodes', () => {
     expect(placed[1]?.position).toEqual(defaultLayout(doc).blk_fn_api);
   });
 
+  it('a posição salva do client vence a grade padrão', () => {
+    const placed = toCanvasNodes(doc, { client: { x: 11, y: 22 } }, null, costs);
+    expect(placed[0]?.position).toEqual({ x: 11, y: 22 });
+  });
+
   it('põe o fluxo da esquerda para a direita, com o client na última coluna', () => {
     const chain = {
       ...doc,
@@ -56,7 +61,7 @@ describe('toCanvasNodes', () => {
       ],
     };
     const at = defaultLayout(chain);
-    expect([at.blk_a?.x, at.blk_b?.x, at.blk_c?.x, at.client?.x]).toEqual([0, 248, 496, 744]);
+    expect([at.blk_a?.x, at.blk_b?.x, at.blk_c?.x, at.client?.x]).toEqual([0, 268, 536, 804]);
   });
 
   it('termina com um ciclo no design', () => {

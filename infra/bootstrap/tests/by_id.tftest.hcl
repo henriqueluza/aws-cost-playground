@@ -39,14 +39,15 @@ run "identidade_anexo_e_papel_de_servico" {
     error_message = "O papel vinculado a serviço do API Gateway nasce no bootstrap, para o serviço ops.apigateway.amazonaws.com."
   }
 
+  # `one` de lista vazia é `null`, que não é `true`: renomear o Sid reprova, com a mensagem abaixo.
   assert {
-    condition = alltrue(flatten([
-      for env in ["staging", "production"] : [
+    condition = alltrue([
+      for env in ["staging", "production"] : one([
         for s in jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement :
         s.Effect == "Deny" && s.Action == "iam:*" && !can(s.Condition) && s.NotResource == "arn:aws:iam::123456789012:role/acp-${env == "staging" ? "stg" : "prod"}-*"
         if s.Sid == "DenyIamOutsideEnvironment"
-      ]
-    ]))
+      ]) == true
+    ])
     error_message = "A negação DenyIamOutsideEnvironment continua fechada: iam:CreateServiceLinkedRole não foi aberta para os papéis apply."
   }
 }
@@ -269,6 +270,19 @@ run "forma_e_escopo_por_ambiente" {
     ]))
     error_message = "Nenhuma ação da política casa com um Deny sem condição de deny-guardrails ou deny-data (DeleteUserPool, Admin*, ListUsers*, DeleteHostedZone)."
   }
+
+  # O assert acima passaria com a lista de negados vazia: ela tem de trazer o que protege o Cognito e a zona.
+  assert {
+    condition = alltrue(flatten([
+      for env in ["staging", "production"] : [
+        for expected in ["cognito-idp:DeleteUserPool", "cognito-idp:Admin*", "cognito-idp:ListUsers*", "route53:DeleteHostedZone"] : contains(flatten([
+          for s in concat(jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement, jsondecode(aws_iam_role_policy.apply_deny_data[env].policy).Statement) :
+          flatten([s.Action]) if s.Effect == "Deny" && can(s.Action) && try(s.Resource == "*", false) && !can(s.Condition)
+        ]), expected)
+      ]
+    ]))
+    error_message = "A lista de negados sem condição, que o assert anterior percorre, contém cognito-idp:DeleteUserPool, cognito-idp:Admin*, cognito-idp:ListUsers* e route53:DeleteHostedZone: esvaziá-la ou trocar o filtro reprova."
+  }
 }
 
 # #338: o Cognito exige cloudfront:UpdateDistribution em "*". Avalia Allow e Deny como o IAM, com
@@ -317,6 +331,16 @@ run "distribuicao_do_outro_ambiente" {
 
 run "registros_dns_por_ambiente" {
   command = apply
+
+  # Os asserts abaixo filtram por Sid ou por ação: sem o statement, passariam sem conferir nada.
+  assert {
+    condition = alltrue([
+      for env in ["staging", "production"] :
+      [for s in jsondecode(aws_iam_policy.apply_id[env].policy).Statement : s.Sid if contains(flatten([s.Action]), "route53:ChangeResourceRecordSets")] == ["Records"]
+      && [for s in jsondecode(aws_iam_policy.apply_id[env].policy).Statement : s.Sid if contains(flatten([s.Action]), "acm:RequestCertificate")] == ["CertificateRequest"]
+    ])
+    error_message = "route53:ChangeResourceRecordSets aparece uma vez, no Sid Records, e acm:RequestCertificate uma vez, no Sid CertificateRequest: os asserts de nome deste run dependem desses dois statements."
+  }
 
   # Avalia as condições como o IAM: todo nome do pedido precisa casar com StringLike e com nenhum StringNotLike.
   assert {

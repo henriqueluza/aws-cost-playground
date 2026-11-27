@@ -18,10 +18,11 @@ const READY_NOTICE =
   'Estimativa on-demand, não é cotação oficial · preços de 2026-11-23 · valores de exemplo';
 
 const WIDE_QUERY = '(min-width: 1024px)';
+const ROOMY_QUERY = '(min-width: 1200px)';
 
 type Listener = () => void;
 
-function stubWidth(initial: boolean | null) {
+function stubWidth(initial: boolean | null, roomy?: boolean) {
   const queries: string[] = [];
   let current = initial ?? true;
   const listeners = new Set<Listener>();
@@ -30,7 +31,8 @@ function stubWidth(initial: boolean | null) {
       queries.push(query);
       return {
         get matches() {
-          return query === WIDE_QUERY ? current : false;
+          if (query === WIDE_QUERY) return current;
+          return query === ROOMY_QUERY ? (roomy ?? current) : false;
         },
         media: query,
         addEventListener: (_type: string, fn: Listener) => listeners.add(fn),
@@ -47,8 +49,8 @@ function stubWidth(initial: boolean | null) {
   };
 }
 
-function renderPage(matches: boolean | null, client?: QueryClient) {
-  const media = stubWidth(matches);
+function renderPage(matches: boolean | null, client?: QueryClient, roomy?: boolean) {
+  const media = stubWidth(matches, roomy);
   const queryClient = client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter([{ path: '/', Component: EditorPage }], {
     initialEntries: ['/'],
@@ -201,10 +203,10 @@ describe('EditorPage estreito', () => {
 });
 
 describe('EditorPage e a largura em runtime', () => {
-  it('consulta exatamente (min-width: 1024px)', () => {
+  it('consulta exatamente (min-width: 1024px) e (min-width: 1200px)', () => {
     const { media } = renderPage(true);
     expect(media.queries.length).toBeGreaterThan(0);
-    expect(new Set(media.queries)).toEqual(new Set([WIDE_QUERY]));
+    expect(new Set(media.queries)).toEqual(new Set([WIDE_QUERY, ROOMY_QUERY]));
   });
 
   it('alterna entre largo e estreito ao disparar change', () => {
@@ -220,6 +222,50 @@ describe('EditorPage e a largura em runtime', () => {
       screen.getByRole('tablist', { name: 'Custo, bloco, carga e exportação' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('banner')).toBeInTheDocument();
+  });
+});
+
+describe('Paleta recolhível (de 1024 a 1199 px)', () => {
+  const trilho = () => screen.getByRole('complementary', { name: 'Paleta' });
+
+  it('abre recolhida abaixo de 1200 px, só com o botão que a mostra', () => {
+    renderPage(true, undefined, false);
+    expect(within(trilho()).queryByRole('heading', { name: 'Paleta' })).toBeNull();
+    expect(within(trilho()).queryByRole('textbox')).toBeNull();
+    const mostrar = within(trilho()).getByRole('button', { name: 'Mostrar a paleta' });
+    expect(mostrar).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('abre expandida a partir de 1200 px, com o botão de recolher', () => {
+    renderPage(true, undefined, true);
+    expect(within(trilho()).getByRole('heading', { name: 'Paleta' })).toBeVisible();
+    expect(within(trilho()).getByRole('button', { name: 'Recolher a paleta' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
+  it('mostrar e recolher pelo teclado levam o foco ao botão que ficou no lugar', async () => {
+    const user = userEvent.setup();
+    renderPage(true, undefined, false);
+    within(trilho()).getByRole('button', { name: 'Mostrar a paleta' }).focus();
+    await user.keyboard('{Enter}');
+    expect(within(trilho()).getByRole('heading', { name: 'Paleta' })).toBeVisible();
+    expect(within(trilho()).getByRole('button', { name: 'Recolher a paleta' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(within(trilho()).getByRole('button', { name: 'Mostrar a paleta' })).toHaveFocus();
+  });
+
+  it('clicar em Mostrar a paleta abre o painel com a busca', async () => {
+    renderPage(true, undefined, false);
+    await userEvent.click(within(trilho()).getByRole('button', { name: 'Mostrar a paleta' }));
+    expect(within(trilho()).getByRole('heading', { name: 'Paleta' })).toBeVisible();
+    expect(within(trilho()).getByRole('textbox', { name: 'Buscar bloco' })).toBeVisible();
+  });
+
+  it('não tem violações de acessibilidade, recolhida', async () => {
+    const { container } = renderPage(true, undefined, false);
+    await expectNoAxeViolations(container);
   });
 });
 

@@ -121,6 +121,14 @@ O roteiro completo, com os comandos, está em `infra/bootstrap/README.md`, seç�
 
 Antes do bootstrap, de [guardrails de custo](guardrails-de-custo.md) só vale a leitura da quota (passo 1 deste runbook). O resto daquele runbook exige a infra do ambiente já aplicada e fica para depois do passo 6.
 
+0. Confira o formato do `sub` que o repositório emite (#366). Os trusts esperam o formato imutável, conferido em 27/11/2026 com um token real: o repositório emite `repo:henriqueluza@60079862/aws-cost-playground@1463554125:<contexto>`.
+
+   ```bash
+   gh api repos/henriqueluza/aws-cost-playground/actions/oidc/customization/sub
+   ```
+
+   Esperado: `use_default: true`, `use_immutable_subject: true` e `sub_claim_prefix` igual a `repo:henriqueluza@60079862/aws-cost-playground@1463554125`. Se vier diferente, **não aplique**: os papéis seriam criados com um trust que nenhum job casa. Abra uma Issue `area:infra-bootstrap` com a resposta (são dados públicos do repositório) para ajustar `infra/bootstrap/oidc.tf` e os testes antes. A tabela papel → `sub` está em `infra/bootstrap/README.md`, "Formato do `sub`".
+
 1. Na raiz do repositório, em `main` atualizada, inicialize.
 
    ```bash
@@ -310,6 +318,8 @@ O parâmetro `/acp/<env>/anthropic-api-key` é criado à mão, fora do Terraform
 ## 6. Primeiro deploy de staging (#77)
 
 O deploy é o workflow `deploy-staging.yml`, disparado por `push` em `main`. O que cada passo dele faz está em `docs/infra.md`. O caminho recomendado é deixar o próprio pipeline fazer o primeiro apply: ele sobe o zip das funções para `functions/<sha>.zip` antes do Terraform. Um zip posto à mão nessa chave, com outro conteúdo, faz o deploy desse commit falhar fechado (`docs/infra.md`, passo `package`).
+
+**Se um job falhar em `AssumeRoleWithWebIdentity`** (`Not authorized to perform sts:AssumeRoleWithWebIdentity` no passo de credenciais da AWS): é falha fechada, ninguém ganhou acesso. Só o `sub` de `pull_request` foi visto num token real; os de `environment:<env>` e de `ref:refs/heads/main` vêm da documentação do GitHub e se confirmam na primeira execução de cada workflow. Confira, nesta ordem: (a) a variável com o ARN do papel é a do papel certo (`AWS_ROLE_ARN` do Environment, `AWS_PLAN_ROLE_ARN`, `AWS_PRICES_ROLE_ARN`); (b) o job roda em `main` e declara o `environment:` esperado; (c) o comando do passo 3.0 ainda devolve o prefixo esperado; (d) o `sub` que o job recebeu (procure o evento `AssumeRoleWithWebIdentity` negado no CloudTrail, se ele aparecer; senão, peça um passo temporário de conferência como o do PR #388), comparado com a tabela de `infra/bootstrap/README.md`, "Formato do `sub`". Se o `sub` real for outro, o ajuste é em `infra/bootstrap/` (Issue `area:infra-bootstrap`) e exige reaplicar o bootstrap; não afrouxe o trust à mão no console.
 
 1. Confira de novo a tabela "O que precisa estar em `main` antes". Com #338, #209 ou #307 aberta, o deploy falha por permissão, por falta do bucket ou sobe uma função que não importa.
 

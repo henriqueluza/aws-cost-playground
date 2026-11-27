@@ -336,3 +336,62 @@
   fill: var(--accent);
   pointer-events: none;
 }
+
+/*
+ * Modo compacto do bloco (DESIGN.md, "Bloco no canvas"): com o diagrama inteiro na tela o zoom é
+ * baixo, então o bloco mostra só o nome e o valor, num corpo ampliado na razão inversa do zoom
+ * (--node-scale, de `semanticZoom.ts`), e o texto na tela fica em ~10,5px. O tamanho do bloco não
+ * muda (as arestas e o ajuste dependem dele); SKU e "por mês" seguem no nome acessível do nó e no
+ * inspetor, e voltam ao aproximar. Sem transição: nada anima, então não há o que reduzir.
+ */
+.canvas[data-detail='compact'] .block {
+  height: var(--node-height);
+  padding: var(--node-pad-compact) var(--space-2);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'name name'
+    'tile value';
+  align-content: space-between;
+  align-items: center;
+  gap: 2px var(--space-2);
+}
+.canvas[data-detail='compact'] .head {
+  display: contents;
+}
+.canvas[data-detail='compact'] .name {
+  grid-area: name;
+  font-size: calc(var(--fs-body) * var(--node-scale));
+  line-height: var(--lh-node);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--name-lines);
+  line-clamp: var(--name-lines);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.canvas[data-detail='compact'] .tile {
+  grid-area: tile;
+}
+.canvas[data-detail='compact'] .summary,
+.canvas[data-detail='compact'] .per {
+  display: none;
+}
+.canvas[data-detail='compact'] .quota {
+  display: contents;
+}
+.canvas[data-detail='compact'] .value,
+.canvas[data-detail='compact'] .valueMuted {
+  grid-area: value;
+  justify-self: end;
+  white-space: nowrap;
+  font-size: calc(var(--fs-body) * var(--node-scale));
+  line-height: var(--lh-node);
+}
+/* O nó da internet tem uma linha só: ladrilho e nome, na mesma altura de sempre. */
+.canvas[data-detail='compact'] .blockClient {
+  height: auto;
+  min-height: 50px;
+  grid-template-areas: 'tile name';
+  align-content: center;
+}

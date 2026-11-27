@@ -63,6 +63,14 @@ resource "aws_iam_role_policy" "api" {
 }
 
 # llm-proxy: contadores de quota (leitura e incremento atômico) e leitura da chave. Único papel que lê o parâmetro.
+# A condição da quota (#372) segue o exemplo 6 de "Using IAM policy conditions for fine-grained access
+# control" do DynamoDB. Os designs moram na mesma partição `USER#<sub>` dos contadores: quem os separa é
+# `dynamodb:Attributes`, não `LeadingKeys`. A lista é a de api/app/quotas/repository.py mais as chaves,
+# que a AWS exige; `Select` obriga o `GetItem` a levar projeção e `ReturnValues` impede devolver o item.
+locals {
+  quota_attributes = ["PK", "SK", "count", "ttl"]
+}
+
 resource "aws_iam_role_policy" "llm_proxy" {
   name = "access"
   role = aws_iam_role.this["llm-proxy"].id
@@ -70,7 +78,18 @@ resource "aws_iam_role_policy" "llm_proxy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      { Sid = "Quota", Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"], Resource = var.table_arn },
+      {
+        Sid      = "Quota"
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
+        Resource = var.table_arn
+        Condition = {
+          "ForAllValues:StringLike"   = { "dynamodb:LeadingKeys" = ["USER#*", "GLOBAL"] }
+          "Null"                      = { "dynamodb:LeadingKeys" = "false" }
+          "ForAllValues:StringEquals" = { "dynamodb:Attributes" = local.quota_attributes }
+          "StringEqualsIfExists"      = { "dynamodb:Select" = "SPECIFIC_ATTRIBUTES", "dynamodb:ReturnValues" = "NONE" }
+        }
+      },
       { Sid = "ChaveDaClaudeApi", Effect = "Allow", Action = "ssm:GetParameter", Resource = local.api_key_parameter_arn },
     ]
   })
