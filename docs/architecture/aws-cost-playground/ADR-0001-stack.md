@@ -205,13 +205,24 @@ O template inicial já traz uma descrição de carga de exemplo e `usage` com `s
 
 Estimativa por chamada com um diagrama de 20 blocos: cerca de 4 mil tokens de entrada e 2 mil de saída. A medir na Issue do proxy.
 
-| Modelo | Custo por chamada | Pior caso na quota global (300/dia) |
-|---|---|---|
-| `claude-haiku-5-5` (**escolhido**) | ~US$ 0,0014 | ~US$ 13/mês |
-| `claude-sonnet-5-5` | ~US$ 0,028 | ~US$ 252/mês |
-| `claude-opus-5-5` | ~US$ 0,056 | ~US$ 504/mês |
+| Modelo | Custo por chamada (20 blocos) | Quota global cheia (30/dia), 20 blocos | Quota global cheia, pior chamada |
+|---|---|---|---|
+| `claude-haiku-5-5` (**escolhido**) | ~US$ 0,0014 | ~US$ 1,30/mês | ~US$ 3,30/mês |
+| `claude-sonnet-5-5` | ~US$ 0,028 | ~US$ 26/mês | ~US$ 66/mês |
+| `claude-opus-5-5` | ~US$ 0,056 | ~US$ 52/mês | ~US$ 132/mês |
 
-**Decisão do autor:** `claude-haiku-5-5`, quota de 20/dia por usuário e 300/dia global. O pior caso (~US$ 13/mês) cabe com folga nos US$ 200 de créditos. O id do modelo e as quotas são configuração, não código; trocar de modelo muda o custo em até 40 vezes e por isso passa pelo autor.
+**Decisão do autor (26/11/2026, #384):** `claude-haiku-5-5`, quota de **5/dia por usuário e 30/dia global** (eram 20 e 300 no Gate 1). O pior caso fica em cerca de US$ 3,30/mês. O id do modelo e as quotas são configuração, não código; trocar de modelo muda o custo em até 40 vezes e por isso passa pelo autor.
+
+A conta do pior caso, com o preço do Haiku 5.5 (US$ 0,10 por milhão de tokens de entrada e US$ 0,50 de saída, para prompt de até 100 mil tokens):
+
+- **Chamadas por mês:** quota global × dias = 30 × 31 = 930. A quota por usuário não entra: o teto de custo é dado pela global.
+- **Chamada de 20 blocos** (4.000 de entrada, 2.000 de saída): 4.000 × 0,10 / 10⁶ + 2.000 × 0,50 / 10⁶ = 0,0004 + 0,0010 = US$ 0,0014. No mês: 930 × 0,0014 = **US$ 1,30**.
+- **Pior chamada que a API aceita** (cerca de 15.000 de entrada, estimativa da #61; saída no teto `max_tokens` = 4.096): 15.000 × 0,10 / 10⁶ + 4.096 × 0,50 / 10⁶ = 0,0015 + 0,0020 = US$ 0,0035. No mês: 930 × 0,0035 = **US$ 3,30** (US$ 3,72 se a chamada for arredondada para US$ 0,004, como na #61; a decisão do autor cita "cerca de US$ 3,50").
+- **Antes** (300/dia): 300 × 31 = 9.300 chamadas; US$ 13/mês com 20 blocos e US$ 33/mês com a pior chamada (os "cerca de US$ 35" da #61). O valor de US$ 13 que este ADR trazia supunha o diagrama de 20 blocos, não o teto de `max_tokens`.
+
+Os tokens são estimativas: nenhuma chamada real foi medida. `max_tokens`, modelo, timeout e ausência de nova tentativa não mudaram.
+
+Os números vivem em um lugar por camada: `DEFAULT_QUOTA_USER_DAILY_LIMIT` e `DEFAULT_QUOTA_GLOBAL_DAILY_LIMIT` em `api/app/config.py` (a infra não passa as variáveis `QUOTA_*`, então valem esses padrões) e `QUOTA_LIMITS` em `web/src/shared/lib/api/quotaLimits.ts` (fake de desenvolvimento e e2e). Se 5 por dia for pouco no ensaio da apresentação, o autor previu subir a quota por usuário para 10, **mantendo a global em 30**: é trocar a constante do usuário nos dois arquivos, e o teto de custo acima não muda.
 
 O gasto com a Claude API **não aparece na fatura da AWS**. Quem o limita é o limite de gasto do workspace no Console da Anthropic, mais as quotas.
 
@@ -246,11 +257,11 @@ O repositório traz a infra como código Terraform, escrito pelos agentes e revi
 | Ambiente | Domínios | Publica | Dados |
 |---|---|---|---|
 | `staging` | `staging.<domínio>`, `api.staging.<domínio>`, `auth.staging.<domínio>` | CI, após merge em `main` | fictícios; self-signup **desligado**, contas de teste criadas pelo autor |
-| `production` | `<domínio>`, `api.<domínio>`, `auth.<domínio>` | CI, só por `workflow_dispatch` humano | reais |
+| `production` | `<domínio>`, `api.<domínio>`, `auth.<domínio>` | CI, só por `workflow_dispatch` humano | reais; self-signup **desligado** até depois da apresentação (#383), conta criada pelo autor |
 
 - Mesmo código Terraform, `infra/envs/staging` e `infra/envs/production`, cada um com estado próprio em S3 com lock nativo. Nomes `acp-stg-*` e `acp-prod-*`.
 - **Mesmo artefato nos dois ambientes.** O zip das Lambdas e o bundle do site são construídos uma vez por commit e guardados por SHA. Por isso o site não recebe configuração em tempo de build: lê `/config.json` (URL da API, ids do Cognito) ao iniciar, e esse arquivo é o único que difere por ambiente.
-- **CI autentica por OIDC.** Papéis separados: `plan` (leitura, usado em PR), `apply-staging`, `apply-production` e `prices` (só `pricing:GetProducts`). Trust restrito a `repo:henriqueluza/aws-cost-playground:environment:<env>`.
+- **CI autentica por OIDC.** Papéis separados: `plan` (leitura, usado em PR), `apply-staging`, `apply-production` e `prices` (só `pricing:GetProducts`). Trust restrito a `repo:henriqueluza@60079862/aws-cost-playground@1463554125:environment:<env>` (formato imutável do `sub`, com os IDs do dono e do repositório; #366).
 - `infra/bootstrap/` (buckets de estado, provedor OIDC, papéis) é aplicado uma vez pelo autor. Agentes não mexem nele.
 - **Segredos.** O parâmetro `/acp/<env>/anthropic-api-key` fica fora do Terraform: o autor o cria e grava a chave à mão, e os módulos só conhecem o nome. O valor nunca passa pelo plano, pelo state nem pelo CI. Só o papel do `llm-proxy` tem `ssm:GetParameter` nesse caminho; nenhum papel de CI o lê, e o papel `plan` tem negação explícita (decisão do autor na #126). Chaves diferentes por ambiente, cada uma num workspace do Console com limite de gasto próprio. Rotação em `docs/runbooks/rotacao-de-segredos.md`.
 - **Rollback.** O workflow de produção recebe o SHA a publicar; rollback é dispará-lo com o SHA anterior. Documentado em `docs/runbooks/rollback.md`. Mudanças no formato do design são compatíveis com a versão anterior (`schemaVersion` + leitura tolerante).
@@ -279,7 +290,7 @@ Divisão combinada no Gate 1: a aplicação se protege sozinha de consumo sem li
 
 | Guardrail | Como |
 |---|---|
-| Quotas | 20/dia por usuário e 300/dia global, atômicas no DynamoDB |
+| Quotas | 5/dia por usuário e 30/dia global, atômicas no DynamoDB |
 | Tamanho da entrada | Descrição até 2.000 caracteres, até 100 blocos, `doc` até 100 KB, 10 designs por usuário |
 | Chamada à LLM | `max_tokens` fixo; timeout de 29 s no proxy e 10 s na API |
 | Interruptor | Variável `LLM_ENABLED`: com `false`, o proxy responde 503 sem chamar a Claude API |
@@ -303,15 +314,15 @@ Valores a calibrar na Price List API (pendência 2 do discovery); ordem de grand
 |---|---|---|---|
 | Lançamento | 1 usuário, ~100 estimativas | US$ 0,50 a 2,50 | ~US$ 0,15 |
 | 6 meses | ~50 usuários ativos, ~1.000 estimativas | US$ 1 a 3 | ~US$ 1,40 |
-| Gatilho de revisão | ~1.000 usuários ativos, quota global cheia | US$ 2 a 6 | ~US$ 13 |
+| Gatilho de revisão | ~1.000 usuários ativos, quota global cheia | US$ 2 a 6 | ~US$ 1,30 (até ~US$ 3,30 no pior caso) |
 
-Nos três a infra fica abaixo do teto de US$ 20. O que escala com uso é a LLM, e ela tem teto próprio.
+Nos três a infra fica abaixo do teto de US$ 20. O que escala com uso é a LLM, e ela tem teto próprio: com a quota global de 30/dia (#384) são no máximo 930 estimativas por mês, então o cenário de 6 meses também fica limitado a esse número.
 
 ## Segurança
 
 **Ativos:** a chave da Claude API; o dinheiro do autor (fatura AWS e créditos); e-mails dos usuários; designs salvos; a integridade dos arquivos de preço.
 
-**Superfícies:** cadastro aberto no Cognito; API autenticada; proxy da LLM; arquivo JSON aberto no navegador; pipeline de CI e de preços.
+**Superfícies:** login no Cognito, com o cadastro fechado nos dois ambientes desde 26/11/2026 (ver "Cadastro fechado" abaixo; o desenho original previa cadastro aberto em produção); API autenticada; proxy da LLM; arquivo JSON aberto no navegador; pipeline de CI e de preços.
 
 | # | Ameaça | Mitigação |
 |---|---|---|
@@ -327,8 +338,15 @@ Nos três a infra fica abaixo do teto de US$ 20. O que escala com uso é a LLM, 
 **Riscos aceitos pelo autor no Gate 1:**
 
 - Sem WAF (custo fixo). O cadastro aberto pode ser usado para disparar e-mails de verificação a terceiros; o limite diário de envio do remetente padrão do Cognito contém o volume.
-- Cadastro aberto em produção com o remetente padrão do Cognito (aceito pelo autor em 25/11/2026, #139). Dois efeitos conhecidos: a cota é de 50 e-mails por dia por conta AWS, não ajustável e dividida com o staging, e qualquer pessoa pode esgotá-la pelo `client_id` público, o que suspende verificação e recuperação de senha até as 09:00 UTC; e o `SignUp` revela se um e-mail já tem conta. Saídas, se o volume crescer: fechar o cadastro (uma linha em `infra/envs/production/terraform.tfvars`) ou adotar o SES, que cria custo e exige ADR novo.
+- Cadastro aberto em produção com o remetente padrão do Cognito (aceito pelo autor em 25/11/2026, #139). **Suspenso em 26/11/2026:** o cadastro está fechado (#383, "Cadastro fechado" abaixo) e este risco só volta se ele for reaberto. Dois efeitos conhecidos: a cota é de 50 e-mails por dia por conta AWS, não ajustável e dividida com o staging, e qualquer pessoa pode esgotá-la pelo `client_id` público, o que suspende verificação e recuperação de senha até as 09:00 UTC; e o `SignUp` revela se um e-mail já tem conta. Saídas, se o volume crescer: fechar o cadastro (uma linha em `infra/envs/production/terraform.tfvars`) ou adotar o SES, que cria custo e exige ADR novo.
 - Staging e produção na mesma conta AWS, separados por papéis e nomes, não por conta.
+
+**Cadastro fechado (decisão do autor de 26/11/2026, #383).** Até depois da apresentação de 08/12/2026, `self_signup_enabled = false` em staging e em produção: o pool sai com `allow_admin_create_user_only = true` e só o autor cria contas (`docs/runbooks/setup-aws.md`, passo 7). Substitui a decisão da #139 e contraria o discovery, que previa cadastro aberto para recrutadores.
+
+- **Uma fonte de verdade.** A mesma variável fecha o pool e sai no `/config.json` como `selfSignupEnabled`. O site valida o campo com zod, trata a ausência como fechado, não mostra "Criar conta" e nunca monta o caminho de cadastro do login gerenciado. A recuperação de senha continua na tela do login gerenciado.
+- **O que muda nos riscos.** T1: sem contas descartáveis, o abuso de custo da LLM e o custo de leitura e escrita dos designs (#277, #369) só são alcançáveis por uma conta criada pelo autor (a dele ou a de um convidado, ver o runbook); as quotas, o limite de gasto e a ação do Budgets continuam valendo. T3: o isolamento por `sub` não muda, e deixa de haver um segundo usuário para testá-lo fora dos testes de API. A janela do token após a exclusão de conta (#284) deixa de ser alcançável por terceiros. Somem, enquanto fechado, o esgotamento da cota de e-mails pelo `SignUp` e a enumeração de e-mails no cadastro (#139); `ForgotPassword` segue público e ainda gasta a cota de 50 e-mails por dia, só para e-mails com conta.
+- **O que o fechamento não cobre.** Qualquer coisa que não dependa de sessão: o site estático, o editor anônimo e o próprio login gerenciado, que continua público (tentativa de senha e pedido de recuperação contra uma conta existente, sem WAF, como já aceito acima). A página de cadastro do login gerenciado pode continuar abrindo por URL direta: quem recusa o cadastro é o pool, não a página. E cada conta que o autor criar para outra pessoa devolve a ela os riscos de usuário logado.
+- **Para reabrir.** Antes: a opção a da #277 (documento do design em item separado, com ADR novo) e a opção b da #284 (decisão 15 do autor). Depois: `self_signup_enabled = true` em `infra/envs/production/terraform.tfvars` por PR, com revisão normal; o risco da #139 volta a valer e o site passa a mostrar "Criar conta" no deploy seguinte.
 
 ## Alternativas consideradas
 
@@ -361,7 +379,7 @@ Mantido pelo autor. O motor de preço é TypeScript puro com testes de cenário,
 
 | Ponto | Decisão |
 |---|---|
-| Modelo e quota global | `claude-haiku-5-5`, 300/dia global, 20/dia por usuário |
+| Modelo e quota global | `claude-haiku-5-5`, 300/dia global, 20/dia por usuário. **Revisto pelo autor em 26/11/2026 (#384): 30/dia global, 5/dia por usuário** (ver "Modelo da LLM e custo por chamada") |
 | SQS + worker Lambda | Fora do MVP. O API Gateway HTTP API corta a integração em 30 s; se a medição na Issue do proxy mostrar p95 acima de 20 s, a fila com polling entra por ADR novo, com aviso ao autor |
 | Preços | Por PR aberto pelo workflow semanal, não por publicação direta no S3 |
 | Uso por aresta | A LLM devolve `gbPerMonth` por aresta; egress do API Gateway fora do MVP |

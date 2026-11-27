@@ -56,6 +56,8 @@ resource "aws_iam_service_linked_role" "apigateway" {
 
 # `Resource = "*"` só onde a AWS não aceita recurso (criar e listar) ou o ID é gerado; nesses, o
 # ambiente vem da condição de tag. Sem tag possível: políticas e OAC do CloudFront, só criar e ler.
+# `UserPoolDomainDistribution` vale em `*` por risco aceito pelo autor (#338): a distribuição do
+# domínio do Cognito é da AWS, fora da conta.
 #trivy:ignore:AVD-AWS-0057
 resource "aws_iam_policy" "apply_id" {
   for_each = local.environments
@@ -108,8 +110,19 @@ resource "aws_iam_policy" "apply_id" {
         Condition = { StringEquals = { "aws:ResourceTag/environment" = each.key } }
       },
       {
+        # O Cognito exige `cloudfront:UpdateDistribution` em `*` de quem cria o domínio próprio do
+        # user pool: a distribuição é da AWS e não tem a tag. Risco aceito pelo autor (#338). Só
+        # passa recurso sem a tag `environment` ou com a do próprio ambiente; a distribuição do
+        # outro ambiente também cai em `DenyOtherEnvironmentDistribution` (`apply.tf`).
+        Sid       = "UserPoolDomainDistribution"
+        Effect    = "Allow"
+        Action    = "cloudfront:UpdateDistribution"
+        Resource  = "*"
+        Condition = { StringEqualsIfExists = { "aws:ResourceTag/environment" = each.key } }
+      },
+      {
         # Políticas de cache e de cabeçalhos e o OAC não aceitam tag nem outra condição: só criar
-        # (não altera o que existe) e ler. Alterar as existentes fica fora, à espera do autor.
+        # (não altera o que existe) e ler. Alterar as existentes é tarefa manual do autor (#338).
         Sid    = "EdgePolicies"
         Effect = "Allow"
         Action = [

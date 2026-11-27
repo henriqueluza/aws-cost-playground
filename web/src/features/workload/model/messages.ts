@@ -55,7 +55,7 @@ export function failureMessage(failure: EstimateFailure): string {
   }
 }
 
-/** "Restam 12 de 20 hoje". */
+/** "Restam 3 de 5 hoje". */
 export function quotaLine(quota: Pick<Quota, 'limit' | 'remaining'>): string {
   return `Restam ${quota.remaining} de ${quota.limit} hoje`;
 }

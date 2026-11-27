@@ -38,7 +38,7 @@ python3 -m unittest discover -s infra/tools/tests   # tfvars sem segredo e arqui
 |---|---|---|
 | `environment` | `staging` (prefixo `acp-stg`, site em `staging.<zona>`) | `production` (prefixo `acp-prod`, site na própria zona) |
 | `point_in_time_recovery_enabled` | `false` | `true` |
-| `self_signup_enabled` | `false` | `true`. Risco aceito pelo autor na #139 e registrado no ADR; para fechar o cadastro, troque essa linha para `false` por PR |
+| `self_signup_enabled` | `false` | `false` desde a #383 (decisão do autor de 26/11/2026; antes `true`, risco da #139). Fecha o cadastro no pool e sai no `/config.json` como `selfSignupEnabled`. Para reabrir, veja "Cadastro fechado" no ADR |
 | `llm_enabled`, `default_throttle`, `estimates_throttle` | iguais | iguais |
 
 ## Variáveis dos ambientes
@@ -57,7 +57,7 @@ Esses são os valores do deploy (#22; ver [`docs/infra.md`](../docs/infra.md)). 
 
 ## Variáveis do job plan
 
-O job `plan` roda em `pull_request` e sem `environment:` (o trust do papel `plan` exige `sub = repo:<dono>/<repo>:pull_request`, ver `bootstrap/README.md`). Por isso ele lê os valores no nível do **repositório**, e o autor os cadastra uma vez para os dois ambientes:
+O job `plan` roda em `pull_request` e sem `environment:` (o trust do papel `plan` exige `sub = repo:<dono>@<id>/<repo>@<id>:pull_request`, ver `bootstrap/README.md`). Por isso ele lê os valores no nível do **repositório**, e o autor os cadastra uma vez para os dois ambientes:
 
 | Nome no GitHub | Tipo | Vira | Para quê |
 |---|---|---|---|
@@ -89,7 +89,7 @@ gh secret set TF_VAR_ALARM_EMAIL --repo henriqueluza/aws-cost-playground   # ped
 terraform output -json site_config > config.json
 ```
 
-Chaves: `apiBaseUrl`, `cognitoAuthority`, `cognitoClientId`, iguais ao schema de `web/src/shared/config/runtimeConfig.ts`.
+Chaves: `apiBaseUrl`, `cognitoAuthority`, `cognitoClientId` e `selfSignupEnabled` (booleano, da variável `self_signup_enabled`; ausente, o site trata como fechado), iguais ao schema de `web/src/shared/config/runtimeConfig.ts`.
 
 ## Saídas para os runbooks
 

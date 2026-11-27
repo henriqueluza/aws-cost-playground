@@ -257,6 +257,7 @@ Grade de 4px. Um valor de espaçamento por contexto, repetido na horizontal e na
   /* casca do editor (1440 × 900 é a tela de referência) */
   --topbar-height: 48px;
   --sidebar-width: 232px;     /* paleta; 200px entre 1024 e 1279px */
+  --sidebar-collapsed: 48px;  /* paleta recolhida: só o botão que a mostra */
   --rail-width: 360px;        /* coluna direita: custo, bloco, carga; 320px entre 1024 e 1279px */
   --sheet-inset: 8px;         /* folha recuada da borda de baixo (e da direita quando não há coluna) */
   --panel-gap: 12px;          /* entre paleta, folha e coluna direita */
@@ -276,6 +277,9 @@ Grade de 4px. Um valor de espaçamento por contexto, repetido na horizontal e na
 
   /* peças de tamanho fixo */
   --node-width: 216px;        /* todos os blocos têm a mesma largura */
+  --node-height: 94px;        /* e a mesma altura, nos dois modos (completo e compacto) */
+  --lh-node: 1.15;            /* entrelinha do texto do bloco compacto (corpo ampliado) */
+  --node-pad-compact: 6px;    /* padding do bloco compacto: o texto ampliado ocupa a altura toda */
   --tile-node: 24px;          /* ladrilho de categoria no bloco e na paleta */
   --icon: 16px;               /* ícone de interface e de lista */
   --icon-inline: 14px;        /* ícone dentro de linha de texto */
@@ -289,7 +293,7 @@ Grade de 4px. Um valor de espaçamento por contexto, repetido na horizontal e na
 ### A casca do editor
 
 - **Barra superior** (48px, sobre `--ground`, sem régua): marca e nome do produto, nome do design (editável) com a pílula de estado (salvo, não salvo), região, desfazer e refazer, as ações secundárias e um único botão primário.
-- **Paleta** (`--sidebar-width`, sobre `--ground`): cinco grupos na ordem computação, dados, rede, segurança, operação. Cada grupo tem título Section e itens num passo de 40px: ladrilho de categoria, nome do serviço e alça de arraste.
+- **Paleta** (`--sidebar-width`, sobre `--ground`): cinco grupos na ordem computação, dados, rede, segurança, operação. Cada grupo tem título Section e itens num passo de 40px: ladrilho de categoria, nome do serviço e alça de arraste. Um botão no título recolhe a paleta num trilho de `--sidebar-collapsed`, que só guarda o botão para mostrá-la (aberta por padrão a partir de 1200px, recolhida abaixo disso).
 - **Folha** (o canvas): `--surface`, borda `--border` de 1px, cantos `--radius-sheet`. No editor a moldura forma um U (barra superior, paleta e coluna direita): a folha fica a `--panel-gap` da paleta e da coluna e recuada `--sheet-inset` da borda de baixo da janela. Sem grade de pontos; o encaixe invisível é de 8px. O carimbo fica preso 16px dentro do canto inferior direito; zoom e minimapa, 16px dentro do canto inferior esquerdo.
 - **Coluna direita** (`--rail-width`, sobre `--ground`): abas no topo com sublinhado de 2px. Painel de custo, inspetor e carga ficam aqui; a composição exata das abas é decisão da Issue do editor.
 - Telas que não são o editor (lista de designs, comparação, conta) usam a moldura em L do `framed-sheet` (barra superior e navegação à esquerda). A folha fica recuada `--sheet-inset` da direita e de baixo, com `--pad` de padding.
@@ -315,7 +319,8 @@ Densidade é três ajustes movidos juntos: passo da linha, padding e tamanho do 
 ### Larguras
 
 - **1280px ou mais:** casca completa.
-- **De 1024px a 1279px:** paleta com 200px e coluna direita com 320px. A folha fica com cerca de 470px, então o carimbo começa recolhido em uma linha.
+- **De 1200px a 1279px:** paleta com 200px e coluna direita com 320px.
+- **De 1024px a 1199px:** a paleta abre recolhida num trilho de `--sidebar-collapsed` (48px) com um só botão, "Mostrar a paleta" (`aria-expanded`), e a coluna direita tem 320px. A folha passa de ~480px para ~630px, o que sustenta o texto de 10,5px dos blocos (ver "Bloco no canvas"). Quem mostra a paleta ganha os 200px de volta e o canvas reajusta; a escolha vale até a página recarregar. Em qualquer largura a paleta também se recolhe pelo botão do próprio título.
 - **Abaixo de 1024px** (inclusive em zoom de 200% numa tela de 1440px): o canvas não abre. É conteúdo bidimensional, uma exceção da WCAG 1.4.10. No lugar dele vem uma folha de leitura: uma frase dizendo que a edição precisa de pelo menos 1024px de largura, o resumo de custo do design em uma coluna (total, fixo, variável, lista por bloco e por aresta, aviso e data do catálogo) e os links para baixar o JSON e para a lista de designs. O custo continua acessível em qualquer zoom.
 - As páginas de texto funcionam a partir de 320px, com margens de 16px e alvos de pelo menos 44px.
 
@@ -376,6 +381,7 @@ Os componentes ainda não existem. Esta seção fixa a anatomia e os estados que
 ### Bloco no canvas (assinatura)
 - **Forma:** `--node-width`, `--radius-card`, fundo `--surface`, borda `--border`, padding de 12px.
 - **Anatomia fixa:** a mesma em todos os blocos, para que o olho ache cada coisa no mesmo lugar. Linha 1: ladrilho de `--tile-node` (`--cat-*-tint`, ícone de 16px em `--cat-*-ink`, `--radius-chip`) e nome do serviço em 14px/600. Linha 2: resumo do SKU em 12px mono `--muted` (`t4g.small · 2 AZ`). Linha 3: a cota, com `por mês` à esquerda em `--muted` e o valor em mono 14px à direita.
+- **Modo compacto (zoom semântico):** com o diagrama inteiro na tela o zoom é baixo (0,35 a 0,6) e o texto de 14px não se leria. Abaixo de zoom 0,74 todos os blocos passam ao modo compacto, que volta ao completo acima de 0,82 (histerese: entre os dois vale o modo anterior, sem pisca-pisca). No compacto o bloco mostra só o nome (600, até duas linhas) e o valor mensal (mono), mais o ladrilho de categoria: o resumo do SKU e "por mês" somem da tela, mas o nome acessível do nó os mantém e o inspetor os mostra; ao aproximar (zoom acima de 0,82) o bloco completo volta. O corpo do nome e do valor é ampliado na razão inversa do zoom (`--node-scale`, de `semanticZoom.ts`, de 1 a 2) para que o texto na tela fique em 10,5px; nunca abaixo de 14px no canvas. O bloco mantém `--node-width` x `--node-height` (padding de `--node-pad-compact`, entrelinha de `--lh-node`) e as arestas não se movem. Nada anima na troca. Corpo na tela: 10,5px a 11,5px de 1024 a 1920px de largura.
 - **Texto longo:** nome e resumo do SKU ficam numa linha, com reticências e o texto completo em tooltip e no `aria-label`. O valor da cota nunca é cortado. Se não couber, `por mês` some primeiro e o valor ocupa a linha (até `US$ 9.999.999,99` cabe nos 192px internos).
 - **Selecionado:** borda de 2px em `--accent`, desenhada como `outline` para o bloco não mudar de tamanho.
 - **Foco (teclado):** anel `--focus` de 2px a `--focus-offset-node` do bloco, fora da borda de seleção. Os 3px entre o anel e o bloco ficam sempre em `--surface`, então um bloco selecionado e focado mostra duas linhas de tinta separadas por uma faixa da folha. A Issue do editor confere isso na tela renderizada, com zoom de 200%.
@@ -444,8 +450,8 @@ Cada valor de uso no inspetor (e na aresta) diz de onde veio, por forma e não s
 | Vazio | O quadro e o título ficam; uma frase e a próxima ação dentro de um contorno tracejado de 1px em `--control`. Canvas vazio: "Arraste um bloco da paleta ou abra o template". |
 | Erro | Dentro do bloco que falhou, nunca em banner de tela cheia: uma frase com o que falhou, a última vez que deu certo e `Tentar de novo`. O vermelho fica só no ícone ou na pílula. Catálogo de preços que não carregou para a região: o carimbo e o painel mostram `—` no lugar dos valores, a frase "Sem preços de sa-east-1 neste momento" e `Tentar de novo`. |
 | Desatualizado | Pílula de aviso `Estimativa desatualizada` ao lado de `Re-estimar carga`. |
-| Quota do usuário | Linha de capacidade `Restam 12 de 20 hoje` com barra de 4px na proporção real (`--text` sobre `--rule`). Em zero, o botão fica desabilitado e diz quando a quota volta. |
-| Limite global | Quando as 300 estimativas do dia acabam para todos, o botão fica desabilitado com a frase "O limite diário do serviço acabou; volta amanhã" e a linha de capacidade do usuário continua mostrando o que ele ainda teria. |
+| Quota do usuário | Linha de capacidade `Restam 3 de 5 hoje` com barra de 4px na proporção real (`--text` sobre `--rule`). Em zero, o botão fica desabilitado e diz quando a quota volta. |
+| Limite global | Quando as 30 estimativas do dia acabam para todos, o botão fica desabilitado com a frase "O limite diário do serviço acabou; volta amanhã" e a linha de capacidade do usuário continua mostrando o que ele ainda teria. |
 | Salvo | Carimbo de tempo discreto `Salvo há 2 min` em 12px `--muted` na barra superior. |
 
 ### Movimento

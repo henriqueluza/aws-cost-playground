@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ExportPanel } from '../../export';
 import { PricingPanel, usePriceCatalog } from '../../pricing';
@@ -7,6 +7,8 @@ import { useRestoreDesignDraft } from '../hooks/designDraftSync';
 import { useDesignStore } from '../hooks/useDesignStore';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { catalogStamp } from '../model/estimateNotice';
+import { Icon } from './CategoryIcon';
+import { IconButton } from '../../../shared/ui';
 import { ActionBar } from './ActionBar';
 import { CanvasPanel } from './CanvasPanel';
 import styles from './EditorPage.module.css';
@@ -16,6 +18,9 @@ import { InspectorPanel } from './InspectorPanel';
 import { LiveAnnouncer } from './LiveAnnouncer';
 import { PalettePanel } from './PalettePanel';
 import { RailTabs } from './RailTabs';
+
+/** Abaixo de 1200 px a paleta abre recolhida: o canvas fica com a largura que o texto dos blocos pede. */
+const ROOMY_QUERY = '(min-width: 1200px)';
 
 /** Atalhos de histórico só existem com o canvas na tela. */
 function HistoryShortcuts(): null {
@@ -30,6 +35,22 @@ export function EditorPage({
 }: { actions?: ReactNode; workload?: ReactNode } = {}) {
   useRestoreDesignDraft();
   const wide = useMediaQuery('(min-width: 1024px)', true);
+  const roomy = useMediaQuery(ROOMY_QUERY, true);
+  // `null`: segue a largura da janela; depois de um clique, vale a escolha da pessoa.
+  const [paletteChoice, setPaletteChoice] = useState<boolean | null>(null);
+  const paletteOpen = paletteChoice ?? roomy;
+  const paletteRef = useRef<HTMLElement>(null);
+  const toggled = useRef(false);
+  // O botão que recolhe ou mostra a paleta troca de lugar: o foco acompanha, senão se perde.
+  useEffect(() => {
+    if (!toggled.current) return;
+    toggled.current = false;
+    paletteRef.current?.querySelector<HTMLElement>('[data-palette-toggle]')?.focus();
+  }, [paletteOpen]);
+  const togglePalette = () => {
+    toggled.current = true;
+    setPaletteChoice(!paletteOpen);
+  };
   const design = useDesignStore((s) => s.document);
   const selection = useDesignStore((s) => s.selection);
   const select = useDesignStore((s) => s.select);
@@ -66,14 +87,25 @@ export function EditorPage({
   }
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-palette={paletteOpen ? 'open' : 'closed'}>
       <HistoryShortcuts />
       <LiveAnnouncer />
       <header className={styles.topbar}>
         <ActionBar>{actions}</ActionBar>
       </header>
-      <aside aria-label="Paleta" className={styles.palette}>
-        <PalettePanel />
+      <aside aria-label="Paleta" className={styles.palette} ref={paletteRef}>
+        {paletteOpen ? (
+          <PalettePanel onCollapse={togglePalette} />
+        ) : (
+          <IconButton
+            aria-label="Mostrar a paleta"
+            aria-expanded={false}
+            data-palette-toggle
+            onClick={togglePalette}
+          >
+            <Icon name="panel-expand" />
+          </IconButton>
+        )}
       </aside>
       <main className={styles.sheet}>
         <h1 className={styles.hidden}>Editor</h1>

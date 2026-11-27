@@ -77,7 +77,7 @@ describe('appliedMessage e quotaLine', () => {
   });
 
   it('linha da quota restante', () => {
-    expect(quotaLine({ limit: 20, remaining: 12 })).toBe('Restam 12 de 20 hoje');
+    expect(quotaLine({ limit: 5, remaining: 3 })).toBe('Restam 3 de 5 hoje');
   });
 });
 

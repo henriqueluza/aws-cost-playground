@@ -10,6 +10,8 @@ export type IconName =
   | 'fit'
   | 'undo'
   | 'redo'
+  | 'panel-collapse'
+  | 'panel-expand'
   | 'edge-data'
   | 'edge-runs-on'
   | 'edge-logs';
@@ -58,6 +60,18 @@ const SHAPES: Record<IconName, ReactElement> = {
     </>
   ),
   'edge-logs': <path d="M3 3.5h10M3 6.5h10M3 9.5h6.5M3 12.5h8" />,
+  'panel-collapse': (
+    <>
+      <rect x="2" y="2.5" width="12" height="11" rx="2" />
+      <path d="M6 2.5v11M10.5 6 8.5 8l2 2" />
+    </>
+  ),
+  'panel-expand': (
+    <>
+      <rect x="2" y="2.5" width="12" height="11" rx="2" />
+      <path d="M6 2.5v11M8.5 6l2 2-2 2" />
+    </>
+  ),
   globe: (
     <>
       <circle cx="8" cy="8" r="6.5" />

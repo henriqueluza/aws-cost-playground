@@ -74,8 +74,24 @@ Nenhum segredo vai em variável de ambiente.
 | Papel | Permissões |
 |---|---|
 | `api` | `dynamodb:GetItem`, `PutItem`, `UpdateItem` (trava otimista dos designs, #54), `DeleteItem`, `Query` e `BatchWriteItem` na tabela, restritas por `dynamodb:LeadingKeys` às partições `USER#*`; `cognito-idp:AdminDeleteUser` no pool. Não lê o parâmetro |
-| `llm-proxy` | `dynamodb:GetItem` e `UpdateItem` na tabela (o `TransactWriteItems` da quota é autorizado pela ação `UpdateItem`); `ssm:GetParameter` só no parâmetro da chave |
+| `llm-proxy` | `dynamodb:GetItem` e `UpdateItem` na tabela (o `TransactWriteItems` da quota é autorizado pela ação `UpdateItem`), limitadas às partições `USER#*` e `GLOBAL` e às colunas dos contadores (ver "Condição da quota"); `ssm:GetParameter` só no parâmetro da chave |
 | Ambos | `logs:CreateLogStream` e `logs:PutLogEvents` só no próprio log group. Sem `logs:CreateLogGroup`: o Terraform já criou o grupo |
+
+## Condição da quota
+
+A declaração `Quota` do `llm-proxy` segue o exemplo 6 de [Using IAM policy conditions for fine-grained access control](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/specifying-conditions.html):
+
+| Condição | Efeito |
+|---|---|
+| `ForAllValues:StringLike` em `dynamodb:LeadingKeys` = `USER#*`, `GLOBAL` | Só as partições que o proxy usa. Numa transação, o DynamoDB autoriza cada item em separado, com a ação e a chave de partição dele |
+| `Null` em `dynamodb:LeadingKeys` = `false` | A requisição precisa trazer chave de partição (`ForAllValues` vale verdadeiro quando a chave falta) |
+| `ForAllValues:StringEquals` em `dynamodb:Attributes` = `PK`, `SK`, `count`, `ttl` | Só as colunas do contador podem ser lidas, escritas ou usadas em condição. As chaves entram porque a AWS exige |
+| `StringEqualsIfExists` em `dynamodb:Select` = `SPECIFIC_ATTRIBUTES` e `dynamodb:ReturnValues` = `NONE` | Pela documentação, `Select` vale para toda operação que devolve atributos: `GetItem` sem projeção é negado. `ReturnValues` = `NONE` é a condição do exemplo 4 de [Using IAM with DynamoDB transactions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis-iam.html), que impede devolver o item quando a condição de um item da transação falha |
+
+- **O que a condição reduz.** Os designs ficam na mesma partição `USER#<sub>` dos contadores, e a política não conhece o `sub`. `LeadingKeys` sozinha, com o modelo de dados de hoje, não tira nada do papel: quem separa quota de design é a lista de colunas. Com ela, um defeito no proxy não lê nem altera `doc`, `name` nem as outras colunas de um design. Isso é o que a documentação descreve, não o que um teste local prova: `IfExists` deixa passar a requisição em que a chave de condição não vem.
+- **O que sobra.** `UpdateItem` também cria item, e a condição da expressão é da requisição, não da política. Um defeito no proxy ainda escreve as colunas `count` e `ttl`, com qualquer valor, em qualquer item de `USER#*` ou `GLOBAL`, existente ou novo: os contadores de quota inclusive. Ele não tem `Query` para descobrir chaves. Fechar isso exigiria os contadores numa partição ou tabela própria, o que muda o modelo de dados do ADR.
+- **Quem muda `api/app/quotas/repository.py` muda a lista.** Coluna nova, `GetItem` sem `ProjectionExpression` ou `ReturnValues` são negados em execução, sem erro no plano. `infra/tools/tests/test_quota_policy.py` compara os dois lados.
+- **Só o staging prova.** A documentação afirma a autorização item a item da transação para `LeadingKeys`; para `Attributes`, a referência de autorização lista a chave na ação `UpdateItem`, mas não há exemplo com transação. O primeiro deploy de staging precisa de uma estimativa (`POST /estimates`) e de um `GET /quota` com sucesso: é a prova de que a condição não nega o uso legítimo. O lado contrário (o que ela nega) fica pela documentação. Se o DynamoDB negar, o proxy responde indisponível (falha fechada: nenhuma chamada à LLM) e o log registra a quota indisponível, com `AccessDeniedException` no caso da transação. A volta é remover da declaração a linha de `dynamodb:Attributes` e a de `StringEqualsIfExists`.
 
 ## Limite de permissões
 

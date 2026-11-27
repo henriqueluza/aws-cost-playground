@@ -15,9 +15,9 @@ describe('confirmationMatches', () => {
 
 describe('formato', () => {
   it('quotaSummary concorda no singular e no plural', () => {
-    expect(quotaSummary(17, 20)).toBe('Restam 17 de 20 estimativas por dia');
-    expect(quotaSummary(1, 20)).toBe('Resta 1 de 20 estimativas por dia');
-    expect(quotaSummary(0, 20)).toBe('Restam 0 de 20 estimativas por dia');
+    expect(quotaSummary(3, 5)).toBe('Restam 3 de 5 estimativas por dia');
+    expect(quotaSummary(1, 5)).toBe('Resta 1 de 5 estimativas por dia');
+    expect(quotaSummary(0, 5)).toBe('Restam 0 de 5 estimativas por dia');
   });
 
   it('formatResetsAt usa pt-BR e devolve travessão para data inválida', () => {

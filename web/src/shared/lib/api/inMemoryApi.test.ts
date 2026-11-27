@@ -26,8 +26,8 @@ const UNKNOWN = '0'.repeat(26);
 function setup(overrides: Partial<InMemoryApiOptions> = {}) {
   let t = T0;
   const api = createInMemoryApi({
-    userDailyLimit: 20,
-    globalDailyLimit: 300,
+    userDailyLimit: 5,
+    globalDailyLimit: 30,
     maxDesigns: 50,
     maxDocBytes: BIG,
     now: () => new Date(t),
@@ -449,7 +449,7 @@ describe('createInMemoryApi: estimateUsage', () => {
     expect(response).toEqual({
       blocks: [{ id: 'blk_fn_api', values: { requestsPerMonth: 10 }, source: 'llm' }],
       edges: [],
-      quota: { limit: 20, remaining: 19, resetsAt: DAY_END },
+      quota: { limit: 5, remaining: 4, resetsAt: DAY_END },
     });
   });
 
@@ -458,7 +458,7 @@ describe('createInMemoryApi: estimateUsage', () => {
       estimate: () => ({ blocks: [{ id: 'blk_fn_api', values: { texto: 'livre' } }] }) as never,
     });
     await rejectsWith(estimates.estimateUsage(REQUEST), 'invalid-response');
-    expect((await quota.get()).remaining).toBe(20);
+    expect((await quota.get()).remaining).toBe(5);
   });
 
   it('esgotar a quota do usuário dá quota-exhausted com scope user e resetsAt', async () => {
@@ -503,7 +503,7 @@ describe('createInMemoryApi: estimateUsage', () => {
     const { estimates, quota } = setup({ llmEnabled: false, userDailyLimit: 0, estimate });
     await rejectsWith(estimates.estimateUsage(REQUEST), 'unavailable');
     expect(calls).toBe(0);
-    expect(await setup({ llmEnabled: false }).quota.get()).toMatchObject({ remaining: 20 });
+    expect(await setup({ llmEnabled: false }).quota.get()).toMatchObject({ remaining: 5 });
     expect(await quota.get()).toMatchObject({ limit: 0, remaining: 0 });
   });
 

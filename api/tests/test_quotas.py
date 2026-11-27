@@ -38,7 +38,7 @@ CONDITION = "attribute_not_exists(#count) OR #count < :limit"
 LEAKS = ("acp-test", "USER#", "GLOBAL", "QUOTA#", "Dynamo", "Requested resource")
 
 
-def settings(user: int = 20, global_: int = 300, *, enabled: bool = True) -> Settings:
+def settings(user: int = 5, global_: int = 30, *, enabled: bool = True) -> Settings:
     return Settings(
         table_name="acp-test",
         llm_enabled=enabled,
@@ -139,14 +139,14 @@ def exhausted(sub: str, config: Settings, table: Any, now: datetime = NOON) -> Q
 
 def test_consumo_cria_os_dois_contadores_com_ttl_de_35_dias(table: Any) -> None:
     state = consume(SUB, table=table, settings=settings(), now=at())
-    assert state.model_dump(by_alias=True) == {"limit": 20, "remaining": 19, "resetsAt": RESETS}
+    assert state.model_dump(by_alias=True) == {"limit": 5, "remaining": 4, "resetsAt": RESETS}
     ttl = int(NOON.timestamp()) + 35 * 86_400
     expected = {"PK": f"USER#{SUB}", "SK": DAY, "count": 1, "ttl": ttl}
     assert stored(table, f"USER#{SUB}") == expected
     assert stored(table, "GLOBAL") == expected | {"PK": "GLOBAL"}
     # O segundo consumo soma e não empurra o `ttl` (if_not_exists).
     later = consume(SUB, table=table, settings=settings(), now=at(NOON + timedelta(hours=3)))
-    assert later.remaining == 18
+    assert later.remaining == 3
     assert stored(table, f"USER#{SUB}") == expected | {"count": 2}
     assert stored(table, "GLOBAL") == expected | {"PK": "GLOBAL", "count": 2}
 
@@ -188,7 +188,7 @@ def test_transacao_unica_com_dois_updates_condicionais() -> None:
     for item, key, limit in zip(
         items,
         ({"PK": f"USER#{SUB}", "SK": DAY}, {"PK": "GLOBAL", "SK": DAY}),
-        (20, 300),
+        (5, 30),
         strict=True,
     ):
         assert item["Update"] == {
@@ -203,7 +203,12 @@ def test_transacao_unica_com_dois_updates_condicionais() -> None:
 
 @pytest.mark.parametrize(
     ("users", "per_user", "config", "allowed"),
-    [(1, 60, settings(), 20), (5, 20, settings(global_=50), 50), (4, 30, settings(), 80)],
+    [
+        (1, 60, settings(), 5),  # um usuário para no limite dele
+        (4, 30, settings(), 20),  # quatro usuários: 4 x 5, abaixo da global
+        (10, 20, settings(), 30),  # dez usuários pediriam 50: a global corta em 30
+        (5, 20, settings(user=20, global_=50), 50),
+    ],
 )
 def test_consumos_simultaneos_nunca_passam_dos_limites(
     users: int, per_user: int, config: Settings, allowed: int
@@ -329,13 +334,13 @@ def test_relogio_sem_fuso_nao_autoriza() -> None:
 
 def test_limites_padrao_sao_os_do_adr_e_vem_do_ambiente(monkeypatch: pytest.MonkeyPatch) -> None:
     config = get_settings()
-    assert (config.quota_user_daily_limit, config.quota_global_daily_limit) == (20, 300)
-    monkeypatch.setenv("QUOTA_USER_DAILY_LIMIT", "5")
+    assert (config.quota_user_daily_limit, config.quota_global_daily_limit) == (5, 30)
+    monkeypatch.setenv("QUOTA_USER_DAILY_LIMIT", "10")
     monkeypatch.setenv("QUOTA_GLOBAL_DAILY_LIMIT", "40")
     monkeypatch.setenv("LLM_ENABLED", "true")
     get_settings.cache_clear()
     config = get_settings()
-    assert (config.quota_user_daily_limit, config.quota_global_daily_limit) == (5, 40)
+    assert (config.quota_user_daily_limit, config.quota_global_daily_limit) == (10, 40)
     assert config.llm_enabled is True
 
 
@@ -381,11 +386,11 @@ def test_get_quota_le_sem_consumir_e_so_o_proprio_usuario(app: FastAPI, table: A
         status, _, body = invoke(app, quota_event())
         assert status == 200
         assert set(body) == {"limit", "remaining", "resetsAt"}
-        assert (body["limit"], body["remaining"]) == (20, 19)
+        assert (body["limit"], body["remaining"]) == (5, 4)
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T00:00:00Z", body["resetsAt"])
         assert datetime.fromisoformat(body["resetsAt"]) > today
-    assert invoke(app, quota_event(OTHER))[2]["remaining"] == 17
-    assert invoke(app, quota_event("sem-uso"))[2]["remaining"] == 20
+    assert invoke(app, quota_event(OTHER))[2]["remaining"] == 2
+    assert invoke(app, quota_event("sem-uso"))[2]["remaining"] == 5
     # Limite reduzido abaixo do contador: o restante nunca fica negativo.
     assert read(OTHER, table=table, settings=settings(user=2), now=at(today)).remaining == 0
 

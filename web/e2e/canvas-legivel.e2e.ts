@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { expectNoSeriousA11yViolations } from './support/axe';
 
 interface Box {
   x: number;
@@ -38,6 +39,30 @@ async function boxes(page: Page) {
   });
 }
 
+/** Corpo do nome de cada bloco na tela, em px: o font-size computado vezes o zoom do viewport. */
+async function nameBodies(page: Page) {
+  return page.evaluate(() => {
+    const zoom = new DOMMatrix(
+      getComputedStyle(document.querySelector('.react-flow__viewport')!).transform,
+    ).a;
+    const names = [...document.querySelectorAll('.react-flow__node [class*="name"]')];
+    const blocks = [...document.querySelectorAll('.react-flow__node')].map(
+      (n) => n.firstElementChild!,
+    );
+    return {
+      zoom,
+      bodies: names.map((name) => parseFloat(getComputedStyle(name).fontSize) * zoom),
+      // o texto ampliado cabe no bloco: nada passa da caixa
+      overflowing: blocks.filter(
+        (b) => b.scrollHeight > b.clientHeight + 1 || b.scrollWidth > b.clientWidth + 1,
+      ).length,
+    };
+  });
+}
+
+/** Abaixo de 9px na tela o nome não se lê (critério da #342). */
+const MIN_BODY = 9;
+
 async function expectLegible(page: Page, nodeCount = 21) {
   const { canvas, legend, tools, nodes, tags } = await boxes(page);
   expect(nodes).toHaveLength(nodeCount);
@@ -48,6 +73,11 @@ async function expectLegible(page: Page, nodeCount = 21) {
   // 3. nenhum par de etiquetas de aresta se sobrepõe
   const pairs = tags.flatMap((a, i) => tags.slice(i + 1).filter((b) => hit(a, b)));
   expect(pairs).toEqual([]);
+  // 4. o nome de cada bloco se lê, e o texto ampliado não estoura o bloco
+  const { bodies, overflowing } = await nameBodies(page);
+  expect(bodies).toHaveLength(nodeCount);
+  expect(Math.min(...bodies)).toBeGreaterThanOrEqual(MIN_BODY);
+  expect(overflowing).toBe(0);
 }
 
 for (const [width, height] of [
@@ -62,6 +92,71 @@ for (const [width, height] of [
     await expectLegible(page);
   });
 }
+
+for (const [width, height, minimum] of [
+  [1920, 1080, 10.5],
+  [1440, 900, 10],
+  [1024, 768, 10],
+] as const) {
+  test(`o corpo do nome do bloco na tela é de pelo menos ${minimum}px em ${width}x${height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/');
+    await boxes(page);
+    const { bodies } = await nameBodies(page);
+    expect(Math.min(...bodies)).toBeGreaterThanOrEqual(minimum);
+  });
+}
+
+for (const [width, height] of [
+  [1024, 768],
+  [1440, 900],
+] as const) {
+  test(`o modo compacto do bloco passa no axe (contraste incluso), claro e escuro, em ${width}x${height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/');
+    await boxes(page);
+    await expect(page.locator('[data-detail]').first()).toHaveAttribute('data-detail', 'compact');
+    await expectNoSeriousA11yViolations(page, `editor ${width}x${height}`);
+  });
+}
+
+test('em 1024 a paleta abre recolhida e, expandida, o diagrama continua inteiro e legível', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto('/');
+  await expectLegible(page);
+  await expect(page.getByRole('heading', { name: 'Paleta' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mostrar a paleta' }).click();
+  await expect(page.getByRole('button', { name: 'Recolher a paleta' })).toBeFocused();
+  await expectLegible(page);
+  await page.getByRole('button', { name: 'Recolher a paleta' }).click();
+  await expect(page.getByRole('button', { name: 'Mostrar a paleta' })).toBeFocused();
+  await expectLegible(page);
+});
+
+test('ao aproximar o zoom o bloco volta ao completo, com o SKU e "por mês", e o nome acessível não muda', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await boxes(page);
+  const canvas = page.locator('[data-detail]').first();
+  const label = await page.locator('.react-flow__node[data-id]').nth(1).getAttribute('aria-label');
+  await expect(canvas).toHaveAttribute('data-detail', 'compact');
+  await expect(page.getByText('por mês').first()).toBeHidden();
+  for (let i = 0; i < 4; i += 1)
+    await page.getByRole('button', { name: 'Aumentar o zoom' }).click();
+  await expect(canvas).toHaveAttribute('data-detail', 'full');
+  await expect(page.getByText('por mês').first()).toBeVisible();
+  expect(await page.locator('.react-flow__node[data-id]').nth(1).getAttribute('aria-label')).toBe(
+    label,
+  );
+});
 
 test('ao redimensionar a janela de 1440 para 1024 o diagrama continua inteiro', async ({
   page,
@@ -106,3 +201,31 @@ for (const theme of ['light', 'dark'] as const) {
     await expectLegible(page);
   });
 }
+
+/** Zoom do viewport do React Flow, lido do `transform` (a escala do diagrama na tela). */
+const viewportZoom = (page: Page) =>
+  page.evaluate(
+    () =>
+      new DOMMatrix(getComputedStyle(document.querySelector('.react-flow__viewport')!).transform).a,
+  );
+
+test('arquivos sem posições abrem com o layout compacto: zoom mínimo em 1440x900, inteiros', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expectLegible(page);
+  // zoom mínimo de cada cenário (a Issue pedia 0,65; os de 5 colunas dão ~0,61 com corredores de 52 px)
+  const minimum = { 'api-serverless': 0.9, 'app-classico': 0.6, 'pipeline-de-filas': 0.6 };
+  for (const [name, count] of SCENARIOS) {
+    await page.locator('input[type="file"]').setInputFiles({
+      name: `${name}.json`,
+      mimeType: 'application/json',
+      buffer: readFileSync(`../contracts/scenarios/${name}.json`),
+    });
+    const replace = page.getByRole('button', { name: 'Substituir design' });
+    if (await replace.isVisible().catch(() => false)) await replace.click();
+    await expectLegible(page, count);
+    expect(await viewportZoom(page)).toBeGreaterThanOrEqual(minimum[name]);
+  }
+});

@@ -30,7 +30,7 @@ Cada passo cita o arquivo do repositório de onde saiu. Se o arquivo e este runb
 | 4. GitHub Environments, variáveis e segredo | #77 |
 | 5. Chave da Claude API no SSM | #75 (criar a chave) e #77 (gravar) |
 | 6. Primeiro deploy de staging | #77 |
-| 7. Contas de teste no Cognito | #77 |
+| 7. Contas de teste no Cognito e a sua conta em produção | #77 e #383 |
 | 8. Catálogo de preços | #77 |
 | Guardrails de custo | #78 |
 | Validação completa e produção | #80 (fora deste runbook) |
@@ -41,7 +41,7 @@ Em 26/11/2026 o código de `main` ainda não deixa o primeiro deploy passar. Con
 
 | Issue | O que falta | Trava o passo |
 |---|---|---|
-| #338 | Decisão do autor sobre as ações de escrita dos papéis `acp-ci-apply-<env>` que não se delimitam por ambiente. Sem ela o deploy deve parar no stage do HTTP API e no domínio do Cognito (`infra/bootstrap/README.md`, "Recursos com ARN por ID") | 6 |
+| #338 | Ações de escrita dos papéis `acp-ci-apply-<env>` que não se delimitam por ambiente. Decisão do autor em 26/11/2026: a entrega de log do HTTP API e o `cloudfront:UpdateDistribution` do domínio do Cognito entram como risco aceito; alterar política de cache, de cabeçalhos (CSP) ou OAC e etiquetar no API Gateway são tarefa manual do autor (`infra/bootstrap/README.md`, "Recursos com ARN por ID", com o passo a passo). Com o código em `main`, **reaplique o bootstrap** (6 atualizações no lugar, nenhuma criação); sem isso o deploy para no stage do HTTP API e no domínio do Cognito | 6 |
 | #209 | Bucket de artefatos das funções no bootstrap, um por ambiente. É a origem de `TF_VAR_PACKAGE_BUCKET`: a saída `github_environment_variables` traz o nome (`infra/bootstrap/README.md`, "Bucket de artefatos"). Com o código em `main`, **reaplique o bootstrap** (12 criações) antes de cadastrar a variável | 4 e 6 |
 | #307 (e #210, mesmo assunto) | Runtime das Lambdas: `python3.13` em `infra/modules/functions/main.tf`, contra o pacote montado para Python 3.14 (`api/.python-version`) | 6 |
 | #125 | Papel `prices` do bootstrap (já em `main`; reaplique o bootstrap se ainda não o aplicou) | 8, só para o workflow |
@@ -120,6 +120,14 @@ O único valor desta seção que vai para o GitHub é o nome do domínio (variá
 O roteiro completo, com os comandos, está em `infra/bootstrap/README.md`, seções "Como aplicar (autor)" e "Estado deste diretório". Siga-o de lá. Aqui ficam a ordem e a conferência.
 
 Antes do bootstrap, de [guardrails de custo](guardrails-de-custo.md) só vale a leitura da quota (passo 1 deste runbook). O resto daquele runbook exige a infra do ambiente já aplicada e fica para depois do passo 6.
+
+0. Confira o formato do `sub` que o repositório emite (#366). Os trusts esperam o formato imutável, conferido em 27/11/2026 com um token real: o repositório emite `repo:henriqueluza@60079862/aws-cost-playground@1463554125:<contexto>`.
+
+   ```bash
+   gh api repos/henriqueluza/aws-cost-playground/actions/oidc/customization/sub
+   ```
+
+   Esperado: `use_default: true`, `use_immutable_subject: true` e `sub_claim_prefix` igual a `repo:henriqueluza@60079862/aws-cost-playground@1463554125`. Se vier diferente, **não aplique**: os papéis seriam criados com um trust que nenhum job casa. Abra uma Issue `area:infra-bootstrap` com a resposta (são dados públicos do repositório) para ajustar `infra/bootstrap/oidc.tf` e os testes antes. A tabela papel → `sub` está em `infra/bootstrap/README.md`, "Formato do `sub`".
 
 1. Na raiz do repositório, em `main` atualizada, inicialize.
 
@@ -311,6 +319,8 @@ O parâmetro `/acp/<env>/anthropic-api-key` é criado à mão, fora do Terraform
 
 O deploy é o workflow `deploy-staging.yml`, disparado por `push` em `main`. O que cada passo dele faz está em `docs/infra.md`. O caminho recomendado é deixar o próprio pipeline fazer o primeiro apply: ele sobe o zip das funções para `functions/<sha>.zip` antes do Terraform. Um zip posto à mão nessa chave, com outro conteúdo, faz o deploy desse commit falhar fechado (`docs/infra.md`, passo `package`).
 
+**Se um job falhar em `AssumeRoleWithWebIdentity`** (`Not authorized to perform sts:AssumeRoleWithWebIdentity` no passo de credenciais da AWS): é falha fechada, ninguém ganhou acesso. Só o `sub` de `pull_request` foi visto num token real; os de `environment:<env>` e de `ref:refs/heads/main` vêm da documentação do GitHub e se confirmam na primeira execução de cada workflow. Confira, nesta ordem: (a) a variável com o ARN do papel é a do papel certo (`AWS_ROLE_ARN` do Environment, `AWS_PLAN_ROLE_ARN`, `AWS_PRICES_ROLE_ARN`); (b) o job roda em `main` e declara o `environment:` esperado; (c) o comando do passo 3.0 ainda devolve o prefixo esperado; (d) o `sub` que o job recebeu (procure o evento `AssumeRoleWithWebIdentity` negado no CloudTrail, se ele aparecer; senão, peça um passo temporário de conferência como o do PR #388), comparado com a tabela de `infra/bootstrap/README.md`, "Formato do `sub`". Se o `sub` real for outro, o ajuste é em `infra/bootstrap/` (Issue `area:infra-bootstrap`) e exige reaplicar o bootstrap; não afrouxe o trust à mão no console.
+
 1. Confira de novo a tabela "O que precisa estar em `main` antes". Com #338, #209 ou #307 aberta, o deploy falha por permissão, por falta do bucket ou sobe uma função que não importa.
 
 2. Dispare o deploy. O workflow não tem disparo manual: ele roda no próximo merge em `main`. Para não esperar um merge, reexecute a última execução, que terminou verde só com o aviso de deploy pulado.
@@ -379,7 +389,7 @@ O smoke test não invoca nenhuma Lambda (`docs/infra.md`, "Limites conhecidos").
 
 ## 7. Contas de teste no Cognito de staging (#77)
 
-Em staging o cadastro é fechado (`self_signup_enabled = false` em `infra/envs/staging/terraform.tfvars`): só o administrador cria contas. O pool se chama `acp-stg-users` e o login é por e-mail (`infra/modules/auth/README.md`). O CI não cria usuários: o papel `apply` tem negação de `cognito-idp:Admin*`.
+O cadastro é fechado nos dois ambientes (`self_signup_enabled = false` em `infra/envs/<ambiente>/terraform.tfvars`; em produção desde a #383, decisão do autor de 26/11/2026): só o administrador cria contas, o site não mostra "Criar conta" e ninguém se cadastra pelo login gerenciado. Os passos abaixo são os de staging; a sua conta de produção está em "Sua conta em produção", logo depois. O pool se chama `acp-stg-users` e o login é por e-mail (`infra/modules/auth/README.md`). O CI não cria usuários: o papel `apply` tem negação de `cognito-idp:Admin*`.
 
 1. Descubra o id do pool.
 
@@ -408,6 +418,50 @@ Em staging o cadastro é fechado (`self_signup_enabled = false` em `infra/envs/s
 5. Crie pelo menos duas contas. A validação da #80 exclui uma delas pelo próprio produto.
 
 Use dados fictícios em staging (ADR, tabela de ambientes). Não anote e-mail nem senha de conta de teste em Issue, PR ou commit.
+
+### Sua conta em produção (#383)
+
+Faça depois do primeiro deploy de produção (#80). Os comandos rodam na sua sessão de administrador; o CI não cria usuários. Use o seu e-mail real só no terminal: ele não vai para Issue, PR, commit nem para este arquivo.
+
+1. Descubra o id do pool de produção.
+
+   ```bash
+   aws cognito-idp list-user-pools --max-results 20 --query "UserPools[?Name=='acp-prod-users'].Id" --output text
+   ```
+
+2. Confira que o cadastro está fechado.
+
+   ```bash
+   aws cognito-idp describe-user-pool --user-pool-id <USER_POOL_ID> --query "UserPool.AdminCreateUserConfig.AllowAdminCreateUserOnly" --output text
+   ```
+
+   Como conferir: `True`. O site (`https://<DOMINIO>`) mostra só "Entrar" na barra do editor, e `https://<DOMINIO>/config.json` traz `"selfSignupEnabled": false`.
+
+3. Crie a conta. O Cognito manda a senha temporária para o e-mail, válida por 3 dias, e gasta um dos 50 e-mails diários do remetente padrão.
+
+   ```bash
+   aws cognito-idp admin-create-user --user-pool-id <USER_POOL_ID> --username <SEU_EMAIL> --user-attributes Name=email,Value=<SEU_EMAIL> Name=email_verified,Value=true
+   ```
+
+   Pelo console, o mesmo: Cognito → User pools → `acp-prod-users` → Users → Create user, com convite por e-mail, o e-mail como nome de usuário, "Mark email address as verified" marcado e senha gerada.
+
+4. Entre em `https://<DOMINIO>` → "Entrar", com o e-mail e a senha temporária. O login gerenciado pede a senha definitiva (15 caracteres ou mais) antes de voltar ao site. Guarde-a num cofre de senhas.
+
+   Como conferir: o site volta autenticado, com o seu e-mail na barra, e o comando abaixo responde `CONFIRMED`.
+
+   ```bash
+   aws cognito-idp admin-get-user --user-pool-id <USER_POOL_ID> --username <SEU_EMAIL> --query UserStatus --output text
+   ```
+
+Vale saber:
+
+- **Senha temporária vencida** (3 dias sem o primeiro acesso): repita o comando do passo 3 acrescentando `--message-action RESEND`.
+- **"Esqueci a senha"** continua na tela do login gerenciado e funciona com o cadastro fechado, mas só para conta `CONFIRMED` com e-mail verificado. Antes do primeiro acesso (`FORCE_CHANGE_PASSWORD`), use o reenvio acima.
+- **Conta para outra pessoa** (um avaliador, por exemplo): os mesmos passos 3 e 4, com o e-mail dela. Cada conta volta a expor os riscos de usuário logado que o cadastro fechado tirou de alcance (ADR, "Cadastro fechado"); as quotas da LLM continuam valendo.
+
+### Reabrir o cadastro
+
+Não é só trocar a variável. Antes, precisam estar em `main` a opção a da #277 e a opção b da #284 (ADR, "Cadastro fechado"). Depois, por PR com revisão normal: `self_signup_enabled = true` em `infra/envs/production/terraform.tfvars`. O plano mostra uma atualização in-place do pool (`allow_admin_create_user_only: true → false`), sem substituição, e o deploy seguinte publica `"selfSignupEnabled": true` no `/config.json`: o site volta a mostrar "Criar conta" sem novo build.
 
 ## 8. Catálogo de preços (#77)
 

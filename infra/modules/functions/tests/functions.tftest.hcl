@@ -48,10 +48,29 @@ run "papeis_de_menor_privilegio" {
 
   assert {
     condition = jsondecode(aws_iam_role_policy.llm_proxy.policy).Statement == [
-      { Sid = "Quota", Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"], Resource = var.table_arn },
+      {
+        Sid      = "Quota"
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
+        Resource = var.table_arn
+        Condition = {
+          "ForAllValues:StringLike"   = { "dynamodb:LeadingKeys" = ["USER#*", "GLOBAL"] }
+          "Null"                      = { "dynamodb:LeadingKeys" = "false" }
+          "ForAllValues:StringEquals" = { "dynamodb:Attributes" = ["PK", "SK", "count", "ttl"] }
+          "StringEqualsIfExists"      = { "dynamodb:Select" = "SPECIFIC_ATTRIBUTES", "dynamodb:ReturnValues" = "NONE" }
+        }
+      },
       { Sid = "ChaveDaClaudeApi", Effect = "Allow", Action = "ssm:GetParameter", Resource = "arn:aws:ssm:us-east-1:123456789012:parameter/acp/staging/anthropic-api-key" },
     ]
-    error_message = "O llm-proxy só pode ter as ações de quota na tabela e ssm:GetParameter no parâmetro da chave."
+    error_message = "O llm-proxy só pode ter as ações de quota na tabela, limitadas às partições e às colunas dos contadores, e ssm:GetParameter no parâmetro da chave."
+  }
+
+  # Sem ação que troque o item inteiro ou liste a partição: a condição de colunas só vale com GetItem e UpdateItem.
+  assert {
+    condition = alltrue([
+      for a in ["PutItem", "DeleteItem", "Query", "Scan", "Batch", "PartiQL"] : !strcontains(aws_iam_role_policy.llm_proxy.policy, a)
+    ])
+    error_message = "O llm-proxy não pode trocar item inteiro, apagar, listar nem usar lote: essas ações furam a condição de colunas."
   }
 
   assert {

@@ -56,7 +56,7 @@ variable "logout_urls" {
 }
 
 variable "self_signup_enabled" {
-  description = "Abre o cadastro pelo login gerenciado. Desligado (padrão), só o administrador cria contas, como em staging."
+  description = "Abre o cadastro pelo login gerenciado. Desligado (padrão), só o administrador cria contas, como nos dois ambientes (#383)."
   type        = bool
   default     = false
 }
