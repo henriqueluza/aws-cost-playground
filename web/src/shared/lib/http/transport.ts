@@ -8,7 +8,7 @@ import { ApiError, type ApiErrorKind } from '../api';
  * nunca repassa texto do servidor: todo erro sai como `ApiError`, só com o `kind`.
  */
 
-/** O `doc` tem até 350 KB (ADR-0001); o resto do corpo de um design cabe na folga. */
+/** O `doc` tem até 100 KB (ADR-0001, #386); o resto do corpo de um design cabe na folga. */
 export const MAX_RESPONSE_BYTES = 512 * 1024;
 export const DEFAULT_TIMEOUT_MS = 30_000;
 

@@ -42,8 +42,8 @@ export const stepText = (kind: StepKind): string => STEP_TEXT[kind];
 
 /**
  * Teto de passos desfazíveis (passado e futuro somados nunca passam dele). O schema aceita até
- * 350 KB por documento e a validação devolve cópia, sem compartilhar estrutura: no pior caso
- * (documento no limite, cada passo uma cópia de ~1 MB na memória) são ~100 MB; um design comum
+ * 100 KB por documento e a validação devolve cópia, sem compartilhar estrutura: no pior caso
+ * (documento no limite, cada passo uma cópia de algumas centenas de KB na memória) são dezenas de MB; um design comum
  * (dezenas de blocos, ~30 KB) fica em poucos MB. O mais antigo cai primeiro.
  */
 export const HISTORY_LIMIT = 100;
