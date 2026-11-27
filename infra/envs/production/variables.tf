@@ -13,7 +13,7 @@ variable "environment" {
 }
 
 variable "self_signup_enabled" {
-  description = "Abre o cadastro pelo login gerenciado do Cognito. Staging false; production true."
+  description = "Abre o cadastro pelo login gerenciado do Cognito e o botão \"Criar conta\" do site. False nos dois ambientes (#383)."
   type        = bool
 }
 

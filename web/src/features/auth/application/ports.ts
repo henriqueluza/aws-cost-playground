@@ -75,11 +75,16 @@ export type SignInOptions = {
 
 /** Sessão do usuário para o resto do site. Criar o serviço não faz nenhuma chamada de rede. */
 export interface AuthService {
+  /** O provedor aceita cadastro pelo próprio usuário. Fechado, a interface não oferece "Criar conta". */
+  readonly signUpAvailable: boolean;
   /** Referência estável enquanto a sessão não muda (serve a `useSyncExternalStore`). */
   getSnapshot(): AuthSnapshot;
   /** Avisa a cada mudança do snapshot; devolve a função que cancela. */
   subscribe(listener: () => void): () => void;
-  /** Leva ao login gerenciado. Rejeita com `AuthError` se a URL não puder ser montada. */
+  /**
+   * Leva ao login gerenciado. Com o cadastro fechado, a tela `sign-up` vira `sign-in`: o site nunca
+   * monta o caminho de cadastro. Rejeita com `AuthError` se a URL não puder ser montada.
+   */
   signIn(options?: SignInOptions): Promise<void>;
   /**
    * Conclui o retorno do login e devolve o caminho interno para onde voltar. A mesma
@@ -101,6 +106,8 @@ export type AuthServiceDeps = {
   readonly provider: IdentityProvider;
   readonly store: SessionStore;
   readonly navigate: Navigate;
+  /** Cadastro aberto no provedor (`selfSignupEnabled` do `/config.json`). Padrão: fechado. */
+  readonly signUpAvailable?: boolean;
   /** Relógio em milissegundos desde a época. Padrão: `Date.now`. */
   readonly now?: () => number;
 };

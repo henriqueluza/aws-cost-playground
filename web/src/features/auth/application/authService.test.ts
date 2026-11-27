@@ -6,7 +6,7 @@ import type { Session } from '../model/session';
 import { createAuthService } from './authService';
 import type { IdentityProvider, SessionStore } from './ports';
 
-function setup(initial: Session | null = fakeSession(), now = () => NOW) {
+function setup(initial: Session | null = fakeSession(), now = () => NOW, signUpAvailable = true) {
   const store: SessionStore = createMemorySessionStore();
   if (initial) store.write(initial);
   const provider = {
@@ -25,7 +25,7 @@ function setup(initial: Session | null = fakeSession(), now = () => NOW) {
     ),
   } satisfies IdentityProvider;
   const navigate = vi.fn();
-  const service = createAuthService({ provider, store, navigate, now });
+  const service = createAuthService({ provider, store, navigate, now, signUpAvailable });
   return { provider, store, navigate, service };
 }
 
@@ -75,6 +75,28 @@ describe('signIn', () => {
   ])('destino fora da lista de rotas internas vira `/`: %s', async (returnTo) => {
     const { service, provider } = setup(null);
     await service.signIn({ screen: 'sign-up', returnTo });
+    expect(provider.beginSignIn).toHaveBeenCalledWith('sign-up', '/');
+  });
+
+  it('cadastro fechado: a tela de cadastro vira a de login, e fechado é o padrão', async () => {
+    const closed = setup(null, () => NOW, false);
+    expect(closed.service.signUpAvailable).toBe(false);
+    await closed.service.signIn({ screen: 'sign-up', returnTo: '/designs' });
+    expect(closed.provider.beginSignIn).toHaveBeenCalledExactlyOnceWith('sign-in', '/designs');
+    await closed.service.signIn({ screen: 'forgot-password' });
+    expect(closed.provider.beginSignIn).toHaveBeenLastCalledWith('forgot-password', '/');
+
+    const { provider, store, navigate } = setup(null);
+    const byDefault = createAuthService({ provider, store, navigate });
+    expect(byDefault.signUpAvailable).toBe(false);
+    await byDefault.signIn({ screen: 'sign-up' });
+    expect(provider.beginSignIn).toHaveBeenLastCalledWith('sign-in', '/');
+  });
+
+  it('cadastro aberto: a tela de cadastro é pedida ao provedor', async () => {
+    const { service, provider } = setup(null);
+    expect(service.signUpAvailable).toBe(true);
+    await service.signIn({ screen: 'sign-up' });
     expect(provider.beginSignIn).toHaveBeenCalledWith('sign-up', '/');
   });
 

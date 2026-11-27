@@ -32,7 +32,7 @@ module "auth" {
   acm_certificate_arn = module.dns.certificate_arns["auth"]
   callback_urls       = ["https://${module.dns.domain_names["site"]}/auth/callback"]
   logout_urls         = ["https://${module.dns.domain_names["site"]}/"]
-  self_signup_enabled = false # produção: true
+  self_signup_enabled = false # os dois ambientes, desde a #383
 }
 ```
 
@@ -67,7 +67,7 @@ Avisos de composição (ambiente, #21):
 | `acm_certificate_arn` | `string` | obrigatório | Certificado ACM em us-east-1 que cobre `domain_name`. Outra região é recusada |
 | `callback_urls` | `list(string)` | obrigatório | URLs de retorno do login. Ao menos uma; cada uma `https://<host>[/caminho]`, sem curinga, porta, query, fragmento, `//` nem segmento de caminho iniciado por ponto. Idênticas ao `redirect_uri` do site |
 | `logout_urls` | `list(string)` | obrigatório | URLs de retorno do logout, mesmas regras de `callback_urls`. Idênticas ao `logout_uri` do site |
-| `self_signup_enabled` | `bool` | `false` | Abre o cadastro pelo login gerenciado. Produção passa `true`; staging mantém `false` |
+| `self_signup_enabled` | `bool` | `false` | Abre o cadastro pelo login gerenciado. Os dois ambientes passam `false` desde a #383 |
 
 ## Saídas
 
@@ -104,6 +104,7 @@ Não dá para validar sem apply: se a página do login gerenciado oferece usuár
 - Listas de senhas comuns ou vazadas (ASVS 6.2.4 e 6.2.12) só existem no tier Plus, que o projeto não usa.
 - Sem WAF no domínio (risco aceito no ADR).
 - O remetente padrão do Cognito envia no máximo 50 e-mails por dia por conta AWS; a cota não é ajustável e volta às 09:00 UTC. Com `self_signup_enabled = true`, qualquer pessoa com o `client_id` (público) pode esgotá-la por `SignUp`, `ResendConfirmationCode` e `ForgotPassword`; até a cota voltar, ninguém recebe código de verificação nem de recuperação. A saída é o SES, fora de escopo. Decisão do autor na #139.
+- Com o cadastro fechado (`allow_admin_create_user_only = true`, os dois ambientes desde a #383), a conta nasce por `AdminCreateUser` com senha temporária de 3 dias e status `FORCE_CHANGE_PASSWORD`; o login gerenciado pede a senha definitiva no primeiro acesso (desafio `NEW_PASSWORD_REQUIRED`). A recuperação de senha ("Esqueci a senha") só funciona depois disso, com a conta `CONFIRMED` e o e-mail verificado. Mudar `admin_create_user_config` é atualização in-place do pool (`UpdateUserPool`): no provider, só `alias_attributes`, `username_attributes` e `username_configuration.case_sensitive` forçam substituição.
 - Com o cadastro aberto, o `SignUp` responde `UsernameExistsException` para um e-mail já cadastrado: `prevent_user_existence_errors` não cobre o cadastro. Também na #139.
 - Depois do primeiro apply, por causa do `prevent_destroy`, não mudam sem substituir o pool: `name_prefix` (o nome do pool), login por e-mail, `case_sensitive = false` e a ausência de `schema`. Mudar `generate_secret` substituiria o cliente e trocaria o `client_id`; o plan-guard barra.
 

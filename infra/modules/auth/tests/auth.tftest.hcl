@@ -67,6 +67,16 @@ run "c2_cadastro_fechado_por_padrao" {
   }
 }
 
+# #383: os dois ambientes passam `false` explicitamente; o pool sai só com criação pelo administrador.
+run "c2_cadastro_fechado_quando_desligado" {
+  command = plan
+  variables { self_signup_enabled = false }
+  assert {
+    condition     = aws_cognito_user_pool.this.admin_create_user_config[0].allow_admin_create_user_only == true
+    error_message = "Com self_signup_enabled = false só o administrador cria contas."
+  }
+}
+
 run "c2_cadastro_aberto_quando_ligado" {
   command = plan
   variables { self_signup_enabled = true }

@@ -23,6 +23,8 @@ export const runtimeConfigSchema = z.object({
   apiBaseUrl: webUrl,
   cognitoAuthority: webUrl,
   cognitoClientId: z.string().regex(/^[\w-]{1,128}$/),
+  /** O pool aceita cadastro pelo login gerenciado. Ausente vale fechado: o site não oferece "Criar conta". */
+  selfSignupEnabled: z.boolean().default(false),
 });
 
 export type RuntimeConfig = z.infer<typeof runtimeConfigSchema>;
