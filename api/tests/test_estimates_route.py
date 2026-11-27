@@ -211,6 +211,20 @@ def test_sem_nada_a_estimar_responde_mesmo_com_a_quota_esgotada(
     assert harness.post()[0] == 429  # com algo a estimar, a quota esgotada segue recusando
 
 
+def test_sem_nada_a_estimar_responde_com_a_quota_global_esgotada(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A resposta traz só a quota do próprio usuário; a global esgotada segue barrando o resto."""
+    monkeypatch.setenv("QUOTA_GLOBAL_DAILY_LIMIT", "1")
+    get_settings.cache_clear()
+    quotas.consume(OTHER)
+    status, _, answer = harness.post(NOTHING[0])
+    assert (status, answer["quota"]["remaining"]) == (200, answer["quota"]["limit"])
+    assert (harness.calls, harness.paid_calls()) == (["prepare", "estimate"], 0)
+    status, _, problem = harness.post()
+    assert (status, problem["scope"], harness.paid_calls()) == (429, "global", 0)
+
+
 def test_sem_nada_a_estimar_e_quota_ilegivel_responde_503(
     harness: Harness, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -206,6 +206,8 @@ export function createInMemoryApi(options: InMemoryApiOptions): Api {
         if (!llmEnabled) fail('unavailable');
         const resetsAt = openQuotaWindow();
         // Como na API: sem nada a estimar a LLM não é chamada e a quota não é gasta, só lida.
+        // Mais estreito que a API, que decide pelas chaves de uso do contrato (bloco de tipo
+        // desconhecido também não gasta lá): o fake não conhece o contrato.
         if (request.blocks.length === 0) {
           const response = estimateResponseSchema.safeParse({
             ...estimate(request),
