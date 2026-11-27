@@ -19,7 +19,9 @@ Template de todo projeto novo. `scripts/setup-project.sh <nome>` (no repositóri
 | `.mcp.json` | Context7 (docs de frameworks), Playwright (navegador), Figma (designs) | sim* |
 | `.agents/skills/` | Espelho das skills para o Codex (gerado, não edite à mão) | — |
 | `scripts/pr-size.py` + `.github/workflows/pr-size.yml` | Mede o PR (aviso > 400, falha > 800 linhas; ignora gerados/lock/docs via `.github/pr-size-ignore`). `size:exception` só por humano | — |
-| `.github/workflows/review-pr.yml` | Roda a skill `review-pr` automaticamente em todo PR (Claude Code Action, autenticada com o segredo `CLAUDE_CODE_OAUTH_TOKEN` da assinatura; federação disponível comentada no workflow). Pula drafts e PRs com label `skip-review`/`kit`; push novo não re-revisa — aplique `re-review` | — |
+| `.github/workflows/review-pr.yml` | Roda a skill `review-pr` automaticamente em todo PR (Claude Code Action, autenticada com o segredo `CLAUDE_CODE_OAUTH_TOKEN` da assinatura; federação disponível comentada no workflow). Pula drafts e PRs com label `skip-review`/`kit`; push novo não re-revisa — aplique `re-review`. Dois jobs: `review` (agente somente leitura, sem shell, sem escrita e sem rede; lê o contexto de `scripts/review-context.sh` e devolve veredito estruturado) e `publish` (sem agente e sem segredo; `scripts/review-verdict.sh` é o único caminho que comenta e troca label). Não executa código do PR: testes, lint e build ficam nos outros workflows | — |
+| `scripts/review-context.sh` | Coleta, antes do agente, o contexto da revisão (PR, Issues, diff, comentários filtrados por autor, checks, tamanho) | — |
+| `scripts/review-verdict.sh` | Publica o veredito da revisão: comentário e troca de label dentro de uma lista fechada | — |
 
 \* Figma usa login OAuth — funciona nas sessões locais depois que você autentica; na nuvem pode não autenticar.
 
@@ -29,7 +31,7 @@ Template de todo projeto novo. `scripts/setup-project.sh <nome>` (no repositóri
 architecture-discovery → project-bootstrap (ADR + PRD + Issues) → sprint-planning (Gate 3)
 → dispatch automático → implement-issue (+ qa-tester) → PR
 → review-pr automático no GitHub Actions (code-reviewer ‖ security-reviewer ‖ qa-tester ‖ ui-reviewer)
-→ comentário consolidado (+ label needs-human se bloqueante) → você faz o merge
+→ comentário consolidado (+ label changes-requested/needs-human se bloqueante) → você faz o merge
 ```
 
 ## Tutorial: primeiro dia de um projeto novo

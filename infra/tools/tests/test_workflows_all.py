@@ -31,18 +31,17 @@ ENVIRONMENTS = {"deploy-production.yml": ["production"], "deploy-staging.yml": [
 # Escrita no repositório, por arquivo. `contents: write` só no job que abre o PR de preços.
 WRITE_SCOPES = {
     "prices.yml": ["contents", "pull-requests"],
-    "review-pr.yml": ["issues", "pull-requests"],
+    "review-pr.yml": ["pull-requests"],  # só o job publish, que não tem agente (#364)
     "terraform.yml": ["pull-requests"],
 }
-# Pendências conhecidas (docs/security/revisao.md, achados CI-2 e CI-3). Só diminui.
+# Pendências conhecidas (docs/security/revisao.md, achados CI-2 e CI-3). Só diminui: o
+# review-pr.yml saiu com a #364 (CI-1), que reescreveu os três passos dele.
 UNPINNED = {
     ("pr-size.yml", "actions/checkout@v4"): 1,
-    ("review-pr.yml", "actions/checkout@v4"): 1,
-    ("review-pr.yml", "anthropics/claude-code-action@v1"): 1,
     ("security.yml", "actions/checkout@v4"): 2,
 }
 UNPINNED_CONTAINERS = {("security.yml", "semgrep/semgrep")}
-NO_TOP_PERMISSIONS = {"review-pr.yml"}
+NO_TOP_PERMISSIONS: set[str] = set()
 SHA = re.compile(r"@[0-9a-f]{40}$")
 RUN = re.compile(r"^(\s*)(?:- )?run:\s*(.*)$")
 

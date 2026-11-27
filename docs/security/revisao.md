@@ -3,7 +3,7 @@
 Issue #73, em duas rodadas. A primeira (#73) fez a auditoria do repositório inteiro contra o threat model do ADR (`docs/architecture/aws-cost-playground/ADR-0001-stack.md`, seção "Segurança", ameaças T1 a T6).
 
 - **Data:** 26/11/2026. **Commit auditado:** `4f2a233` (`main` no início da revisão). Durante a revisão `main` avançou até `86442c2`; esse delta não foi auditado (ver "Fora desta rodada"), mas os testes novos rodam verdes sobre ele.
-- **Resultado:** nenhum achado crítico. Um achado **alto**, no CI (agente revisor de PR, #364). Um médio, doze baixos e três informativos, cada um com Issue ou corrigido neste PR. Nenhum segredo no repositório nem no histórico. Nenhuma dependência com vulnerabilidade conhecida.
+- **Resultado:** nenhum achado crítico. Um achado **alto**, no CI (agente revisor de PR, #364), corrigido no PR da #364 e aguardando revisão manual do autor. Um médio, doze baixos e três informativos, cada um com Issue ou corrigido neste PR. Nenhum segredo no repositório nem no histórico. Nenhuma dependência com vulnerabilidade conhecida.
 - **Segunda rodada (#375), 26/11/2026, sobre `6801232`:** auditou o delta `4f2a233..6801232`, que inclui a API e a tela de alterar, duplicar e apagar designs, as rotas de designs no API Gateway, os designs salvos na comparação e o `export-validate.yml`. Não há achado crítico nem alto. Há um médio (DSN-1, que amplia a #277) e um informativo (INP-1, #381). As cinco conferências foram refeitas no estado final. Ver "Segunda rodada: o delta".
 
 O repositório é público. O achado alto está descrito aqui em termos gerais; o caminho de exploração foi entregue ao autor fora do repositório.
@@ -101,7 +101,7 @@ Nenhum uso de id de usuário vindo de corpo, query, caminho ou cabeçalho em `ap
 
 ### T5. Vazamento da chave ou de credencial de CI
 
-**Veredito: mitigada na aplicação e no IAM. No CI há um achado alto (CI-1) e um médio (CI-2).**
+**Veredito: mitigada na aplicação e no IAM. No CI, o achado alto (CI-1) está corrigido no PR da #364, aguardando revisão manual do autor e observação nos primeiros PRs; o médio (CI-2) segue aberto.**
 
 | Mitigação | Onde | Teste |
 |---|---|---|
@@ -186,8 +186,8 @@ Cada um passou por `fp-check`. Severidade é a final, depois da verificação.
 
 | Id | Sev. | Achado | Onde | `fp-check` | Issue |
 |---|---|---|---|---|---|
-| CI-1 | **Alta** | O agente revisor de PR tem ferramentas e permissões mais amplas do que a tarefa exige e trata como confiável parte do conteúdo que lê. Confiança média: a estrutura está demonstrada no repositório; o efeito depende do comportamento da action e do modelo. PR de fork não é afetado | `.github/workflows/review-pr.yml`, `.claude/skills/review-pr/SKILL.md` (linhas no relatório entregue ao autor) | Verdadeiro. Uma sub-alegação refutada (FP-2) | #364 (`needs-human`) |
-| CI-2 | Média | Actions por tag móvel em três workflows, uma delas a do agente revisor, que recebe segredo e token de escrita. Imagem do Semgrep sem digest, gitleaks baixado sem checksum, checkouts sem `persist-credentials: false` | `review-pr.yml:44,50`, `pr-size.yml:14`, `security.yml:13,15,21,25` | Verdadeiro (média na action do revisor, baixa no resto) | #365 |
+| CI-1 | **Alta** | O agente revisor de PR tem ferramentas e permissões mais amplas do que a tarefa exige e trata como confiável parte do conteúdo que lê. Confiança média: a estrutura está demonstrada no repositório; o efeito depende do comportamento da action e do modelo. PR de fork não é afetado | `.github/workflows/review-pr.yml`, `.claude/skills/review-pr/SKILL.md` (linhas no relatório entregue ao autor) | Verdadeiro. Uma sub-alegação refutada (FP-2). **Corrigido no PR da #364, aguardando revisão manual do autor e observação nos primeiros PRs:** o workflow passou a ter um job de revisão sem shell, sem escrita e sem rede, e um job de publicação sem agente e sem segredo, com lista fechada de ações. Testes em `infra/tools/tests/test_workflow_review_pr.py` e `test_workflows_all.py` | #364 |
+| CI-2 | Média | Actions por tag móvel em `pr-size.yml` e `security.yml` (a do agente revisor foi fixada por SHA na #364). Imagem do Semgrep sem digest, gitleaks baixado sem checksum, checkouts sem `persist-credentials: false` | `pr-size.yml:14`, `security.yml:13,15,21,25` | Verdadeiro (média na action do revisor, baixa no resto) | #365 |
 | API-1 | Baixa | A exclusão de conta apaga também o contador diário do usuário; com a janela do token (#284), o teto por usuário deixa de valer para quem exclui a própria conta. O gasto segue limitado pela quota global: reduz de cerca de 15 contas para 1 o esforço que o ADR já aceita (com as quotas da #384, 5 e 30, de 6 contas para 1) | `api/app/account/repository.py:51-55`, `api/app/quotas/repository.py:24`, `api/app/account/service.py:58-61` | Verdadeiro, rebaixado de média | #369 (`needs-human`, depende da #284) |
 | CI-3 | Baixa | O job de plano roda o plan-guard a partir do próprio PR, no job que tem a credencial de leitura da AWS e escrita no PR. Latente: a variável do papel não está cadastrada | `.github/workflows/terraform.yml:70-77,94-97,121,129` | Verdadeiro, rebaixado: quem tem push já edita o workflow | #365 |
 | CI-4 | Baixa | O catálogo de preços está nos caminhos da revisão seletiva e os testes de hoje conferem schema e hash, não valores | `CLAUDE.md:52`, `review-pr.yml:31`, `.github/pr-size-ignore:37` | Verdadeiro, rebaixado: exige escrita no repositório | #368 (`needs-human`) |
@@ -218,7 +218,7 @@ Cada um passou por `fp-check`. Severidade é a final, depois da verificação.
 | Id | Candidato | Por que caiu |
 |---|---|---|
 | FP-1 | gitleaks `generic-api-key` em `api/app/estimates/claude_client.py:162` (commit `dfe2356`, só em branches antigas) | É a chamada `get_parameter(Name=self._key_parameter, ...)`: nome de atributo, não segredo |
-| FP-2 | "O PR reescreve as instruções do próprio revisor" | A action, no commit atual da tag, restaura `.claude/` e afins a partir da base antes de rodar. Depende de a tag continuar móvel ou de fixar um commit recente (CI-2) |
+| FP-2 | "O PR reescreve as instruções do próprio revisor" | A action, no commit atual da tag, restaura `.claude/` e afins a partir da base antes de rodar. Depende de a tag continuar móvel ou de fixar um commit recente (CI-2). Com a #364, a action do revisor está fixada por SHA |
 | FP-3 | `AKIA…EXAMPLE`, `ghp_xxxx`, `aws_secret_access_key = "testing"` | Exemplo da documentação da AWS, placeholder de skill, credencial falsa de teste |
 | FP-4 | Semgrep: DynamoDB e variáveis de ambiente da Lambda "sem criptografia" | O DynamoDB cifra em repouso por padrão; as variáveis não têm segredo, só o nome do parâmetro |
 | FP-5 | Semgrep: log groups sem chave própria | Verdadeiro tecnicamente; chave própria é custo fixo vetado pelo ADR. Risco aceito |
@@ -431,7 +431,7 @@ Nenhuma foi tomada nesta revisão. O risco de cada opção:
 | #338 | Escritas do `apply` que não se delimitam por ambiente | Aceitar: o papel de staging alcança política de logs, distribuição, cabeçalhos (CSP) e tags da API de produção. Recusar: esses itens viram tarefa manual e o primeiro deploy para no stage da API e no domínio do Cognito. **Decidido em 26/11/2026:** aceitos o log de acesso do HTTP API e o `cloudfront:UpdateDistribution` do Cognito (com mitigação por tag); cabeçalhos, cache, OAC e tags da API ficam manuais |
 | #327 | Fixar o arquivo do workflow no trust do `prices` | Fixar: fecha o uso por outro workflow em `main`; valor errado tranca o workflow até reaplicar o bootstrap. Manter: qualquer job em `main` sem environment assume o papel, cujo alcance é só leitura de preço público. A mesma pergunta vale para os `apply` (#367), com alcance de escrita |
 | #277 | Custo de leitura e escrita da partição de designs (DSN-1) | **Decidido pelo autor em 26/11/2026: limites menores (#386: 10 designs de 100.000 bytes; o `PATCH` no teto cai de cerca de 342 para cerca de 98 WRU) e limite de taxa por rota (manual) agora; separar o `doc` depois do prazo, antes de reabrir o cadastro (ADR-0001, "Custo da listagem de designs").** Registro original: As rotas já estão em `main` (#252). Decidir antes do `apply` de produção. Só o limite de taxa por rota cobre leitura, escrita e saída; separar o `doc` não resolve o `PATCH` com `doc` |
-| #364 | Agente revisor (CI-1) | Enquanto aberto: a label de aprovação e outras labels de autorização dependem de o revisor não ser induzido. Mitigação imediata, do autor: a automação de merge conferir quem aplicou a label |
+| #364 | Agente revisor (CI-1) | Corrigido no PR da #364, aguardando revisão manual do autor e observação nos primeiros PRs. Só o job de publicação, sem agente, comenta e troca labels, com lista fechada. Testes: `test_workflow_review_pr.py`. Mantém-se a conferência, pela automação de merge, de quem aplicou a label |
 | #366 | Formato do `sub` | Sem corrigir antes do bootstrap, o primeiro deploy falha (fechado) |
 | #367, #368, #369 | Environment de produção, code owner, papel `plan`; preços na revisão seletiva; quota na exclusão | Nas Issues |
 
