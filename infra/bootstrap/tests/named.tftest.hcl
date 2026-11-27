@@ -103,6 +103,12 @@ run "lista_inteira_de_statements" {
       },
       { Sid = "LogGroupList", Effect = "Allow", Action = "logs:DescribeLogGroups", Resource = "*" },
       {
+        Sid      = "ApiAccessLogDelivery"
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogDelivery", "logs:DeleteLogDelivery", "logs:DescribeResourcePolicies", "logs:GetLogDelivery", "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:UpdateLogDelivery"]
+        Resource = "*"
+      },
+      {
         Sid    = "AlarmTopic"
         Effect = "Allow"
         Action = [
@@ -139,7 +145,7 @@ run "lista_inteira_de_statements" {
       },
       { Sid = "SiteObjects", Effect = "Allow", Action = "s3:PutObject", Resource = "arn:aws:s3:::acp-${p}-site-aws-cost-playground/*" },
     ]])
-    error_message = "A política dá exatamente estes 12 Allow: tabela, duas funções, dois papéis, log groups, alarmes, tópico e o bucket do site do próprio ambiente. Ação, recurso ou condição a mais ou a menos quebra o assert."
+    error_message = "A política dá exatamente estes 13 Allow: tabela, duas funções, dois papéis, log groups, entrega do log de acesso do HTTP API, alarmes, tópico e o bucket do site do próprio ambiente. Ação, recurso ou condição a mais ou a menos quebra o assert."
   }
 
   assert {
@@ -160,12 +166,12 @@ run "forma_da_politica" {
           !can(s.NotAction) && !can(s.NotResource),
           !strcontains(jsonencode(s.Action), "*"),
           alltrue([for action in flatten([s.Action]) : can(regex("^(dynamodb|lambda|iam|logs|sns|cloudwatch|s3):", action))]),
-          s.Resource == "*" ? (s.Sid == "LogGroupList" && s.Action == "logs:DescribeLogGroups") : true,
-          s.Sid != "LogGroupList" || s.Resource == "*",
+          s.Resource == "*" ? try({ LogGroupList = "logs:DescribeLogGroups", ApiAccessLogDelivery = ["logs:CreateLogDelivery", "logs:DeleteLogDelivery", "logs:DescribeResourcePolicies", "logs:GetLogDelivery", "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:UpdateLogDelivery"] }[s.Sid] == s.Action, false) : true,
+          !contains(["LogGroupList", "ApiAccessLogDelivery"], s.Sid) || (s.Resource == "*" && !can(s.Condition)),
         ]
       ]
     ]))
-    error_message = "Todo statement é Allow, sem NotAction, NotResource nem curinga em ação, só dynamodb, lambda, iam, logs, sns, cloudwatch e s3, e Resource \"*\" só em logs:DescribeLogGroups."
+    error_message = "Todo statement é Allow, sem NotAction, NotResource nem curinga em ação, só dynamodb, lambda, iam, logs, sns, cloudwatch e s3, e Resource \"*\" só em logs:DescribeLogGroups e nas sete ações da entrega de log do HTTP API (#338), que não aceitam recurso nem condição."
   }
 
   assert {
@@ -196,11 +202,11 @@ run "forma_da_politica" {
     condition = alltrue(flatten([
       for env, p in { staging = "stg", production = "prod" } : [
         for s in jsondecode(aws_iam_policy.apply_named[env].policy).Statement : [
-          for r in flatten([s.Resource]) : (r == "*" ? s.Sid == "LogGroupList" : strcontains(r, "acp-${p}-"))
+          for r in flatten([s.Resource]) : (r == "*" ? contains(["LogGroupList", "ApiAccessLogDelivery"], s.Sid) : strcontains(r, "acp-${p}-"))
         ]
       ]
     ]))
-    error_message = "Todo recurso, fora logs:DescribeLogGroups, leva o prefixo acp-<prefixo>- do próprio ambiente."
+    error_message = "Todo recurso, fora logs:DescribeLogGroups e a entrega de log do HTTP API, leva o prefixo acp-<prefixo>- do próprio ambiente."
   }
 
   assert {
@@ -298,12 +304,13 @@ run "acao_negada_e_dado" {
           for action in flatten([s.Action]) : [
             alltrue([for pattern in ["s3:GetObject.*", "s3:DeleteObject.*", "sns:Publish", "logs:PutLogEvents", "logs:CreateLogStream", "lambda:Invoke.*"] : !can(regex("^${pattern}$", action))]),
             alltrue([for prefix in ["cognito-idp:", "ssm:", "secretsmanager:"] : !startswith(action, prefix)]),
-            alltrue([for word in ["Delete", "Remove", "Detach", "Unsubscribe"] : !strcontains(action, word)]),
+            alltrue([for word in ["Delete", "Remove", "Detach", "Unsubscribe"] : !strcontains(action, word)]) || (action == "logs:DeleteLogDelivery" && s.Sid == "ApiAccessLogDelivery"),
+            !contains(["logs:DeleteResourcePolicy", "logs:DeleteLogGroup", "logs:DeleteLogStream", "logs:DeleteRetentionPolicy", "logs:PutDestination", "logs:PutDestinationPolicy", "logs:PutDeliveryDestinationPolicy"], action),
           ]
         ]
       ]
     ]))
-    error_message = "A política não lê nem apaga objeto, não publica em tópico, não escreve evento de log, não invoca função, não toca Cognito, SSM nem Secrets Manager e não tem ação de exclusão (Delete, Remove, Detach, Unsubscribe)."
+    error_message = "A política não lê nem apaga objeto, não publica em tópico, não escreve evento de log, não invoca função, não toca Cognito, SSM nem Secrets Manager e não tem ação de exclusão (Delete, Remove, Detach, Unsubscribe), fora logs:DeleteLogDelivery na entrega de log do HTTP API (#338): nem apagar política de recurso, grupo ou stream, nem destino de log entre contas."
   }
 }
 
@@ -321,6 +328,7 @@ run "contrato_com_os_modulos" {
           flatten([for group in ["/aws/lambda/acp-${p}-api", "/aws/lambda/acp-${p}-llm-proxy", "/aws/vendedlogs/apigateway/acp-${p}-http-api"] : [
             for action in ["logs:CreateLogGroup", "logs:PutRetentionPolicy"] : [for suffix in ["", ":*"] : { action = action, resource = "arn:aws:logs:us-east-1:123456789012:log-group:${group}${suffix}" }]
           ]]),
+          [for action in ["logs:CreateLogDelivery", "logs:DeleteLogDelivery", "logs:DescribeResourcePolicies", "logs:GetLogDelivery", "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:UpdateLogDelivery"] : { action = action, resource = "*" }],
           [for action in ["sns:CreateTopic", "sns:Subscribe"] : { action = action, resource = "arn:aws:sns:us-east-1:123456789012:acp-${p}-alarms" }],
           [for name in ["api-errors", "api-throttles", "llm-proxy-errors", "llm-proxy-throttles", "http-api-5xx"] : { action = "cloudwatch:PutMetricAlarm", resource = "arn:aws:cloudwatch:us-east-1:123456789012:alarm:acp-${p}-${name}" }],
           [
@@ -336,6 +344,6 @@ run "contrato_com_os_modulos" {
         ])
       ]
     ]))
-    error_message = "A política tem de permitir tudo o que os módulos functions, alarms, site e a tabela chamam, no recurso real do ambiente: criar tabela, função, papel, log group, tópico, alarme e bucket, e publicar o index.html."
+    error_message = "A política tem de permitir tudo o que os módulos functions, alarms, site e a tabela chamam, no recurso real do ambiente: criar tabela, função, papel, log group, entrega de log do HTTP API, tópico, alarme e bucket, e publicar o index.html."
   }
 }

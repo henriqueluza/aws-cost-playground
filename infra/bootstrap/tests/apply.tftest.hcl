@@ -158,13 +158,27 @@ run "negacoes_do_papel_apply" {
   }
 
   assert {
+    condition = alltrue([for env in ["staging", "production"] : jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement[8] == {
+      Sid      = "DenyOtherEnvironmentDistribution"
+      Effect   = "Deny"
+      Action   = "cloudfront:UpdateDistribution"
+      Resource = "*"
+      Condition = {
+        Null            = { "aws:ResourceTag/environment" = "false" }
+        StringNotEquals = { "aws:ResourceTag/environment" = env }
+      }
+    }])
+    error_message = "O papel apply não altera distribuição do CloudFront que tenha a tag environment de outro ambiente (#338)."
+  }
+
+  assert {
     condition = alltrue([
       for env in ["staging", "production"] : alltrue([for s in jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement : s.Effect == "Deny"])
-      && length(jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement) == 8
+      && length(jsondecode(aws_iam_role_policy.apply_deny[env].policy).Statement) == 9
       && aws_iam_role_policy.apply_deny[env].name == "deny-guardrails"
       && aws_iam_role_policy.apply_deny[env].role == "acp-ci-apply-${env}"
     ])
-    error_message = "A política deny-guardrails tem exatamente oito statements, todos Deny, presa ao papel apply do próprio ambiente."
+    error_message = "A política deny-guardrails tem exatamente nove statements, todos Deny, presa ao papel apply do próprio ambiente."
   }
 }
 

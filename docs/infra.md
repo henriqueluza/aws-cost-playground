@@ -77,7 +77,7 @@ Cadastre `AWS_APPLY_ROLE_ARN` por último: é ele que liga o deploy.
 
 O runtime `python3.14` das Lambdas já está resolvido (#307): o módulo `functions` acompanha `api/.python-version` e um teste reprova a divergência. Sem isso o zip não carregaria, e o smoke não perceberia.
 
-1. #166, #167 e #169 (em `main`) e #338 (decisão do autor, aberta): permissões de escrita do apply. Além do Terraform, o deploy precisa de `s3:PutObject`/`s3:GetObject` no bucket de artefatos, de objetos do bucket do site, de `lambda:GetFunctionConfiguration` e de `cloudfront:CreateInvalidation`/`cloudfront:GetInvalidation`.
+1. #166, #167, #169 e #338 (em `main`; a #338 traz o risco aceito pelo autor e o que ficou manual, em `infra/bootstrap/README.md`): permissões de escrita do apply. Além do Terraform, o deploy precisa de `s3:PutObject`/`s3:GetObject` no bucket de artefatos, de objetos do bucket do site, de `lambda:GetFunctionConfiguration` e de `cloudfront:CreateInvalidation`/`cloudfront:GetInvalidation`.
 2. #209: bucket de artefatos.
 3. #77: bootstrap aplicado, Environment `staging` restrito a `main` e primeiro apply manual.
 4. As variáveis da seção anterior.
@@ -130,7 +130,7 @@ gh variable set AWS_APPLY_ROLE_ARN --env production --body "<arn>" --repo henriq
 gh variable set TF_VAR_PACKAGE_BUCKET --env production --body "<bucket>" --repo henriqueluza/aws-cost-playground
 ```
 
-O Environment `production` tem de aceitar só o branch `main` (Settings → Environments → Deployment branches). O trust do papel exige `environment:production`, `ref` igual a `refs/heads/main` e `aud` `sts.amazonaws.com`; o release-gate recusa qualquer outro `ref` antes disso. As permissões de escrita do papel estão em `main` (#167 e #169), menos as que esperam a decisão do autor na #338; o bucket de artefatos depende da #209, como em staging.
+O Environment `production` tem de aceitar só o branch `main` (Settings → Environments → Deployment branches). O trust do papel exige `environment:production`, `ref` igual a `refs/heads/main` e `aud` `sts.amazonaws.com`; o release-gate recusa qualquer outro `ref` antes disso. As permissões de escrita do papel estão em `main` (#167, #169 e #338; o que a #338 deixou como tarefa manual do autor está em `infra/bootstrap/README.md`); o bucket de artefatos depende da #209, como em staging.
 
 ## Limites de produção
 
