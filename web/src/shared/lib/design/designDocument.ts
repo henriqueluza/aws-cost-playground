@@ -20,8 +20,8 @@ export const DESIGN_LIMITS = {
   maxLabelLength: 80,
   maxUsageValue: 1e12,
   maxFieldsPerRecord: 32,
-  /** Tamanho do documento serializado, em bytes: o mesmo teto da API (ADR-0001) e do arquivo aberto (#50). */
-  maxDocBytes: 350 * 1024,
+  /** Bytes UTF-8 do documento serializado: o `MAX_DOC_BYTES` da API (ADR-0001, #277) e o teto do arquivo aberto (#50). */
+  maxDocBytes: 100_000,
 } as const;
 
 /**

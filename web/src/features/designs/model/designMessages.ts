@@ -1,6 +1,6 @@
-import type { ApiErrorKind } from '../../../shared/lib/api';
+import { MAX_DESIGNS, type ApiErrorKind } from '../../../shared/lib/api';
 
-export const DESIGN_LIMIT = 50;
+export const DESIGN_LIMIT = MAX_DESIGNS;
 
 const MESSAGES: Record<ApiErrorKind, string> = {
   unauthenticated: 'Entre na sua conta para salvar e abrir designs.',
