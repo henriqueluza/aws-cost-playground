@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -69,8 +68,11 @@ class WorkflowShape(unittest.TestCase):
     def test_o_job_do_agente_so_le_e_o_que_escreve_nao_tem_agente_nem_segredo(self) -> None:
         self.assertEqual(
             permissions(self.review),
-            {"contents": "read", "pull-requests": "read", "issues": "read", "checks": "read"},
+            {"contents": "read", "pull-requests": "read", "issues": "read", "checks": "read", "statuses": "read"},
         )
+        guard = self.review.split("runs-on:", 1)[0]
+        self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", guard)
+        self.assertIn("(github.event.action != 'labeled' || github.event.label.name == 're-review')", guard)
         self.assertEqual(permissions(self.publish), {"contents": "read", "pull-requests": "write"})
         self.assertEqual(self.review.count("secrets.CLAUDE_CODE_OAUTH_TOKEN"), 1)
         self.assertNotRegex(self.publish, r"claude|CLAUDE|anthropic|id-token")
@@ -81,12 +83,18 @@ class WorkflowShape(unittest.TestCase):
         allowed = re.search(r'--allowedTools "([^"]*)"', self.review)
         denied = re.search(r'--disallowedTools "([^"]*)"', self.review)
         assert allowed is not None and denied is not None
-        self.assertEqual(allowed.group(1).split(","), ["Read", "Grep", "Glob", "Task", "Agent", "Skill"])
-        for tool in ["Bash", "Write", "Edit", "NotebookEdit", "WebFetch", "WebSearch"]:
+        self.assertEqual(allowed.group(1).split(","), ["Task", "Agent", "Skill"])
+        blocked = ["Bash", "Write", "Edit", "NotebookEdit", "WebFetch", "WebSearch"]
+        blocked += ["Read(//proc/**)", "Read(//home/runner/work/_temp/**)", "Read(./.git/**)"]
+        for tool in blocked:
             self.assertIn(tool, denied.group(1).split(","))
         self.assertEqual(re.findall(r"--permission-mode (\S+)", self.review), ["default"])
+        self.assertRegex(self.review, r"--max-turns \d+\n")
+        self.assertIn("--strict-mcp-config\n", self.review)
         self.assertNotRegex(self.review, r"dangerously|bypassPermissions|mcp__|allowed_non_write|allowed_bots")
+        self.assertNotRegex(self.review, r"--add-dir|--settings|--mcp-config|\n +settings:|--agents")
         self.assertEqual(self.review.count("--allowedTools"), 1)
+        self.assertEqual(self.review.count("--disallowedTools"), 1)
 
     def test_o_segredo_e_os_tokens_nao_chegam_aos_subprocessos_do_agente(self) -> None:
         self.assertIn('CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"', self.review)
@@ -106,16 +114,18 @@ class WorkflowShape(unittest.TestCase):
             if block is not head[0]:
                 self.assertIn("ref: ${{ github.base_ref }}\n", block)
                 self.assertNotIn("path:", block)
-        self.assertIn("--add-dir pr-head", self.review)
 
     def test_nenhum_job_executa_codigo_do_pr_e_o_de_escrita_so_roda_o_script(self) -> None:
         self.assertEqual(runs(self.publish), ["bash scripts/review-verdict.sh"])
         commands = runs(self.review)
-        self.assertIn('bash scripts/review-context.sh "$PR_NUMBER" review-context', commands)
+        self.assertEqual(commands[0], 'bash scripts/review-context.sh "$PR_NUMBER" review-context pr-head')
+        size = '(cd pr-head && python3 ../scripts/pr-size.py "origin/$BASE_REF") > review-context/pr-size.txt 2>&1 || true'
+        self.assertEqual(commands[1], size)
+        self.assertEqual(len(commands), 3)
         for line in commands + runs(self.publish):
             self.assertNotIn("${{", line)
             self.assertNotRegex(line, EXECUTES_CODE, line)
-            self.assertNotRegex(line, r"(bash|python3) +\.?/?pr-head/", "script vindo do PR")
+        self.assertNotIn("pr-head", commands[2])
         uses = re.findall(r"uses: (\S+)", code())
         self.assertEqual(len(uses), 4)
         for ref in uses:
@@ -131,6 +141,7 @@ class WorkflowShape(unittest.TestCase):
                 self.assertIn("`github-actions[bot]` **e** que começa com `<!-- review-pr -->`", text)
                 self.assertNotIn("select(.body | startswith", text, "seleção só pelo marcador")
                 self.assertNotRegex(text, r"gh pr edit <n> --add-label|gh label create")
+                self.assertIn(".pr-copy", text)
 
 
 FAKE_GH = r"""#!/usr/bin/env python3
@@ -146,7 +157,7 @@ if args[:1] == ["api"] and "DELETE" in args:
     if status:
         sys.stderr.write(f"gh: erro (HTTP {status})\n"); sys.exit(1)
 elif args[:1] == ["api"] and "--paginate" in args:
-    print(json.dumps(fixtures.get("comments", [])))
+    print(json.dumps(fixtures.get(args[-1].rsplit("/", 1)[1], [])))
 elif args[:2] == ["pr", "view"]:
     print(json.dumps(fixtures["pr"]))
 elif args[:2] == ["pr", "diff"]:
@@ -164,7 +175,6 @@ def comment(ident: int, user: dict[str, str], body: str) -> dict[str, object]:
     return {"id": ident, "user": user, "body": body, "created_at": "2026-11-27T00:00:00Z", "updated_at": "x"}
 
 
-@unittest.skipUnless(shutil.which("jq") and shutil.which("bash"), "jq ou bash ausente")
 class ScriptCase(unittest.TestCase):
     def setUp(self) -> None:
         tmp = tempfile.TemporaryDirectory()
@@ -217,6 +227,8 @@ class VerdictScript(ScriptCase):
         for pr in ["", "0", "12;id", "../1", "1 2"]:
             self.assertEqual(self.publish("approved", pr=pr).returncode, 2)
         self.assertEqual(self.publish("approved", body=" \n ").returncode, 2)
+        for secret in ["sk-ant-" + "a1B2" * 6, "ghs_" + "a1B2" * 9]:
+            self.assertEqual(self.publish("approved", body=f"token: {secret}").returncode, 2)
         self.assertEqual(self.calls(), [])
 
     def test_cada_veredito_troca_so_as_labels_de_veredito(self) -> None:
@@ -229,7 +241,8 @@ class VerdictScript(ScriptCase):
         for verdict, labels in expected.items():
             with self.subTest(verdict=verdict):
                 self.log.write_text("")
-                self.fixtures = {"delete": {"re-review": 404}}
+                event = {"event": "labeled", "label": {"name": "needs-human"}, "actor": {"login": BOT["login"]}}
+                self.fixtures = {"delete": {"re-review": 404}, "events": [event]}
                 self.assertEqual(self.publish(verdict).returncode, 0)
                 self.assertEqual(self.labels(), labels)
                 self.assertLessEqual(set(labels[0] + labels[1]), VERDICT_LABELS)
@@ -255,6 +268,17 @@ class VerdictScript(ScriptCase):
         self.assertEqual(update["args"][:4], ["api", "-X", "PATCH", "repos/dono/repo/issues/comments/7"])
         self.assertEqual(json.loads(str(update["stdin"]))["body"], MARKER + "\n\nnova")
 
+    def test_needs_human_aplicada_por_outra_conta_nao_e_removida(self) -> None:
+        mine = {"event": "labeled", "label": {"name": "needs-human"}, "actor": {"login": BOT["login"]}}
+        theirs = {**mine, "actor": {"login": "autora"}}
+        for events, removed in [([mine, theirs], False), ([theirs, mine], True), ([], False)]:
+            with self.subTest(events=len(events), removed=removed):
+                self.log.write_text("")
+                self.fixtures = {"events": events}
+                self.assertEqual(self.publish("approved").returncode, 0)
+                self.assertEqual(self.labels()[0], ["review:approved"])
+                self.assertEqual("needs-human" in self.labels()[1], removed)
+
     def test_falha_ao_remover_label_antiga_nao_aplica_a_nova(self) -> None:
         self.fixtures = {"delete": {"changes-requested": 500}}
         self.assertEqual(self.publish("approved").returncode, 1)
@@ -264,14 +288,33 @@ class VerdictScript(ScriptCase):
 class ContextScript(ScriptCase):
     def collect(self) -> Path:
         out = self.base / "out"
-        proc = self.run_script(CONTEXT, "12", str(out), REVIEW_POLL_SECONDS="0", REVIEW_WAIT_SECONDS="30")
+        self.head = self.base / "pr-head"
+        for rel in [".git/CLAUDE.md", ".claude/skills/x/SKILL.md", "web/.claude/a.md", "web/CLAUDE.md", "AGENTS.md", ".mcp.json", "web/a.ts"]:
+            (self.head / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.head / rel).write_text("x")
+        (self.head / "web" / "link").symlink_to("/proc/self/environ")
+        env = {"REVIEW_POLL_SECONDS": "0", "REVIEW_WAIT_SECONDS": "30", "REVIEW_SETTLE_SECONDS": "0"}
+        proc = self.run_script(CONTEXT, "12", str(out), str(self.head), EXPECTED_HEAD_SHA="abc", **env)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         return out
+
+    def test_o_checkout_do_pr_perde_o_kit_de_agente_e_os_links(self) -> None:
+        self.fixtures = {"pr": {"author": {"login": "autora"}, "body": "", "headRefOid": "abc"}, "checks": [[{"workflow": "V", "bucket": "pass"}]]}
+        self.collect()
+        left = sorted(str(p.relative_to(self.head)) for p in self.head.rglob("*") if p.is_file() or p.is_symlink())
+        expected = [".claude.pr-copy/skills/x/SKILL.md", ".git/CLAUDE.md", ".mcp.json.pr-copy", "AGENTS.md.pr-copy"]
+        self.assertEqual(left, [*expected, "web/.claude.pr-copy/a.md", "web/CLAUDE.md.pr-copy", "web/a.ts"])
+
+    def test_falha_se_o_pr_recebeu_commit_depois_do_evento(self) -> None:
+        self.fixtures = {"pr": {"author": {"login": "autora"}, "body": "", "headRefOid": "outro"}}
+        proc = self.run_script(CONTEXT, "12", str(self.base / "out"), EXPECTED_HEAD_SHA="abc")
+        self.assertEqual(proc.returncode, 1)
+        self.assertFalse(any(call["args"][0] == "api" for call in self.calls()))
 
     def test_so_entram_comentarios_do_bot_com_marcador_e_respostas_do_autor(self) -> None:
         author, other = {"login": "autora", "type": "User"}, {"login": "outra-conta", "type": "User"}
         self.fixtures = {
-            "pr": {"author": {"login": "autora"}, "body": "Closes #364\nParte de #73, refs #364 e #abc"},
+            "pr": {"author": {"login": "autora"}, "headRefOid": "abc", "body": "Closes #364\nParte de #73, refs #364 e #abc"},
             "checks": [[{"name": "validate", "workflow": "Validate", "bucket": "pass", "state": "SUCCESS"}]],
             "comments": [
                 comment(1, BOT, MARKER + "\n## Revisão\nB1"),
@@ -294,7 +337,7 @@ class ContextScript(ScriptCase):
         own = {"name": "review", "workflow": "review-pr", "bucket": "pending", "state": "IN_PROGRESS"}
         validate = {"name": "validate", "workflow": "Validate", "bucket": "pending", "state": "IN_PROGRESS"}
         done = {**validate, "bucket": "fail", "state": "FAILURE"}
-        self.fixtures = {"pr": {"author": {"login": "autora"}, "body": ""}, "checks": [[own], [own, validate], [own, done]]}
+        self.fixtures = {"pr": {"author": {"login": "autora"}, "body": "", "headRefOid": "abc"}, "checks": [[own], [own, validate], [own, done]]}
         out = self.collect()
         self.assertEqual(json.loads((out / "checks.json").read_text()), [done])
         self.assertEqual(sum(1 for call in self.calls() if call["args"][:2] == ["pr", "checks"]), 3)

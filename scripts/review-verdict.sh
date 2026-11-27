@@ -5,7 +5,8 @@
 #
 # Labels que este script toca, e nenhuma outra: review:approved, changes-requested, needs-human
 # e re-review (só remoção). Nunca agent:authorized, infra:destroy-approved, skip-review nem
-# size:exception.
+# size:exception. `needs-human` só sai se foi o próprio bot que aplicou: o freio posto por uma
+# pessoa (ou por outro agente, com a conta dela) continua, mesmo com veredito de aprovação.
 #
 # Env:  PR_NUMBER, VERDICT, BODY, GH_TOKEN (pull-requests: write), GH_REPO (dono/repo).
 set -euo pipefail
@@ -46,6 +47,10 @@ esac
 remove+=("re-review")
 
 [ -n "${body//[[:space:]]/}" ] || { echo "comentário vazio: nada foi publicado" >&2; exit 2; }
+if grep -Eq 'sk-ant-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}' <<<"$body"; then
+  echo "o comentário tem forma de credencial: nada foi publicado" >&2
+  exit 2
+fi
 body="${body#"$MARKER"}"
 body="$MARKER"$'\n'"${body:0:$MAX_BODY}"
 
@@ -64,7 +69,14 @@ fi
 
 # Primeiro sai o veredito antigo, depois entra o novo: uma falha no meio nunca deixa aprovação
 # junto com pedido de mudança.
+brake_by="$(gh api --paginate "repos/$repo/issues/$pr/events" |
+  jq -rs '(add // []) | map(select(.event == "labeled" and .label.name == "needs-human"))
+    | (last | .actor.login) // ""')"
 for label in "${remove[@]}"; do
+  if [ "$label" = "needs-human" ] && [ "$brake_by" != "$BOT" ]; then
+    [ -z "$brake_by" ] || echo "needs-human foi aplicada por outra conta: fica" >&2
+    continue
+  fi
   encoded="$(jq -rn --arg label "$label" '$label | @uri')"
   if ! error="$(gh api -X DELETE "repos/$repo/issues/$pr/labels/$encoded" 2>&1 >/dev/null)"; then
     case "$error" in
