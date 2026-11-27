@@ -3,7 +3,7 @@ import { pkceChallenge } from '../features/auth/infrastructure/webCrypto';
 
 /** Servidor de autorização simulado (Cognito): confere PKCE, código de uso único e refresh token. */
 export const ISSUER = 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_Teste';
-export const AUTH_ORIGIN = 'https://auth.example.com';
+export const AUTH_ORIGIN = 'https://auth.app.example.com';
 export const CLIENT_ID = 'cliente-de-teste';
 export const APP = 'https://app.example.com';
 export const REDIRECT_URI = `${APP}/auth/callback`;

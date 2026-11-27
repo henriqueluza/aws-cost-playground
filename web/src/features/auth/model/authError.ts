@@ -5,6 +5,7 @@
  * - `provider-denied`: o provedor devolveu `error` no retorno.
  * - `session-expired`: o refresh token não vale mais; é preciso entrar de novo.
  * - `invalid-response`: tokens ou claims fora do esperado.
+ * - `login-origin`: o login anunciado pela descoberta não é o login gerenciado deste site.
  * - `network`: o provedor não respondeu; tentar de novo pode resolver.
  */
 export type AuthErrorKind =
@@ -13,6 +14,7 @@ export type AuthErrorKind =
   | 'provider-denied'
   | 'session-expired'
   | 'invalid-response'
+  | 'login-origin'
   | 'network';
 
 /**

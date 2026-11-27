@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reply, validConfig as valid } from '../../test/fixtures';
 
 const json = (override: object = {}) => JSON.stringify({ ...valid, ...override });
@@ -6,6 +6,7 @@ const load = async () => import('./runtimeConfig');
 
 describe('runtimeConfig', () => {
   beforeEach(() => vi.resetModules());
+  afterEach(() => vi.unstubAllEnvs());
 
   it('carrega config válida, sem cache, e a guarda', async () => {
     const fetchFn = reply(json());
@@ -18,10 +19,33 @@ describe('runtimeConfig', () => {
     );
   });
 
-  it('aceita http em localhost', async () => {
+  it.each(['http://localhost:8000', 'http://127.0.0.1:8000'])(
+    'no servidor de desenvolvimento aceita %s',
+    async (url) => {
+      vi.stubEnv('DEV', true);
+      const { loadRuntimeConfig } = await load();
+      const local = { ...valid, apiBaseUrl: url, cognitoAuthority: `${url}/pool` };
+      await expect(loadRuntimeConfig(reply(JSON.stringify(local)))).resolves.toEqual(local);
+    },
+  );
+
+  it.each([
+    ['apiBaseUrl', 'http://localhost:8000'],
+    ['apiBaseUrl', 'http://127.0.0.1:8000'],
+    ['cognitoAuthority', 'http://localhost:9229/local_pool'],
+    ['apiBaseUrl', 'HTTP://LOCALHOST:8000'],
+  ])('fora do servidor de desenvolvimento recusa http em %s (%s)', async (field, url) => {
+    vi.stubEnv('DEV', false);
     const { loadRuntimeConfig } = await load();
-    const local = { ...valid, apiBaseUrl: 'http://localhost:8000' };
-    await expect(loadRuntimeConfig(reply(JSON.stringify(local)))).resolves.toEqual(local);
+    await expect(loadRuntimeConfig(reply(json({ [field]: url })))).rejects.toThrow(
+      'A configuração do aplicativo é inválida.',
+    );
+  });
+
+  it('fora do servidor de desenvolvimento segue aceitando https', async () => {
+    vi.stubEnv('DEV', false);
+    const { loadRuntimeConfig } = await load();
+    await expect(loadRuntimeConfig(reply(json()))).resolves.toEqual(valid);
   });
 
   it('sem `selfSignupEnabled` o cadastro vale fechado; `true` abre', async () => {

@@ -1,12 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { expectNoSeriousA11yViolations } from './support/axe';
 import { watchForeignRequests } from './support/network';
+import { API, useSiteConfig } from './support/siteConfig';
 
 /** Total do template em us-east-1 com o catálogo versionado em `public/prices`. */
 const TEMPLATE_TOTAL = 'US$ 131,28';
 const ZERO_TOTAL = 'US$ 0,00';
 
 test.use({ viewport: { width: 1440, height: 900 } });
+test.beforeEach(useSiteConfig);
 
 const totalLine = (page: Page) =>
   page.getByRole('region', { name: 'Preço' }).getByRole('paragraph').filter({ hasText: '/mês' });
@@ -127,7 +129,7 @@ test('fluxo anônimo: template, edição, baixar e abrir, sem tocar a API', asyn
 });
 
 /**
- * Sanidade da asserção de rede: uma chamada à `apiBaseUrl` do `/config.json` é registrada. Se a
+ * Sanidade da asserção de rede: uma chamada à `apiBaseUrl` do `/config.json` do teste é registrada. Se a
  * API passasse a ter a mesma origem do site, a asserção do fluxo deixaria de valer e este teste
  * falharia. A rota é interceptada: nada sai da máquina.
  */
@@ -138,9 +140,8 @@ test('a guarda de rede acusa uma chamada à API', async ({ page, baseURL }) => {
   await expect(totalLine(page)).toBeVisible();
   expect(foreignRequests).toEqual([]);
 
-  const config = (await (await page.request.get('/config.json')).json()) as { apiBaseUrl: string };
-  const apiUrl = `${config.apiBaseUrl}/designs`;
-  await page.route(`${config.apiBaseUrl}/**`, (route) => route.abort());
+  const apiUrl = `${API}/designs`;
+  await page.route(`${API}/**`, (route) => route.abort());
   await page.evaluate((url) => fetch(url).catch(() => undefined), apiUrl);
 
   expect(foreignRequests).toEqual([`GET ${apiUrl}`]);

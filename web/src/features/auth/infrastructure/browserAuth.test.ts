@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBrowserAuth } from './browserAuth';
 
 const CONFIG = {
@@ -43,5 +43,39 @@ describe('createBrowserAuth', () => {
     await createBrowserAuth(CONFIG, location).signOut();
     expect(location.assign).toHaveBeenCalledExactlyOnceWith('https://app.example.com/');
     fetchSpy.mockRestore();
+  });
+
+  describe('login em localhost', () => {
+    const login = 'https://localhost:9229';
+    const discovery = {
+      issuer: CONFIG.cognitoAuthority,
+      authorization_endpoint: `${login}/oauth2/authorize`,
+      token_endpoint: `${login}/oauth2/token`,
+    };
+    const respond = () => Promise.resolve(Response.json(discovery));
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+    });
+
+    it('fora do servidor de desenvolvimento é recusado, mesmo com o site em localhost', async () => {
+      vi.stubEnv('DEV', false);
+      vi.spyOn(globalThis, 'fetch').mockImplementation(respond);
+      const location = fakeLocation('http://localhost:5173');
+      await expect(createBrowserAuth(CONFIG, location).signIn()).rejects.toMatchObject({
+        kind: 'login-origin',
+      });
+      expect(location.assign).not.toHaveBeenCalled();
+    });
+
+    it('no servidor de desenvolvimento, com o site em localhost, abre', async () => {
+      vi.stubEnv('DEV', true);
+      vi.spyOn(globalThis, 'fetch').mockImplementation(respond);
+      const location = fakeLocation('http://localhost:5173');
+      await createBrowserAuth(CONFIG, location).signIn();
+      expect(location.assign).toHaveBeenCalledExactlyOnceWith(
+        expect.stringMatching(/^https:\/\/localhost:9229\/oauth2\/authorize\?/),
+      );
+    });
   });
 });
