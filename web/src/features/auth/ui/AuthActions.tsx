@@ -80,8 +80,8 @@ export function SignInButton({ beforeSignIn }: { beforeSignIn?: () => void }) {
 }
 
 /**
- * Conta na barra de ações do editor. Anônimo: Entrar e Criar conta (a recuperação de senha está na
- * tela do login gerenciado). Com sessão: o e-mail leva à conta e Sair encerra a sessão.
+ * Conta na barra de ações do editor. Anônimo: Entrar e, só com o cadastro aberto no provedor, Criar
+ * conta (a recuperação de senha está na tela do login gerenciado). Com sessão: o e-mail leva à conta e Sair encerra a sessão.
  */
 export function AuthActions({ beforeSignIn }: { beforeSignIn?: () => void }) {
   const { service, snapshot } = useAuth();
@@ -124,9 +124,11 @@ export function AuthActions({ beforeSignIn }: { beforeSignIn?: () => void }) {
       <Button aria-disabled={busy !== null} onClick={() => go('sign-in')}>
         {busy === 'sign-in' ? 'Abrindo…' : 'Entrar'}
       </Button>
-      <Button variant="tertiary" aria-disabled={busy !== null} onClick={() => go('sign-up')}>
-        {busy === 'sign-up' ? 'Abrindo…' : 'Criar conta'}
-      </Button>
+      {service.signUpAvailable && (
+        <Button variant="tertiary" aria-disabled={busy !== null} onClick={() => go('sign-up')}>
+          {busy === 'sign-up' ? 'Abrindo…' : 'Criar conta'}
+        </Button>
+      )}
       <span role="status" className={styles.hidden}>
         {busy !== null ? 'Abrindo o login…' : ''}
       </span>

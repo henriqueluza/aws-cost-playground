@@ -153,7 +153,7 @@ O hash do manifest protege contra deploy parcial e corrupção. Não protege con
 | API Gateway | Authorizer JWT em todas as rotas, nenhuma pública; emissor e audiência do pool do ambiente; limite de taxa; endpoint padrão desligado; domínio com TLS 1.2. |
 | DynamoDB | Cifrado com chave da AWS, PITR em produção, proteção contra exclusão e `prevent_destroy`. |
 | Lambda | Papel mínimo por função, sem segredo em variável de ambiente, sem URL de função, invocação só pelo API Gateway com `source_arn`. Ver INF-2. |
-| Cognito | Senha de 15 caracteres ou mais, só o fluxo `code`, sem segredo de cliente, URLs exatas em https, tokens de 15 min, revogação ligada, proteção contra exclusão. Cadastro aberto em produção é risco **aceito pelo autor** no ADR (#139). |
+| Cognito | Senha de 15 caracteres ou mais, só o fluxo `code`, sem segredo de cliente, URLs exatas em https, tokens de 15 min, revogação ligada, proteção contra exclusão. Cadastro aberto em produção era risco **aceito pelo autor** no ADR (#139); desde 26/11/2026 o cadastro está **fechado nos dois ambientes** (#383, ADR "Cadastro fechado"): os achados que dependem de usuário logado (#277, #284, #369 e o custo da LLM) só são alcançáveis por conta criada pelo autor, e reabrir exige antes a opção a da #277 e a opção b da #284. |
 | IAM do bootstrap | Sem caminho de escalada além do limite de permissões: papel novo só com o limite, sem troca de trust nem anexo de política gerenciada, `PassRole` só para os dois papéis das funções. Os limites conhecidos estão em `infra/bootstrap/README.md`. Decisões pendentes: ver "Decisões do autor". |
 
 ## As cinco conferências

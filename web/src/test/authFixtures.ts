@@ -18,11 +18,18 @@ export function fakeSession(overrides: Partial<Session> = {}): Session {
   };
 }
 
-/** Serviço de sessão falso, com o snapshot trocável (`set`) e as chamadas espiáveis. */
-export function fakeAuth(initial: AuthSnapshot = { status: 'anonymous' }) {
+/**
+ * Serviço de sessão falso, com o snapshot trocável (`set`) e as chamadas espiáveis. O cadastro
+ * começa fechado, como no `/config.json` sem `selfSignupEnabled`.
+ */
+export function fakeAuth(
+  initial: AuthSnapshot = { status: 'anonymous' },
+  { signUpAvailable = false }: { signUpAvailable?: boolean } = {},
+) {
   let snapshot = initial;
   const listeners = new Set<() => void>();
   const service = {
+    signUpAvailable,
     getSnapshot: () => snapshot,
     subscribe(listener: () => void) {
       listeners.add(listener);

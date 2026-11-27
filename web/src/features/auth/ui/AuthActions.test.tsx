@@ -8,6 +8,7 @@ import { AuthError } from '../model/authError';
 import { AuthActions, SignInButton } from './AuthActions';
 import { AuthProvider } from './AuthProvider';
 
+const OPEN = { signUpAvailable: true };
 const USER = { status: 'authenticated', user: { sub: 'u1', email: 'pessoa@example.com' } } as const;
 
 function mount(auth: ReturnType<typeof fakeAuth>, ui = <AuthActions />, path = '/?x=1') {
@@ -41,15 +42,26 @@ describe('AuthActions', () => {
     expect(auth.service.signIn).toHaveBeenCalledWith({ screen: 'sign-in', returnTo: '/?x=1' });
   });
 
-  it('Criar conta pede a tela de cadastro', async () => {
+  it('cadastro fechado: só Entrar, sem Criar conta nem link de cadastro', async () => {
     const auth = fakeAuth();
+    const { container } = mount(auth);
+    expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Criar conta' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(container.querySelector('a')).toBeNull();
+    expect(container).not.toHaveTextContent(/criar conta|cadastr/i);
+    await expectNoAxeViolations(container);
+  });
+
+  it('cadastro aberto: Criar conta pede a tela de cadastro', async () => {
+    const auth = fakeAuth(undefined, OPEN);
     mount(auth);
     await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
     expect(auth.service.signIn).toHaveBeenCalledWith({ screen: 'sign-up', returnTo: '/?x=1' });
   });
 
   it('mostra o progresso e ignora o segundo clique enquanto abre o login', async () => {
-    const auth = fakeAuth();
+    const auth = fakeAuth(undefined, OPEN);
     auth.service.signIn.mockReturnValue(new Promise(() => {}));
     mount(auth);
     await userEvent.click(screen.getByRole('button', { name: 'Entrar' }));
@@ -63,7 +75,7 @@ describe('AuthActions', () => {
   });
 
   it('falha ao abrir o login: diálogo com texto próprio e tentar de novo', async () => {
-    const auth = fakeAuth();
+    const auth = fakeAuth(undefined, OPEN);
     auth.service.signIn.mockRejectedValueOnce(new AuthError('network'));
     mount(auth);
     await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }));

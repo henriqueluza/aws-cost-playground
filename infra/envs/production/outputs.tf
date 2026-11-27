@@ -26,6 +26,8 @@ output "site_config" {
     apiBaseUrl       = "https://${module.dns.domain_names.api}"
     cognitoAuthority = module.auth.issuer
     cognitoClientId  = module.auth.client_id
+    # Mesma variável que fecha o cadastro no pool: o site só oferece "Criar conta" se o pool aceita.
+    selfSignupEnabled = var.self_signup_enabled
   }
 }
 

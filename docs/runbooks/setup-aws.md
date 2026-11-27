@@ -30,7 +30,7 @@ Cada passo cita o arquivo do repositório de onde saiu. Se o arquivo e este runb
 | 4. GitHub Environments, variáveis e segredo | #77 |
 | 5. Chave da Claude API no SSM | #75 (criar a chave) e #77 (gravar) |
 | 6. Primeiro deploy de staging | #77 |
-| 7. Contas de teste no Cognito | #77 |
+| 7. Contas de teste no Cognito e a sua conta em produção | #77 e #383 |
 | 8. Catálogo de preços | #77 |
 | Guardrails de custo | #78 |
 | Validação completa e produção | #80 (fora deste runbook) |
@@ -376,7 +376,7 @@ O smoke test não invoca nenhuma Lambda (`docs/infra.md`, "Limites conhecidos").
 
 ## 7. Contas de teste no Cognito de staging (#77)
 
-Em staging o cadastro é fechado (`self_signup_enabled = false` em `infra/envs/staging/terraform.tfvars`): só o administrador cria contas. O pool se chama `acp-stg-users` e o login é por e-mail (`infra/modules/auth/README.md`). O CI não cria usuários: o papel `apply` tem negação de `cognito-idp:Admin*`.
+O cadastro é fechado nos dois ambientes (`self_signup_enabled = false` em `infra/envs/<ambiente>/terraform.tfvars`; em produção desde a #383, decisão do autor de 26/11/2026): só o administrador cria contas, o site não mostra "Criar conta" e ninguém se cadastra pelo login gerenciado. Os passos abaixo são os de staging; a sua conta de produção está em "Sua conta em produção", logo depois. O pool se chama `acp-stg-users` e o login é por e-mail (`infra/modules/auth/README.md`). O CI não cria usuários: o papel `apply` tem negação de `cognito-idp:Admin*`.
 
 1. Descubra o id do pool.
 
@@ -405,6 +405,50 @@ Em staging o cadastro é fechado (`self_signup_enabled = false` em `infra/envs/s
 5. Crie pelo menos duas contas. A validação da #80 exclui uma delas pelo próprio produto.
 
 Use dados fictícios em staging (ADR, tabela de ambientes). Não anote e-mail nem senha de conta de teste em Issue, PR ou commit.
+
+### Sua conta em produção (#383)
+
+Faça depois do primeiro deploy de produção (#80). Os comandos rodam na sua sessão de administrador; o CI não cria usuários. Use o seu e-mail real só no terminal: ele não vai para Issue, PR, commit nem para este arquivo.
+
+1. Descubra o id do pool de produção.
+
+   ```bash
+   aws cognito-idp list-user-pools --max-results 20 --query "UserPools[?Name=='acp-prod-users'].Id" --output text
+   ```
+
+2. Confira que o cadastro está fechado.
+
+   ```bash
+   aws cognito-idp describe-user-pool --user-pool-id <USER_POOL_ID> --query "UserPool.AdminCreateUserConfig.AllowAdminCreateUserOnly" --output text
+   ```
+
+   Como conferir: `True`. O site (`https://<DOMINIO>`) mostra só "Entrar" na barra do editor, e `https://<DOMINIO>/config.json` traz `"selfSignupEnabled": false`.
+
+3. Crie a conta. O Cognito manda a senha temporária para o e-mail, válida por 3 dias, e gasta um dos 50 e-mails diários do remetente padrão.
+
+   ```bash
+   aws cognito-idp admin-create-user --user-pool-id <USER_POOL_ID> --username <SEU_EMAIL> --user-attributes Name=email,Value=<SEU_EMAIL> Name=email_verified,Value=true
+   ```
+
+   Pelo console, o mesmo: Cognito → User pools → `acp-prod-users` → Users → Create user, com convite por e-mail, o e-mail como nome de usuário, "Mark email address as verified" marcado e senha gerada.
+
+4. Entre em `https://<DOMINIO>` → "Entrar", com o e-mail e a senha temporária. O login gerenciado pede a senha definitiva (15 caracteres ou mais) antes de voltar ao site. Guarde-a num cofre de senhas.
+
+   Como conferir: o site volta autenticado, com o seu e-mail na barra, e o comando abaixo responde `CONFIRMED`.
+
+   ```bash
+   aws cognito-idp admin-get-user --user-pool-id <USER_POOL_ID> --username <SEU_EMAIL> --query UserStatus --output text
+   ```
+
+Vale saber:
+
+- **Senha temporária vencida** (3 dias sem o primeiro acesso): repita o comando do passo 3 acrescentando `--message-action RESEND`.
+- **"Esqueci a senha"** continua na tela do login gerenciado e funciona com o cadastro fechado, mas só para conta `CONFIRMED` com e-mail verificado. Antes do primeiro acesso (`FORCE_CHANGE_PASSWORD`), use o reenvio acima.
+- **Conta para outra pessoa** (um avaliador, por exemplo): os mesmos passos 3 e 4, com o e-mail dela. Cada conta volta a expor os riscos de usuário logado que o cadastro fechado tirou de alcance (ADR, "Cadastro fechado"); as quotas da LLM continuam valendo.
+
+### Reabrir o cadastro
+
+Não é só trocar a variável. Antes, precisam estar em `main` a opção a da #277 e a opção b da #284 (ADR, "Cadastro fechado"). Depois, por PR com revisão normal: `self_signup_enabled = true` em `infra/envs/production/terraform.tfvars`. O plano mostra uma atualização in-place do pool (`allow_admin_create_user_only: true → false`), sem substituição, e o deploy seguinte publica `"selfSignupEnabled": true` no `/config.json`: o site volta a mostrar "Criar conta" sem novo build.
 
 ## 8. Catálogo de preços (#77)
 

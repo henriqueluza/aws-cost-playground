@@ -223,7 +223,7 @@ O repositório traz a infra como código Terraform, escrito pelos agentes e revi
 | Ambiente | Domínios | Publica | Dados |
 |---|---|---|---|
 | `staging` | `staging.<domínio>`, `api.staging.<domínio>`, `auth.staging.<domínio>` | CI, após merge em `main` | fictícios; self-signup **desligado**, contas de teste criadas pelo autor |
-| `production` | `<domínio>`, `api.<domínio>`, `auth.<domínio>` | CI, só por `workflow_dispatch` humano | reais |
+| `production` | `<domínio>`, `api.<domínio>`, `auth.<domínio>` | CI, só por `workflow_dispatch` humano | reais; self-signup **desligado** até depois da apresentação (#383), conta criada pelo autor |
 
 - Mesmo código Terraform, `infra/envs/staging` e `infra/envs/production`, cada um com estado próprio em S3 com lock nativo. Nomes `acp-stg-*` e `acp-prod-*`.
 - **Mesmo artefato nos dois ambientes.** O zip das Lambdas e o bundle do site são construídos uma vez por commit e guardados por SHA. Por isso o site não recebe configuração em tempo de build: lê `/config.json` (URL da API, ids do Cognito) ao iniciar, e esse arquivo é o único que difere por ambiente.
@@ -288,7 +288,7 @@ Nos três a infra fica abaixo do teto de US$ 20. O que escala com uso é a LLM, 
 
 **Ativos:** a chave da Claude API; o dinheiro do autor (fatura AWS e créditos); e-mails dos usuários; designs salvos; a integridade dos arquivos de preço.
 
-**Superfícies:** cadastro aberto no Cognito; API autenticada; proxy da LLM; arquivo JSON aberto no navegador; pipeline de CI e de preços.
+**Superfícies:** login no Cognito, com o cadastro fechado nos dois ambientes desde 26/11/2026 (ver "Cadastro fechado" abaixo; o desenho original previa cadastro aberto em produção); API autenticada; proxy da LLM; arquivo JSON aberto no navegador; pipeline de CI e de preços.
 
 | # | Ameaça | Mitigação |
 |---|---|---|
@@ -304,8 +304,15 @@ Nos três a infra fica abaixo do teto de US$ 20. O que escala com uso é a LLM, 
 **Riscos aceitos pelo autor no Gate 1:**
 
 - Sem WAF (custo fixo). O cadastro aberto pode ser usado para disparar e-mails de verificação a terceiros; o limite diário de envio do remetente padrão do Cognito contém o volume.
-- Cadastro aberto em produção com o remetente padrão do Cognito (aceito pelo autor em 25/11/2026, #139). Dois efeitos conhecidos: a cota é de 50 e-mails por dia por conta AWS, não ajustável e dividida com o staging, e qualquer pessoa pode esgotá-la pelo `client_id` público, o que suspende verificação e recuperação de senha até as 09:00 UTC; e o `SignUp` revela se um e-mail já tem conta. Saídas, se o volume crescer: fechar o cadastro (uma linha em `infra/envs/production/terraform.tfvars`) ou adotar o SES, que cria custo e exige ADR novo.
+- Cadastro aberto em produção com o remetente padrão do Cognito (aceito pelo autor em 25/11/2026, #139). **Suspenso em 26/11/2026:** o cadastro está fechado (#383, "Cadastro fechado" abaixo) e este risco só volta se ele for reaberto. Dois efeitos conhecidos: a cota é de 50 e-mails por dia por conta AWS, não ajustável e dividida com o staging, e qualquer pessoa pode esgotá-la pelo `client_id` público, o que suspende verificação e recuperação de senha até as 09:00 UTC; e o `SignUp` revela se um e-mail já tem conta. Saídas, se o volume crescer: fechar o cadastro (uma linha em `infra/envs/production/terraform.tfvars`) ou adotar o SES, que cria custo e exige ADR novo.
 - Staging e produção na mesma conta AWS, separados por papéis e nomes, não por conta.
+
+**Cadastro fechado (decisão do autor de 26/11/2026, #383).** Até depois da apresentação de 08/12/2026, `self_signup_enabled = false` em staging e em produção: o pool sai com `allow_admin_create_user_only = true` e só o autor cria contas (`docs/runbooks/setup-aws.md`, passo 7). Substitui a decisão da #139 e contraria o discovery, que previa cadastro aberto para recrutadores.
+
+- **Uma fonte de verdade.** A mesma variável fecha o pool e sai no `/config.json` como `selfSignupEnabled`. O site valida o campo com zod, trata a ausência como fechado, não mostra "Criar conta" e nunca monta o caminho de cadastro do login gerenciado. A recuperação de senha continua na tela do login gerenciado.
+- **O que muda nos riscos.** T1: sem contas descartáveis, o abuso de custo da LLM e o custo de leitura e escrita dos designs (#277, #369) só são alcançáveis por uma conta criada pelo autor; as quotas, o limite de gasto e a ação do Budgets continuam valendo. T3: o isolamento por `sub` não muda, e deixa de haver um segundo usuário para testá-lo fora dos testes de API. A janela do token após a exclusão de conta (#284) deixa de ser alcançável por terceiros. Somem, enquanto fechado, o esgotamento da cota de e-mails pelo `SignUp` e a enumeração de e-mails no cadastro (#139); `ForgotPassword` segue público e ainda gasta a cota de 50 e-mails por dia, só para e-mails com conta.
+- **O que o fechamento não cobre.** Qualquer coisa que não dependa de sessão: o site estático, o editor anônimo e o próprio login gerenciado.
+- **Para reabrir.** Antes: a opção a da #277 (documento do design em item separado, com ADR novo) e a opção b da #284 (decisão 15 do autor). Depois: `self_signup_enabled = true` em `infra/envs/production/terraform.tfvars` por PR, com revisão normal; o risco da #139 volta a valer e o site passa a mostrar "Criar conta" no deploy seguinte.
 
 ## Alternativas consideradas
 

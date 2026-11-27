@@ -71,14 +71,21 @@ describe('routes', () => {
   });
 
   it.each([
-    ['anônimo', { status: 'anonymous' } as const, ['Entrar', 'Criar conta']],
+    ['anônimo com o cadastro fechado', { status: 'anonymous' } as const, false, ['Entrar']],
+    [
+      'anônimo com o cadastro aberto',
+      { status: 'anonymous' } as const,
+      true,
+      ['Entrar', 'Criar conta'],
+    ],
     [
       'com sessão',
       { status: 'authenticated', user: { sub: 'u1', email: null } } as const,
+      true,
       ['Sair'],
     ],
-  ])('a barra do editor, %s, tem os botões da conta', (_name, snapshot, names) => {
-    const auth = fakeAuth(snapshot);
+  ])('a barra do editor, %s, tem os botões da conta', (_name, snapshot, signUpAvailable, names) => {
+    const auth = fakeAuth(snapshot, { signUpAvailable });
     render(
       <QueryClientProvider client={new QueryClient()}>
         <ApiProvider api={api}>
@@ -89,6 +96,9 @@ describe('routes', () => {
       </QueryClientProvider>,
     );
     for (const name of names) expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    if (!names.includes('Criar conta')) {
+      expect(screen.queryByRole('button', { name: 'Criar conta' })).not.toBeInTheDocument();
+    }
     expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument();
   });
 
