@@ -9,7 +9,7 @@ import { ApiError, type Api, type ApiErrorKind } from '../../../shared/lib/api';
 export const newApi = (): Api =>
   createInMemoryApi({
     maxDesigns: 2,
-    maxDocBytes: 350_000,
+    maxDocBytes: 100_000,
     userDailyLimit: 5,
     globalDailyLimit: 5,
   });

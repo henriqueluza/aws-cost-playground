@@ -10,6 +10,8 @@ O que precisa existir antes de qualquer ambiente: os buckets de estado, o proved
 |---|---|---|
 | Bucket de estado de staging | `acp-stg-tfstate-<id da conta>` | Versionamento, SSE-S3, bloqueio de acesso público, TLS obrigatório, `prevent_destroy` |
 | Bucket de estado de produção | `acp-prod-tfstate-<id da conta>` | Idem |
+| Bucket de artefatos de staging | `acp-artifacts-stg-<id da conta>` | Zip das Lambdas em `functions/<sha>.zip`. Versionamento, SSE-S3, bloqueio de acesso público, TLS obrigatório, `prevent_destroy`. Sem regra de lifecycle (manual, abaixo) |
+| Bucket de artefatos de produção | `acp-artifacts-prod-<id da conta>` | Idem |
 | Provedor OIDC | `token.actions.githubusercontent.com` | Audiência `sts.amazonaws.com`; `prevent_destroy` |
 | Papel `plan` | `acp-ci-plan` | Somente leitura; usado pelo job `plan` do `terraform.yml` |
 | Papéis `apply` | `acp-ci-apply-staging` e `acp-ci-apply-production` | Um por ambiente, sessão de 1 hora, `prevent_destroy`. Gravam o próprio estado, escrevem nos recursos do ambiente (duas políticas gerenciadas, abaixo) e carregam as negações |
@@ -22,7 +24,7 @@ O que precisa existir antes de qualquer ambiente: os buckets de estado, o proved
 Os papéis `apply` ainda não completam um deploy. Falta:
 
 - a decisão do autor sobre as ações de escrita que não se delimitam por ambiente (#338): sem a entrega de log do HTTP API e sem o `cloudfront:UpdateDistribution` que o Cognito exige, o deploy deve parar no stage da API e no domínio do user pool;
-- o bucket de artefatos, com o `s3:GetObject` do pacote das funções (#209).
+- reaplicar o bootstrap com o bucket de artefatos (#209, seção "Bucket de artefatos") e cadastrar `TF_VAR_PACKAGE_BUCKET` nos Environments.
 
 O módulo `functions` declara o limite de permissões (#165); sem ele, a negação `DenyRoleWithoutBoundary` impede o apply de criar ou alterar os papéis das funções (falha fechada).
 
@@ -69,7 +71,7 @@ O job `plan` roda código do próprio PR, então o papel parte do princípio de 
 | Pergunta | Resposta |
 |---|---|
 | Quem assume | Só um job do GitHub Actions deste repositório que declare o GitHub Environment do papel e rode em `main`: `aud` igual a `sts.amazonaws.com`, `sub` igual a `repo:henriqueluza@60079862/aws-cost-playground@1463554125:environment:<env>` e `ref` igual a `refs/heads/main`, tudo por `StringEquals` |
-| O que pode | O estado do próprio ambiente (política inline `state`): `s3:ListBucket` no bucket, `GetObject` e `PutObject` em `acp-<stg\|prod>/terraform.tfstate`, e `GetObject`, `PutObject` e `DeleteObject` no `.tflock`. E, pela política gerenciada `acp-ci-apply-named-<env>`, criar, ler, atualizar e etiquetar os recursos com nome do ambiente (tabela abaixo). E, pela `acp-ci-apply-id-<env>`, os recursos com ARN por ID que levam a tag do ambiente e os registros DNS do ambiente (seção "Recursos com ARN por ID") |
+| O que pode | O estado do próprio ambiente (política inline `state`): `s3:ListBucket` no bucket, `GetObject` e `PutObject` em `acp-<stg\|prod>/terraform.tfstate`, e `GetObject`, `PutObject` e `DeleteObject` no `.tflock`. O pacote das funções (política inline `artifacts`): `s3:GetObject` e `s3:PutObject` em `functions/*` do bucket de artefatos do próprio ambiente. E, pela política gerenciada `acp-ci-apply-named-<env>`, criar, ler, atualizar e etiquetar os recursos com nome do ambiente (tabela abaixo). E, pela `acp-ci-apply-id-<env>`, os recursos com ARN por ID que levam a tag do ambiente e os registros DNS do ambiente (seção "Recursos com ARN por ID") |
 | O que não pode | O que as políticas inline `deny-guardrails` e `deny-data` negam, nas tabelas abaixo. Negação explícita vence qualquer `Allow` futuro |
 
 O `sub` de environment não carrega o branch, então o `ref` é fixado no IAM. Um job de `pull_request` não passa, porque o `ref` dele não é `refs/heads/main`.
@@ -205,7 +207,7 @@ Limites conhecidos:
 - `SiteObjects` não tem `s3:AbortMultipartUpload`: o `aws s3 cp` só usa envio em partes acima de 8 MB, tamanho que nenhum arquivo do site alcança hoje. Se um passar disso e o envio falhar no meio, as partes órfãs ficam para o autor limpar.
 - `dynamodb:CreateTable` e `UpdateTable` não têm chave de condição: o apply pode trocar a tabela para capacidade provisionada (custo), desligar o PITR e a proteção contra exclusão (`DeleteTable` segue negada). As outras camadas são as mesmas, mais os alertas do Budgets.
 - O nome do bucket do site é repetido aqui (`acp-<stg|prod>-site-aws-cost-playground`). Trocar o nome no root exige trocar aqui e reaplicar o bootstrap; o teste de paridade em `infra/tools/tests/` reprova a divergência.
-- A lista de ações não foi testada contra a AWS: o primeiro deploy depois da #77 pode pedir ajuste. O primeiro suspeito é `cloudwatch:DescribeAlarms`: o Service Reference diz que aceita o recurso `alarm`, mas a chamada pode ser autorizada contra `alarm:*`. Nesse caso o ajuste é trocar o `Resource` dessa ação para `arn:aws:cloudwatch:us-east-1:<conta>:alarm:*`. O outro bloqueio conhecido é o pacote das funções: `lambda:CreateFunction` e `UpdateFunctionCode` leem o zip com a permissão de quem chama, e o `s3:GetObject` do bucket de artefatos só entra com a #209.
+- A lista de ações não foi testada contra a AWS: o primeiro deploy depois da #77 pode pedir ajuste. O primeiro suspeito é `cloudwatch:DescribeAlarms`: o Service Reference diz que aceita o recurso `alarm`, mas a chamada pode ser autorizada contra `alarm:*`. Nesse caso o ajuste é trocar o `Resource` dessa ação para `arn:aws:cloudwatch:us-east-1:<conta>:alarm:*`. O pacote das funções: `lambda:CreateFunction` e `UpdateFunctionCode` leem o zip com a permissão de quem chama, o `s3:GetObject` da política inline `artifacts` (#209).
 - `#trivy:ignore:AVD-AWS-0057` na política gerenciada: os curingas são o prefixo `acp-<prefixo>-*` de tabela, log group, tópico e alarme, os objetos do bucket do site e o `*` de `logs:DescribeLogGroups`. Nenhuma ação tem curinga.
 - Para quem escreve módulos:
   - papéis só com política inline: sem `aws_iam_policy`, sem `aws_iam_role_policy_attachment` e sem `data "aws_iam_policy"`;
@@ -215,6 +217,26 @@ Limites conhecidos:
   - sem `aws_ssm_parameter`;
   - sem papel vinculado a serviço criado pelo apply (o do API Gateway nasce no bootstrap, #169);
   - trocar o trust de um papel existente é tarefa manual do autor.
+
+### Bucket de artefatos (política inline `artifacts`)
+
+O deploy grava o zip das Lambdas em `s3://acp-artifacts-<stg|prod>-<id da conta>/functions/<sha>.zip` antes do Terraform do ambiente, e o módulo `functions` aponta as funções para essa chave. Um bucket por ambiente (`artifacts.tf`): o papel de staging não troca o pacote que produção publica. O nome **não** casa com `acp-<prefixo>-*`, de propósito: nenhum `Allow` por prefixo do ambiente o alcança.
+
+| Sid | Efeito | Ações | Onde |
+|---|---|---|---|
+| `FunctionPackages` | `Allow` | `s3:GetObject`, `s3:PutObject` | `functions/*` do bucket de artefatos do próprio ambiente |
+| `DenyArtifactsBucketConfig` | `Deny` | Tudo que não for `s3:GetObject` e `s3:PutObject` | O bucket de artefatos do próprio ambiente e os objetos dele |
+| `DenyOtherEnvironmentArtifacts` | `Deny` | `s3:*` | O bucket de artefatos do outro ambiente e os objetos dele |
+
+Por que só essas duas ações: `aws s3api put-object --if-none-match` pede `s3:PutObject`; `head-object --checksum-mode ENABLED` pede `s3:GetObject`; e o Lambda lê o zip (`GetObject`) com a permissão de quem chama `CreateFunction` ou `UpdateFunctionCode`. O módulo não passa versão do objeto, então `s3:GetObjectVersion` fica fora. Sem `s3:ListBucket`, sem `DeleteObject` e sem envio em partes (`put-object` é um pedido só).
+
+Limites conhecidos:
+
+- `s3:PutObject` não é condicionada ao `If-None-Match`: o papel pode gravar de novo uma chave que já existe. O versionamento guarda a versão anterior, o deploy compara o checksum do objeto com o do artefato e confere o `CodeSha256` das funções (`docs/infra.md`). O papel não apaga objeto nem versão: tirar um zip errado é tarefa manual do autor.
+- Sem `s3:ListBucket`, um `head-object` numa chave que não existe devolve 403, e não 404. O deploy só o chama depois de a gravação condicional recusar a chave, quando o objeto existe.
+- **Lifecycle é manual.** O bootstrap não declara regra de expiração (o bucket de estado também não tem, lá de propósito). Sem ela, os zips e as versões antigas ficam para sempre: centavos por mês, mas crescem a cada deploy. O autor aplica a regra do guardrail 7 de `docs/runbooks/guardrails-de-custo.md` nos dois buckets depois de criá-los; como o Terraform não declara lifecycle aqui, reaplicar o bootstrap não a desfaz. O papel de CI não altera lifecycle (`DenyArtifactsBucketConfig`).
+- A lista não foi testada contra a AWS. A documentação do Lambda diz que o serviço faz `GetObject` no pacote e que o bucket tem de estar na mesma região da função; se o primeiro deploy pedir outra ação de S3, ele falha fechado e a política muda aqui.
+- Custo: armazenamento S3 de poucos zips de alguns MB, sem custo fixo.
 
 ## Limite de permissões
 
@@ -278,6 +300,8 @@ terraform apply bootstrap.tfplan
 
 Reaplicar depois de uma mudança neste diretório é o mesmo roteiro. Na reaplicação que traz a política `acp-ci-apply-named-<env>` (#167), o `plan` deve mostrar 4 criações (2 políticas e 2 anexos) e 2 atualizações no lugar (a política inline `deny-data` de cada papel), sem `delete` nem `replace`. Na que traz a política `acp-ci-apply-id-<env>` (#169), 5 criações (2 políticas, 2 anexos e o papel vinculado a serviço do API Gateway) e nenhuma atualização; se o papel vinculado já existir na conta, importe-o antes (abaixo) e o plano mostra 4. Aplique o bootstrap **antes** do primeiro apply de um ambiente que use o limite (#165): sem a política, a criação dos papéis das funções falha.
 
+Na reaplicação que traz o bucket de artefatos (#209), o `plan` deve mostrar 12 criações (por ambiente: o bucket, os quatro recursos de configuração dele e a política inline `artifacts`), nenhuma atualização, nenhum `delete` nem `replace`. Depois dela, cadastre de novo as variáveis dos Environments (abaixo), que passam a trazer `TF_VAR_PACKAGE_BUCKET`, e aplique o lifecycle manual nos dois buckets (guardrail 7).
+
 Se a conta já tiver um provedor OIDC do GitHub (só pode haver um por conta), importe-o antes do `apply`:
 
 ```bash
@@ -317,7 +341,9 @@ A saída `github_environment_variables` é um mapa de dois níveis: a chave exte
 | Environment | Variável | Valor |
 |---|---|---|
 | `staging` | `AWS_APPLY_ROLE_ARN` | ARN do papel `acp-ci-apply-staging` |
+| `staging` | `TF_VAR_PACKAGE_BUCKET` | Bucket de artefatos de staging (`acp-artifacts-stg-<id da conta>`) |
 | `production` | `AWS_APPLY_ROLE_ARN` | ARN do papel `acp-ci-apply-production` |
+| `production` | `TF_VAR_PACKAGE_BUCKET` | Bucket de artefatos de produção (`acp-artifacts-prod-<id da conta>`) |
 
 Pré-requisito: os Environments `staging` e `production` existem e estão restritos ao branch `main` antes de cadastrar a variável. Criar os Environments e a restrição faz parte da #77; sem o Environment, o `gh variable set --env` falha.
 
@@ -341,6 +367,8 @@ O bootstrap cria o bucket onde o estado dos ambientes mora, então o estado dele
 |---|---|
 | `aws_s3_bucket.state["staging"]` e os quatro recursos `aws_s3_bucket_*.state["staging"]` | `acp-stg-tfstate-<id da conta>` |
 | `aws_s3_bucket.state["production"]` e os quatro recursos `aws_s3_bucket_*.state["production"]` | `acp-prod-tfstate-<id da conta>` |
+| `aws_s3_bucket.artifacts["staging"]` e os quatro recursos `aws_s3_bucket_*.artifacts["staging"]` | `acp-artifacts-stg-<id da conta>` |
+| `aws_s3_bucket.artifacts["production"]` e os quatro recursos `aws_s3_bucket_*.artifacts["production"]` | `acp-artifacts-prod-<id da conta>` |
 | `aws_iam_openid_connect_provider.github` | ARN do provedor |
 | `aws_iam_role.plan` | `acp-ci-plan` |
 | `aws_iam_role_policy_attachment.plan_read_only` | `acp-ci-plan/arn:aws:iam::aws:policy/ReadOnlyAccess` |
@@ -351,6 +379,7 @@ O bootstrap cria o bucket onde o estado dos ambientes mora, então o estado dele
 | `aws_iam_role_policy.apply_state["<env>"]` | `acp-ci-apply-<env>:state` |
 | `aws_iam_role_policy.apply_deny["<env>"]` | `acp-ci-apply-<env>:deny-guardrails` |
 | `aws_iam_role_policy.apply_deny_data["<env>"]` | `acp-ci-apply-<env>:deny-data` |
+| `aws_iam_role_policy.apply_artifacts["<env>"]` | `acp-ci-apply-<env>:artifacts` |
 | `aws_iam_policy.apply_boundary["<env>"]` | `arn:aws:iam::<id da conta>:policy/acp-ci-boundary-<env>` |
 | `aws_iam_policy.apply_named["<env>"]` | `arn:aws:iam::<id da conta>:policy/acp-ci-apply-named-<env>` |
 | `aws_iam_role_policy_attachment.apply_named["<env>"]` | `acp-ci-apply-<env>/arn:aws:iam::<id da conta>:policy/acp-ci-apply-named-<env>` |
@@ -367,5 +396,7 @@ terraform -chdir=infra/bootstrap test
 ```
 
 Os testes (`tests/bootstrap.tftest.hcl`, `tests/apply.tftest.hcl`, `tests/boundary.tftest.hcl`, `tests/named.tftest.hcl`, `tests/by_id.tftest.hcl` e `tests/prices.tftest.hcl`) usam provider simulado, com `zone_name = "example.com"`. O CI roda `fmt`, `validate`, `terraform test`, `tflint` e `trivy config` neste diretório (`infra/tools/tf_checks.sh`). O `terraform test` não enxerga `lifecycle` nem recurso que não foi declarado: o `prevent_destroy` dos buckets e do provedor OIDC é conferido por leitura. Para os papéis `apply`, o limite e a política de escrita, isso fica com `infra/tools/tests/test_bootstrap_apply_roles.py`, que o CI roda com os testes do `plan-guard`: ele confere o `prevent_destroy` dos três (papéis, limite e política de escrita) e do papel `prices`, a paridade do nome do bucket do site entre `infra/envs/*/main.tf` e `named.tf`, e compara os recursos de IAM do diretório com um inventário fechado. Política inline, política gerenciada, anexo ou papel novo reprova até entrar no inventário de propósito. O conteúdo das políticas dos papéis `apply` é travado por igualdade em `tests/apply.tftest.hcl`, o do limite e da negação de dado em `tests/boundary.tftest.hcl`, e o da política de escrita em `tests/named.tftest.hcl`: igualdade da lista, o teto de 6.144 caracteres, escopo por ambiente (com sondas do outro ambiente), bucket de estado fora, `PassRole` e `AddPermission` com condição, e nenhuma ação de dado, de exclusão ou já negada. `tests/by_id.tftest.hcl` faz o mesmo para a política por ID: igualdade da lista, os tetos por política e por papel (6.144 caracteres por gerenciada, 10.240 de inline, duas gerenciadas anexadas das 10 possíveis), a tag do próprio ambiente em toda escrita, nomes de registro DNS de um ambiente recusados pelo outro (sondas), nomes de certificado de um ambiente recusados pelo outro, nenhuma ação de usuário do Cognito, e o domínio inválido recusado. O teste Python também confere que toda ação das duas políticas de escrita está na tabela deste README, pelo nome `serviço:Ação`, e que todo recurso de IAM tem linha na tabela de import. É assim que o critério "sem `AdministratorAccess`" e o "único `Allow`" são verificados.
+
+`tests/artifacts.tftest.hcl` cobre os buckets de artefatos (#209): nome fora de `acp-<prefixo>-*`, versionamento, SSE-S3, bloqueio público e TLS; a política inline `artifacts` por igualdade; e sondas que provam que nenhum `Allow` do papel (inline ou gerenciado) alcança o bucket de artefatos do outro ambiente nem o próprio fora de `functions/*`. O `prevent_destroy` dos buckets de estado e de artefatos é conferido pelo teste Python.
 
 `.terraform.lock.hcl` é versionado, com os hashes `h1:` de linux_amd64, linux_arm64 e darwin_arm64.

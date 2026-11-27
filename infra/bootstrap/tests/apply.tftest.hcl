@@ -173,16 +173,16 @@ run "saidas_e_limites_da_aws" {
 
   assert {
     condition = output.github_environment_variables == {
-      staging    = { AWS_APPLY_ROLE_ARN = aws_iam_role.apply["staging"].arn }
-      production = { AWS_APPLY_ROLE_ARN = aws_iam_role.apply["production"].arn }
+      staging    = { AWS_APPLY_ROLE_ARN = aws_iam_role.apply["staging"].arn, TF_VAR_PACKAGE_BUCKET = "acp-artifacts-stg-123456789012" }
+      production = { AWS_APPLY_ROLE_ARN = aws_iam_role.apply["production"].arn, TF_VAR_PACKAGE_BUCKET = "acp-artifacts-prod-123456789012" }
     }
-    error_message = "Cada environment do GitHub recebe só o ARN do seu próprio papel apply."
+    error_message = "Cada environment do GitHub recebe só o ARN do seu próprio papel apply e o seu próprio bucket de artefatos."
   }
 
   assert {
     condition = alltrue([
       for env in ["staging", "production"] :
-      length(aws_iam_role_policy.apply_state[env].policy) + length(aws_iam_role_policy.apply_deny[env].policy) + length(aws_iam_role_policy.apply_deny_data[env].policy) <= 10240
+      length(aws_iam_role_policy.apply_state[env].policy) + length(aws_iam_role_policy.apply_deny[env].policy) + length(aws_iam_role_policy.apply_deny_data[env].policy) + length(aws_iam_role_policy.apply_artifacts[env].policy) <= 10240
     ])
     error_message = "A soma das políticas inline de um papel não pode passar de 10240 caracteres, o limite da AWS."
   }

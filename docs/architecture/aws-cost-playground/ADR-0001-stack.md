@@ -153,14 +153,37 @@ Dentro de cada feature do `web/`: `ui/` → `hooks/` → `application/` → `mod
 - `<sub>` vem do JWT. Nunca do path nem do corpo.
 - `version` implementa trava otimista: a atualização é um `UpdateItem` com `ConditionExpression attribute_exists(PK) AND version = :esperada`, sem ler antes (um `PutItem` regravaria o item inteiro e obrigaria a ler `createdAt` e o `doc` ao renomear). Duas abas abertas não se sobrescrevem em silêncio: a versão desatualizada é 409 e nada é gravado (#54).
 - Listagem: `Query` em `PK` com `begins_with(SK, "DESIGN#")`, projetando tudo menos `doc`.
-- Limites validados na API: 50 designs por usuário, `doc` até 350 KB, 100 blocos por design.
-- O ponteiro para S3 previsto no discovery fica fora do MVP: um design de 20 blocos tem poucos KB. Acima de 350 KB a API responde 413. O ponteiro vira Issue quando alguém bater no limite.
+- Limites validados na API: 10 designs por usuário, `doc` até 100 KB (100.000 bytes), 100 blocos por design. Eram 50 e 350 KB até a decisão da #277 (ver "Custo da listagem de designs").
+- O ponteiro para S3 previsto no discovery fica fora do MVP: um design de 20 blocos tem 8 KB. Acima de 100 KB a API responde 413. O ponteiro vira Issue quando alguém bater no limite.
 - Consistência forte só na quota. Os dois contadores sobem numa `TransactWriteItems` com `ADD count :1` e `ConditionExpression count < :limite` em cada item: ou os dois incrementam, ou a chamada é recusada com 429. Sem leitura antes da escrita. A condição implementada é `attribute_not_exists(count) OR count < :limite` (o item nasce no primeiro `Update` do dia) e o `ttl` entra por `if_not_exists`.
 - `ttl` de 35 dias nos itens de quota, para sobrar histórico do gatilho de revisão (100 estimativas/mês por não-autor).
 - Exclusão de conta: apaga a partição `USER#<sub>` inteira e depois o usuário no Cognito.
   - Apaga: todos os itens de `USER#<sub>` (designs e contadores de quota) e o usuário no Cognito (e-mail e refresh tokens).
   - Não apaga: a quota global (`PK = GLOBAL`); backups de PITR (só produção, 35 dias pelo padrão do DynamoDB, depois somem sozinhos; o dado apagado continua recuperável nessa janela); logs do CloudWatch até a retenção de 7 dias (o log da aplicação não tem e-mail; o evento de exclusão não leva `sub`, mas os eventos de quota e de estimativa do `llm-proxy` levam o `sub`, pseudônimo; o log de acesso do API Gateway registra o `sub`, pseudônimo, em toda requisição, inclusive nesta); o que já foi enviado à Anthropic.
   - Janela do token: o access token vale até 15 min após a exclusão e uma escrita nesse intervalo recria itens de `USER#<sub>`. Sem revogação; mitigação no cliente (descartar os tokens após o 204). Decisão pendente do autor (#284).
+
+### Custo da listagem de designs (decisão da #277)
+
+O `doc` fica no mesmo item dos metadados, e o DynamoDB cobra o item inteiro mesmo quando a `Query` projeta só o resumo ou usa `Select=COUNT`. Cada `GET /designs` e cada contagem do limite (duas por `POST /designs` e por duplicate) leem a partição inteira do usuário.
+
+**Decisão do autor (26/11/2026): opções b + c agora; opção a depois do prazo.**
+
+- **c (feita na #386):** 10 designs por usuário e `doc` de até 100.000 bytes.
+- **b (manual do autor):** limite de taxa em `GET /designs` e `POST /designs` no API Gateway. É configuração de custo, feita à mão.
+- **a (depois do prazo):** separar o `doc` do resumo em outro item, com ADR novo. **É pré-requisito para reabrir o cadastro**, que fica fechado até depois da apresentação (#383).
+
+Pior caso de uma listagem, com leitura consistente (1 unidade de leitura a cada 4 KB):
+
+| | Partição cheia | Conta | Unidades de leitura por listagem | Páginas de 1 MB |
+|---|---|---|---|---|
+| Antes | 50 designs × 350.000 bytes = 17,5 MB | 17.500.000 ÷ 4.000 | ≈ 4.400 | 18 |
+| Depois | 10 designs × 100.000 bytes = 1 MB | 1.000.000 ÷ 4.000 | ≈ 250 | 1 |
+
+Com 4 KB = 4.096 bytes, e arredondando para cima como o DynamoDB faz, são 4.273 e 245; a ordem de grandeza é a mesma. A redução é de cerca de 17 vezes. Na escrita, o `PATCH` num item no teto cai de cerca de 342 para cerca de 98 unidades de escrita (1 a cada 1 KB).
+
+Por que c não basta sozinha, nem b: com a partição cheia, 1 requisição por segundo sustentada ainda lê 250 × 86.400 ≈ 21,6 milhões de unidades por dia (eram cerca de 380 milhões). Ao preço on-demand de us-east-1 usado na #277 (US$ 0,125 por milhão; conferir o preço atual), são cerca de US$ 2,70 por dia, contra cerca de US$ 47 antes. A ação do Budgets só desliga o proxy da LLM, não as rotas de designs. O que torna b + c suficiente agora é o cadastro fechado: o único usuário logado é o autor.
+
+O teto de 100 KB foi medido antes de ser fixado (`api/tests/test_design_limits.py`, na medida da API: bytes UTF-8 do JSON compacto): o template de 20 blocos tem 7.987 bytes e, com descrição de 2.000 caracteres e rótulos de 80 no pior caso de UTF-8, 21.259 bytes. Cabe 12 vezes como está e 4,7 vezes no pior caso.
 
 ### Fluxo da estimativa de carga
 
@@ -257,7 +280,7 @@ Divisão combinada no Gate 1: a aplicação se protege sozinha de consumo sem li
 | Guardrail | Como |
 |---|---|
 | Quotas | 20/dia por usuário e 300/dia global, atômicas no DynamoDB |
-| Tamanho da entrada | Descrição até 2.000 caracteres, até 100 blocos, `doc` até 350 KB, 50 designs por usuário |
+| Tamanho da entrada | Descrição até 2.000 caracteres, até 100 blocos, `doc` até 100 KB, 10 designs por usuário |
 | Chamada à LLM | `max_tokens` fixo; timeout de 29 s no proxy e 10 s na API |
 | Interruptor | Variável `LLM_ENABLED`: com `false`, o proxy responde 503 sem chamar a Claude API |
 
