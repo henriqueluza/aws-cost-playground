@@ -82,7 +82,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          bash pr-head/scripts/review-context.sh "$PR_NUMBER" review-context pr-head
+          bash scripts/review-context.sh "$PR_NUMBER" review-context pr-head
           (cd pr-head && python3 ../scripts/pr-size.py "origin/$BASE_REF") > review-context/pr-size.txt 2>&1 || true
 
       - name: Revisar com a skill review-pr

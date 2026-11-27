@@ -231,7 +231,7 @@ class VerdictScript(ScriptCase):
         for pr in ["", "0", "12;id", "../1", "1 2"]:
             self.assertEqual(self.publish("approved", pr=pr).returncode, 2)
         self.assertEqual(self.publish("approved", body=" \n ").returncode, 2)
-        for secret in ["sk-ant-" + "a1B2" * 6, "ghs_" + "a1B2" * 9]:
+        for secret in ["sk-ant-" + "a1B2" * 6, "ghs_" + "a1B2" * 9, "AKIA" + "A1B2" * 4]:
             self.assertEqual(self.publish("approved", body=f"token: {secret}").returncode, 2)
         self.assertEqual(self.calls(), [])
 
@@ -345,6 +345,9 @@ class ContextScript(ScriptCase):
         out = self.collect()
         self.assertEqual(json.loads((out / "checks.json").read_text()), [done])
         self.assertEqual(sum(1 for call in self.calls() if call["args"][:2] == ["pr", "checks"]), 3)
+        self.fixtures["checks"] = [[own]]
+        proc = self.run_script(CONTEXT, "12", str(out), REVIEW_WAIT_SECONDS="0", REVIEW_SETTLE_SECONDS="0")
+        self.assertEqual(proc.returncode, 1, "sem check lido não há revisão")
 
     def test_recusa_numero_de_pr_e_repositorio_invalidos(self) -> None:
         for args, repo in [(("12;id", "out"), "dono/repo"), (("12", "out"), "dono/repo/../x"), (("12",), "dono/repo")]:

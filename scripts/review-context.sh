@@ -87,6 +87,8 @@ while :; do
   sleep "$poll_seconds"
 done
 rm -f "$out/checks.raw"
+# Sem nenhum check lido, o revisor tomaria a ausência por CI verde: falha em vez de seguir.
+[ "$total" -gt 0 ] || { echo "nenhum check do PR foi lido: peça nova revisão" >&2; exit 1; }
 
 echo "contexto em $out: $(wc -l <"$out/files.txt" | tr -d ' ') arquivo(s) no diff," \
   "$(jq 'length' "$out/comments.json") comentário(s) de rodada anterior, $total check(s), $pending pendente(s)"

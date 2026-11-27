@@ -47,7 +47,7 @@ esac
 remove+=("re-review")
 
 [ -n "${body//[[:space:]]/}" ] || { echo "comentário vazio: nada foi publicado" >&2; exit 2; }
-if grep -Eq 'sk-ant-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}' <<<"$body"; then
+if grep -Eq 'sk-ant-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY' <<<"$body"; then
   echo "o comentário tem forma de credencial: nada foi publicado" >&2
   exit 2
 fi
