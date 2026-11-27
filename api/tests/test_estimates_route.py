@@ -150,11 +150,80 @@ def test_texto_devolvido_pela_llm_nao_chega_a_resposta(harness: Harness) -> None
     assert SENTINEL not in json.dumps(body)
 
 
-def test_diagrama_sem_nada_a_estimar_consome_quota_e_nao_chama_a_llm(harness: Harness) -> None:
-    status, _, body = harness.post(BODY | {"blocks": [], "edges": []})
-    assert (status, body["blocks"], body["edges"]) == (200, [], [])
-    assert harness.calls == ["prepare", f"consume:{SUB}", "estimate"]
-    assert (harness.paid_calls(), body["quota"]["remaining"]) == (0, 19)
+ACCESS_DENIED = ClientError(
+    {"Error": {"Code": "AccessDeniedException", "Message": "texto da AWS"}}, "TransactWriteItems"
+)
+NOTHING = [
+    BODY | {"blocks": [], "edges": []},
+    # Tipo fora do contrato: o bloco não vai para a LLM e a aresta dele fica sem chaves.
+    BODY | {"blocks": [LAMBDA | {"type": "aws.fora-do-contrato"}], "edges": []},
+]
+
+
+@pytest.mark.parametrize("body", NOTHING, ids=["vazio", "tipo-desconhecido"])
+def test_diagrama_sem_nada_a_estimar_nao_gasta_quota_nem_chama_a_llm(
+    harness: Harness,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    body: dict[str, Any],
+) -> None:
+    configure_logging("INFO")
+    table = FakeTable()
+    monkeypatch.setattr(quotas, "get_table", lambda: table)
+    quotas.consume(SUB)  # uma estimativa de verdade antes: a resposta traz a quota atual
+    harness.calls.clear()
+    read = service.read
+    monkeypatch.setattr(
+        service, "read", lambda sub: harness.calls.append(f"read:{sub}") or read(sub)
+    )
+
+    status, _, answer = harness.post(body)
+    assert status == 200
+    assert_client_schema(answer)
+    assert [block["id"] for block in answer["blocks"]] == [block["id"] for block in body["blocks"]]
+    assert all(item["source"] == "default" for item in answer["blocks"])
+    # `consume` não aparece: a quota é lida, não consumida, e nenhuma chamada paga acontece.
+    assert harness.calls == ["prepare", f"read:{SUB}", "estimate"]
+    assert (harness.paid_calls(), harness.fakes.ssm_reads) == (0, 0)
+    assert len(table.transactions) == 1  # só o consumo de antes: nenhuma escrita desta chamada
+    limit = answer["quota"]["limit"]
+    assert (answer["quota"]["remaining"], remaining()) == (limit - 1, limit - 1)
+    (event,) = events(capsys)
+    assert (event["message"], event["level"], event["result"]) == (
+        "estimate completed",
+        "INFO",
+        "ok",
+    )
+    assert (event["input_tokens"], event["output_tokens"]) == (0, 0)
+
+
+def test_sem_nada_a_estimar_responde_mesmo_com_a_quota_esgotada(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("QUOTA_USER_DAILY_LIMIT", "1")
+    get_settings.cache_clear()
+    quotas.consume(SUB)
+    status, _, answer = harness.post(NOTHING[0])
+    assert (status, answer["quota"]["remaining"]) == (200, 0)
+    assert harness.calls == ["prepare", "estimate"]
+    assert harness.post()[0] == 429  # com algo a estimar, a quota esgotada segue recusando
+
+
+def test_sem_nada_a_estimar_e_quota_ilegivel_responde_503(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Falha fechada também na leitura: sem a quota, não há resposta, e nada é consumido."""
+    table = FakeTable(get=ACCESS_DENIED)
+    monkeypatch.setattr(quotas, "get_table", lambda: table)
+    status, _, problem = harness.post(NOTHING[0])
+    assert (status, "detail" in problem) == (503, False)
+    assert (harness.calls, table.transactions, harness.paid_calls()) == (["prepare"], [], 0)
+
+
+def test_interruptor_desligado_vem_antes_de_nada_a_estimar(harness: Harness) -> None:
+    harness.use(Fakes(), enabled=False)
+    assert harness.post(NOTHING[0])[0] == 503
+    assert harness.calls == ["prepare"]
 
 
 def test_identidade_vem_so_do_sub_do_jwt(harness: Harness) -> None:
@@ -259,11 +328,6 @@ def test_quota_esgotada_responde_429_e_a_llm_nao_e_chamada(
     assert (harness.paid_calls(), harness.fakes.ssm_reads) == (0, 0)
 
 
-ACCESS_DENIED = ClientError(
-    {"Error": {"Code": "AccessDeniedException", "Message": "texto da AWS"}}, "TransactWriteItems"
-)
-
-
 @pytest.mark.parametrize(
     "fake",
     [
@@ -358,7 +422,11 @@ def test_falha_da_llm_depois_do_consumo_e_logada_e_a_quota_nao_volta(
     assert harness.paid_calls() <= 1  # nenhuma nova tentativa na rota
     # A quota fica consumida: uma única escrita (o incremento) e nenhum decremento depois.
     assert len(table.transactions) == 1
-    assert (table.count(f"USER#{SUB}"), table.count("GLOBAL")) == (1, 1)
+    # Pela partição, em qualquer dia: a rota usa o relógio real, e `count()` só olha o dia fixo.
+    assert {pk: item["count"] for (pk, _), item in table.items.items()} == {
+        f"USER#{SUB}": 1,
+        "GLOBAL": 1,
+    }
     (event,) = events(capsys)
     assert (event["message"], event["level"]) == ("estimate failed after quota consumed", "ERROR")
     assert (event["result"], event["input_tokens"], event["output_tokens"]) == (code, *tokens)
@@ -379,10 +447,10 @@ def test_erro_inesperado_depois_do_consumo_responde_500_e_fica_no_log(
 
 
 def test_o_codigo_da_rota_nao_tem_devolucao_de_quota_nem_nova_tentativa() -> None:
-    """A rota só conhece `consume`: não importa nada que escreva na quota além dele."""
+    """A rota só conhece `consume` e `read` (que só lê): nada mais que escreva na quota."""
     names = set(vars(service))
-    assert "consume" in names
-    assert not names & {"read", "repository", "refund", "release", "restore", "get_table", "boto3"}
+    assert {"consume", "read"} <= names
+    assert not names & {"repository", "refund", "release", "restore", "get_table", "boto3"}
 
 
 # --- log sem conteúdo -------------------------------------------------------------------------

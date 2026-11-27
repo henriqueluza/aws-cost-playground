@@ -205,6 +205,15 @@ export function createInMemoryApi(options: InMemoryApiOptions): Api {
         const request = parse(estimateRequestSchema, input);
         if (!llmEnabled) fail('unavailable');
         const resetsAt = openQuotaWindow();
+        // Como na API: sem nada a estimar a LLM não é chamada e a quota não é gasta, só lida.
+        if (request.blocks.length === 0) {
+          const response = estimateResponseSchema.safeParse({
+            ...estimate(request),
+            quota: userQuota(resetsAt),
+          });
+          if (!response.success) fail('invalid-response');
+          return response.data;
+        }
         if (usage.user >= userDailyLimit) exhausted('user', resetsAt);
         if (usage.global >= globalDailyLimit) exhausted('global', resetsAt);
         const quota = { ...userQuota(resetsAt), remaining: userDailyLimit - usage.user - 1 };

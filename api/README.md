@@ -111,7 +111,7 @@ Nenhum texto livre da LLM chega ao resultado: ele só tem ids do diagrama, chave
 `get_claude_client()` devolve o `ClaudeClient` do processo, configurado por `LLM_ENABLED`, `LLM_MODEL` e `ANTHROPIC_API_KEY_PARAMETER`. O uso tem dois passos:
 
 1. `prepare(body)` roda antes de consumir quota: confere o interruptor e o tamanho e devolve um `EstimatePlan`. Não lê a chave nem usa a rede.
-2. `estimate(plan)` roda depois da quota: faz uma chamada à API e devolve um `UsageEstimate` (`blocks` e `edges` revalidados, mais `input_tokens` e `output_tokens`). Plano sem nada a estimar (só padrões) volta sem chamada e sem custo.
+2. `estimate(plan)` roda depois da quota: faz uma chamada à API e devolve um `UsageEstimate` (`blocks` e `edges` revalidados, mais `input_tokens` e `output_tokens`). Plano sem nada a estimar (só padrões) volta sem chamada e sem custo, e a rota não consome quota para ele.
 
 Toda falha é um `EstimateError` com `code` e mensagem fixos; os tokens vêm preenchidos quando a chamada foi paga.
 
@@ -135,9 +135,10 @@ Toda falha é um `EstimateError` com `code` e mensagem fixos; os tokens vêm pre
 
 ### Rota de estimativa
 
-`POST /estimates` (`estimates/service.py`, `estimate_usage`) é onde o teto de gasto com a LLM é aplicado. Ordem: 401 → 413 (corpo) → 422 (`ProtectedRoute` e Pydantic) → `prepare` (interruptor e tamanho, sem rede) → `consume` (quota) → `estimate` (uma chamada, sem nova tentativa).
+`POST /estimates` (`estimates/service.py`, `estimate_usage`) é onde o teto de gasto com a LLM é aplicado. Ordem: 401 → 413 (corpo) → 422 (`ProtectedRoute` e Pydantic) → `prepare` (interruptor e tamanho, sem rede) → `consume` (quota) → `estimate` (uma chamada, sem nova tentativa). Sem nada a estimar, o `consume` é trocado por uma leitura da quota e não há chamada.
 
 - Entrada inválida e interruptor desligado não consomem quota.
+- Diagrama sem nada a estimar (sem blocos, ou só com itens sem chave de uso no contrato) também não: a decisão sai do plano (`EstimatePlan.nothing_to_estimate`) antes do `consume`. A resposta é 200 com os padrões e a quota atual, lida sem consumir (`read`); a LLM não é chamada. Se a leitura da quota falhar, 503.
 - Quota recusada ou indisponível nunca chama a LLM.
 - Falha da LLM depois do consumo NÃO devolve a quota: devolver abriria repetição gratuita, bastaria provocar a falha.
 

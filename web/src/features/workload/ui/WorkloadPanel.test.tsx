@@ -228,7 +228,8 @@ describe('WorkloadPanel: quota zerada e resposta vazia', () => {
 });
 
 describe('WorkloadPanel: erros', () => {
-  const reset = '2026-11-27T00:00:00.000Z';
+  // Sempre no futuro: com uma data fixa de 2026, a trava soltava sozinha depois desse dia.
+  const reset = '2999-01-01T00:00:00.000Z';
   it.each([
     [
       { kind: 'quota-exhausted', scope: 'user', resetsAt: reset } as const,
